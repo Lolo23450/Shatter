@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Shatter</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="vignette"></div>
+
+    <div id="main-menu">
+        <h1>SHATTER</h1>
+        <p class="subtitle">A Physics Puzzle Experience</p>
+        <button id="btn-play" class="menu-btn">PLAY</button>
+    </div>
+
+    <div id="ui"><div id="crosshair"></div></div>
+
+    <!-- ADD THIS WHOLE HUD BLOCK -->
+    <div id="editor-hud" style="display: none; position: absolute; top: 20px; left: 20px; color: white; z-index: 10; font-weight: bold; letter-spacing: 2px; text-shadow: 0 0 5px black; pointer-events: none;">
+        <div style="font-size: 24px; margin-bottom: 10px; color: #44ffaa;">EDITOR MODE</div>
+        <div style="font-size: 14px; color: #aaa; margin-bottom: 20px;">
+            LEFT CLICK: Place &nbsp; | &nbsp; RIGHT CLICK: Remove<br>
+            [TAB]: Tool Selector &nbsp; | &nbsp; [P]: PLAY &nbsp; | &nbsp; [K]: SAVE LEVEL
+        </div>
+        <div id="editor-tool-display" style="font-size: 18px; color: #fff;">TOOL: WALL</div>
+    </div>
+
+    <!-- EDITOR HOTBAR -->
+    <div id="editor-hotbar">
+        <!-- populated by JS -->
+    </div>
+
+    <!-- TAB TOOL SELECTOR HUD -->
+    <div id="tool-selector-hud">
+        <div id="tool-selector-title">Select Tool</div>
+        <div id="tool-selector-grid">
+            <!-- populated by JS -->
+        </div>
+
+        <!-- ── TOOL PARAMS PANEL ── -->
+        <div id="tool-params-panel">
+            <div class="tp-header">
+                <div class="tp-tool-dot" id="tp-dot"></div>
+                <div class="tp-title" id="tp-title">PARAMETERS</div>
+            </div>
+
+            <!-- RED: Start Scale -->
+            <div id="tp-section-red" class="tp-section">
+                <div class="tp-row">
+                    <span class="tp-label">Start Size</span>
+                    <input type="range" id="tp-red-scale" min="0.3" max="3.5" step="0.1" value="1.0" style="accent-color:#ff3344; cursor:pointer;">
+                    <span class="tp-val" id="tp-red-scale-val">1.0</span>
+                </div>
+            </div>
+
+            <!-- LIGHT: Color + Intensity + Radius -->
+            <div id="tp-section-light" class="tp-section">
+                <div class="lp-row">
+                    <span class="tp-label">Color</span>
+                    <div class="light-presets" id="light-presets"><!-- JS --></div>
+                    <input type="color" id="tp-light-color-pick" value="#ffffff" title="Custom color">
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Intensity</span>
+                    <input type="range" id="tp-light-intensity" min="0.1" max="12" step="0.1" value="3.0" style="accent-color:#ffee44; cursor:pointer;">
+                    <span class="tp-val" id="tp-light-intensity-val">3.0</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Radius</span>
+                    <input type="range" id="tp-light-radius" min="1" max="30" step="0.5" value="8.0" style="accent-color:#ffee44; cursor:pointer;">
+                    <span class="tp-val" id="tp-light-radius-val">8.0</span>
+                </div>
+            </div>
+
+            <!-- PLATE: Channel Configuration -->
+            <div id="tp-section-plate" class="tp-section">
+                <div class="tp-row">
+                    <span class="tp-label">Link Ch</span>
+                    <input type="range" id="tp-plate-ch" min="1" max="9" step="1" value="1" style="accent-color:#c27a3e; cursor:pointer;">
+                    <span class="tp-val" id="tp-plate-ch-val">1</span>
+                </div>
+            </div>
+
+            <!-- DOOR: Channel + Orientation + Dimensions -->
+            <div id="tp-section-door" class="tp-section">
+                <div class="tp-row">
+                    <span class="tp-label">Link Ch</span>
+                    <input type="range" id="tp-door-ch" min="1" max="9" step="1" value="1" style="accent-color:#66ccff; cursor:pointer;">
+                    <span class="tp-val" id="tp-door-ch-val">1</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Width</span>
+                    <input type="range" id="tp-door-w" min="1" max="10" step="0.5" value="3" style="accent-color:#66ccff; cursor:pointer;">
+                    <span class="tp-val" id="tp-door-w-val">3.0</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Height</span>
+                    <input type="range" id="tp-door-h" min="1" max="10" step="0.5" value="3" style="accent-color:#66ccff; cursor:pointer;">
+                    <span class="tp-val" id="tp-door-h-val">3.0</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Travel</span>
+                    <input type="range" id="tp-door-dist" min="1" max="15" step="0.5" value="2.8" style="accent-color:#66ccff; cursor:pointer;">
+                    <span class="tp-val" id="tp-door-dist-val">2.8</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Direction</span>
+                    <div class="toggle-row" id="toggle-door-dir">
+                        <button class="toggle-btn active" data-dir="left">LEFT</button>
+                        <button class="toggle-btn" data-dir="right">RIGHT</button>
+                        <button class="toggle-btn" data-dir="up">UP</button>
+                        <button class="toggle-btn" data-dir="down">DOWN</button>
+                    </div>
+                </div>
+            </div>
+            <!-- ROOM: Dimensions -->
+            <div id="tp-section-room" class="tp-section">
+                <div class="tp-row">
+                    <span class="tp-label">Width (X)</span>
+                    <input type="range" id="tp-room-x" min="3" max="31" step="2" value="7" style="accent-color:#ffffff; cursor:pointer;">
+                    <span class="tp-val" id="tp-room-x-val">7</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Height (Y)</span>
+                    <input type="range" id="tp-room-y" min="3" max="31" step="1" value="5" style="accent-color:#ffffff; cursor:pointer;">
+                    <span class="tp-val" id="tp-room-y-val">5</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Depth (Z)</span>
+                    <input type="range" id="tp-room-z" min="3" max="31" step="2" value="7" style="accent-color:#ffffff; cursor:pointer;">
+                    <span class="tp-val" id="tp-room-z-val">7</span>
+                </div>
+            </div>
+            <!-- LOGIC: Programming Channels -->
+            <div id="tp-section-logic" class="tp-section">
+                <div class="tp-row">
+                    <span class="tp-label">Target Ch</span>
+                    <input type="range" id="tp-logic-out" min="1" max="9" step="1" value="1">
+                    <span class="tp-val" id="tp-logic-out-val">1</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Gate Type</span>
+                    <div class="toggle-row" id="toggle-logic-type">
+                        <button class="toggle-btn active" data-type="NONE">DIRECT</button>
+                        <button class="toggle-btn" data-type="NOT">NOT</button>
+                        <button class="toggle-btn" data-type="AND">AND</button>
+                    </div>
+                </div>
+                <div id="logic-inputs-row">
+                    <div class="tp-row">
+                        <span class="tp-label">Source A</span>
+                        <input type="range" id="tp-logic-a" min="1" max="9" step="1" value="1">
+                        <span class="tp-val" id="tp-logic-a-val">1</span>
+                    </div>
+                    <div class="tp-row" id="logic-b-row" style="display:none;">
+                        <span class="tp-label">Source B</span>
+                        <input type="range" id="tp-logic-b" min="1" max="9" step="1" value="2">
+                        <span class="tp-val" id="tp-logic-b-val">2</span>
+                    </div>
+                </div>
+            </div>
+            <!-- AERO: Channel Configuration -->
+            <div id="tp-section-aero" class="tp-section">
+                <div class="tp-row">
+                    <span class="tp-label">Link Ch</span>
+                    <input type="range" id="tp-aero-ch" min="1" max="9" step="1" value="1" style="accent-color:#00ffff; cursor:pointer;">
+                    <span class="tp-val" id="tp-aero-ch-val">1</span>
+                </div>
+            </div>
+
+            <!-- ONEWAY: Channel + Inversion -->
+            <div id="tp-section-oneway" class="tp-section">
+                <div class="tp-row">
+                    <span class="tp-label">Link Ch</span>
+                    <input type="range" id="tp-oneway-ch" min="1" max="9" step="1" value="1" style="accent-color:#ffaa00; cursor:pointer;">
+                    <span class="tp-val" id="tp-oneway-ch-val">1</span>
+                </div>
+                <div class="tp-row">
+                    <span class="tp-label">Logic</span>
+                    <div class="toggle-row" id="toggle-oneway-inv">
+                        <button class="toggle-btn active" data-inv="false">NORMAL</button>
+                        <button class="toggle-btn" data-inv="true">INVERT</button>
+                    </div>
+                </div>
+            </div>
+        </div> <!-- End of tool-params-panel -->
+
+        <div id="tool-selector-hint">Hover · Click to select · Release TAB to confirm</div>
+    </div> <!-- End of tool-selector-hud -->
+
+    <!-- RED CUBE START SIZE PANEL (now embedded in TAB menu params panel) -->
+    <div id="red-size-panel" style="display: none;"></div>
+    
+    <div id="blocker">
+        <div id="instructions">
+            PAUSED
+            <div class="sub-text">
+                WASD · Move &nbsp;|&nbsp; SPACE · Jump<br>
+                LEFT HOLD · Grab / Move <br>
+                SCROLL WHEEL on RED Blocks · Shrink / Expand<br>HOLD R · Reset Level &nbsp;|&nbsp; ESC · Pause
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="btn-resume" class="menu-btn" style="background: white; color: black;">RESUME</button>
+                <button id="btn-show-levels" class="menu-btn">LEVELS</button>
+                <button id="btn-show-settings" class="menu-btn">SETTINGS</button>
+            </div>
+        </div>
+
+        <div id="settings-panel">
+            <h2 style="letter-spacing: 5px; margin: 0 0 15px 0; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.5);">SETTINGS</h2>
+            
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-target="tab-video">Video</button>
+                <button class="tab-btn" data-target="tab-audio">Audio</button>
+                <button class="tab-btn" data-target="tab-game">Gameplay</button>
+            </div>
+
+            <div id="tab-video" class="settings-content active">
+                <!-- Graphic Presets -->
+                <div class="preset-label">GRAPHIC PRESET</div>
+                <div class="preset-row">
+                    <button class="preset-btn menu-btn" data-preset="potato">POTATO</button>
+                    <button class="preset-btn menu-btn" data-preset="low">LOW</button>
+                    <button class="preset-btn menu-btn active" data-preset="medium">MEDIUM</button>
+                    <button class="preset-btn menu-btn" data-preset="high">HIGH</button>
+                    <button class="preset-btn menu-btn" data-preset="ultra">ULTRA</button>
+                </div>
+                <div class="settings-grid">
+                    <label>Resolution Scale</label>
+                    <select id="set-res">
+                        <option value="0.5">50% · Performance</option>
+                        <option value="0.75" selected>75% · Balanced</option>
+                        <option value="1.0">100% · Native</option>
+                        <option value="1.25">125% · Supersampled</option>
+                        <option value="1.50">150% · Ultra</option>
+                    </select>
+
+                    <label>Shadow Quality</label>
+                    <select id="set-shadows">
+                        <option value="0">Off</option>
+                        <option value="1">Low</option>
+                        <option value="2" selected>Medium</option>
+                        <option value="3">High</option>
+                        <option value="4">Ultra</option>
+                    </select>
+
+                    <label>Particles</label>
+                    <select id="set-particles">
+                        <option value="0">Off</option>
+                        <option value="1">Low</option>
+                        <option value="2" selected>High</option>
+                    </select>
+
+                    <label>Volumetrics</label>
+                    <div class="toggle-row" id="toggle-volumetrics">
+                        <button class="toggle-btn" data-val="0">OFF</button>
+                        <button class="toggle-btn active" data-val="2">ON</button>
+                    </div>
+
+                    <label>Bloom</label>
+                    <div class="toggle-row" id="toggle-bloom">
+                        <button class="toggle-btn" data-val="0">OFF</button>
+                        <button class="toggle-btn active" data-val="1">ON</button>
+                    </div>
+
+                    <label>Ambient Occlusion</label>
+                    <div class="toggle-row" id="toggle-ssao">
+                        <button class="toggle-btn" data-val="0">OFF</button>
+                        <button class="toggle-btn active" data-val="1">ON</button>
+                    </div>
+
+                    <label>Reflections (SSR)</label>
+                    <div class="toggle-row" id="toggle-ssr">
+                        <button class="toggle-btn active" data-val="0">OFF</button>
+                        <button class="toggle-btn warn" data-val="1">ON ⚠</button>
+                    </div>
+                </div>
+                <!-- Hidden selects keep applyGraphics() working unchanged -->
+                <select id="set-volumetrics" style="display:none"><option value="0">0</option><option value="2" selected>2</option></select>
+                <select id="set-bloom" style="display:none"><option value="0">0</option><option value="1" selected>1</option></select>
+                <select id="set-ssao" style="display:none"><option value="0">0</option><option value="1" selected>1</option></select>
+                <select id="set-fxaa" style="display:none"><option value="0">0</option><option value="1" selected>1</option></select>
+                <select id="set-ssr" style="display:none"><option value="0" selected>0</option><option value="1">1</option></select>
+            </div>
+
+            <div id="tab-audio" class="settings-content">
+                <div class="settings-grid">
+                    <label>Music Volume</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="bgm-slider" min="0" max="1.0" step="0.05" value="0.5">
+                        <span id="bgm-val">50%</span>
+                    </div>
+                    
+                    <label>Synth Volume</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="dyn-slider" min="0" max="1.0" step="0.05" value="0.5">
+                        <span id="dyn-val">50%</span>
+                    </div>
+                    
+                    <label>SFX Volume</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="sfx-slider" min="0" max="1.0" step="0.05" value="0.5">
+                        <span id="sfx-val">50%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-game" class="settings-content">
+                <div class="settings-grid">
+                    <label>Mouse Sensitivity</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="sensitivity-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+                        <span id="sens-val">1.0</span>
+                    </div>
+                </div>
+                <button id="btn-reset-data" class="menu-btn" style="border-color: #ff4444; color: #ff4444; margin-top: 20px; width: 100%;">RESET PROGRESS</button>
+            </div>
+
+            <button id="btn-hide-settings" class="menu-btn" style="margin-top: 25px; width: 100%;">APPLY & BACK</button>
+        </div>
+    </div>
+
+    <div id="level-select-overlay">
+        <div id="ls-layout">
+            <!-- Left Side: List and Controls -->
+            <div id="ls-left">
+                <h2>SELECT LEVEL</h2>
+
+                <!-- Chapter Tabs (Campaign) -->
+                <div id="chapter-toggle-row" style="display: flex;"></div>
+
+                <div id="level-select-list"></div>
+
+                <!-- Bottom Controls Row -->
+                <div id="ls-controls-row">
+                    <button id="level-select-back" class="menu-btn ls-action-btn">← BACK TO GAME</button>
+                    <div class="ls-controls-right">
+                        <button id="btn-custom-levels" class="menu-btn ls-action-btn toggle-custom" style="display: none;">USER LEVELS</button>
+                        <button id="btn-edit-level" class="menu-btn ls-action-btn tool-btn" style="display: none;">[ EDIT ]</button>
+                        <button id="level-select-watch-cutscene" class="menu-btn ls-action-btn cinematic-btn" style="display: none;">PLAY CUTSCENE</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Preview -->
+            <div id="ls-right">
+                <div id="ls-chapter-title-badge">— CHAPTER —</div>
+                <div id="ls-preview-meta">NOW PREVIEWING</div>
+                <h2 id="preview-title">LEVEL 1</h2>
+            </div>
+        </div>
+    </div>
+    
+    <div id="fade-overlay"></div>
+    <div id="level-title">LEVEL 1</div>
+    <div id="scale-hud"></div>
+    
+    <div id="ending-overlay">
+        <div id="ending-title">THE ROTUNDA — COMPLETE</div>
+        <div id="ending-lines">
+            <div class="ending-line" id="el0">You have passed through every chamber.</div>
+            <div class="ending-line" id="el1">The structure holds. The cycle turns.</div>
+            <div class="ending-line" id="el2">Another mind awakens in the Atrium.</div>
+            <div class="ending-line" id="el3">They will find the blocks where you left them.</div>
+            <div class="ending-line" id="el4">The Rotunda remembers everything.</div>
+        </div>
+        <div id="ending-prompt">— CLICK TO RETURN —</div>
+    </div>
+
+    <div id="confirm-popup" style="position: absolute; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.85); display:none; justify-content:center; align-items:center; z-index: 100; backdrop-filter: blur(10px);">
+        <div style="background: #111; border: 2px solid #ff4444; padding: 40px; text-align: center; border-radius: 8px; box-shadow: 0 0 30px rgba(255,68,68,0.3);">
+            <h3 style="color: white; letter-spacing: 5px; margin-bottom: 10px;">WIPE ALL DATA?</h3>
+            <p style="color: #aaa; font-size: 13px; letter-spacing: 1px; margin-bottom: 30px;">Your level progress and chapter unlocks will be lost.<br>This action cannot be undone.</p>
+            <div style="display: flex; gap: 15px; justify-content: center;">
+                <button id="btn-confirm-reset" class="menu-btn" style="background: #ff4444; border-color: #ff4444; color: white;">RESET</button>
+                <button id="btn-cancel-reset" class="menu-btn">CANCEL</button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
