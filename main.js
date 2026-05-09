@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { Timer } from 'three/examples/jsm/misc/Timer.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Water } from 'three/examples/jsm/objects/Water.js';
@@ -6536,7 +6535,7 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
 
     // ── END LOGIC VISUALIZER ─────────────────────────────────────────────────
 
-    const clock = new THREE.Timer();
+    const clock = new THREE.Clock();
     const crosshairEl = document.getElementById('crosshair'); // cached to avoid per-frame DOM lookup
     let _frameCount = 0;
     let elapsedTime = 0; // accumulated seconds — replaces repeated Date.now() calls in animate
