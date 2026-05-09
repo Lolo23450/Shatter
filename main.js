@@ -6521,7 +6521,7 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
                 blending: THREE.AdditiveBlending,
                 depthWrite: false
             });
-
+            
             ch.sources.forEach(srcPos => {
                 ch.targets.forEach(tgtPos => {
                     const geo = new THREE.BufferGeometry().setFromPoints([srcPos, tgtPos]);
