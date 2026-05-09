@@ -11,8 +11,8 @@ import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import * as CANNON from 'cannon-es';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
-import { CHAPTER_LEVEL_NAMES, LEVEL_NAMES, CHAPTERS, LevelBuilder } from './level-builder.js';
-import { OptimizedSSRPass } from './OptimizedSSRPass.js';
+import { CHAPTER_LEVEL_NAMES, LEVEL_NAMES, CHAPTERS, LevelBuilder } from './js/level-builder.js';
+import { OptimizedSSRPass } from './js/OptimizedSSRPass.js';
 
 
     function distSq(v1, v2) { return (v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y) + (v1.z - v2.z) * (v1.z - v2.z); }
