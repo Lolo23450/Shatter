@@ -1218,11 +1218,6 @@ import {
         fillLight.color.setHex(data.fill);
         fillLight.intensity = data.fillInt;
         fillLight.position.set(-data.sunPos[0], 8, -data.sunPos[2]);
-
-        if (volumetricPass) {
-            volumetricPass.material.uniforms.sunDir.value.copy(sunLight.position).normalize();
-            volumetricPass.material.uniforms.sunColor.value.setHex(data.sun);
-        }
     }
 
     function getLevelName(lvl) {
@@ -2574,10 +2569,7 @@ import {
             tDepth:                        { value: null },
             cameraProjectionMatrixInverse: { value: new THREE.Matrix4() },
             cameraMatrixWorld:             { value: new THREE.Matrix4() },
-            sunDir:                        { value: new THREE.Vector3() },
-            sunColor:                      { value: new THREE.Color(0xe6c3d0) },
-            shadowMap:                     { value: null },
-            shadowMatrix:                  { value: new THREE.Matrix4() },
+
             pointLightsPos:                { value: pointPosUniformArray },
             pointLightsColor:              { value: pointColUniformArray },
             pointLightCount:               { value: 0 },
@@ -2598,13 +2590,8 @@ import {
 
             uniform sampler2D tDiffuse;
             uniform sampler2D tDepth;
-            uniform sampler2D shadowMap;
             uniform mat4 cameraProjectionMatrixInverse;
             uniform mat4 cameraMatrixWorld;
-
-            uniform vec3 sunDir;
-            uniform vec3 sunColor;
-            uniform mat4 shadowMatrix;
 
             #define MAX_POINT_LIGHTS 16
             uniform vec3 pointLightsPos[MAX_POINT_LIGHTS];
@@ -2624,13 +2611,6 @@ import {
                 vec4 view = cameraProjectionMatrixInverse * ndc;
                 view /= view.w;
                 return (cameraMatrixWorld * view).xyz;
-            }
-
-            float getSunShadow(vec3 worldPos) {
-                vec4 sc = shadowMatrix * vec4(worldPos, 1.0);
-                sc.xyz /= sc.w;
-                if (sc.x < 0.0 || sc.x > 1.0 || sc.y < 0.0 || sc.y > 1.0) return 1.0;
-                return textureLod(shadowMap, sc.xy, 0.0).r < (sc.z - 0.0015) ? 0.0 : 1.0;
             }
 
             float IGN(vec2 pixel, float frame) {
@@ -2707,25 +2687,10 @@ import {
                 float dither     = IGN(gl_FragCoord.xy, floor(mod(time * 60.0, 128.0)));
                 vec3  currentPos = cameraPos + rayDir * (stepSize * dither);
 
-                float g          = 0.65;
-                float cosTheta   = dot(rayDir, sunDir);
-                float sunPhase   = (1.0 - g * g) / pow((1.0 + g * g) - 2.0 * g * cosTheta, 1.5);
-
-                // ── 4. SUN PHASE GATE ───────────────────────────────────────────
-                // When looking away from sun, sunPhase is negligible — skip
-                // shadow map fetches entirely and only accumulate a dim ambient term.
-                vec3  sunContribPerStep = sunColor * (sunPhase * stepWeight);
-                bool  doSunShadow       = (sunPhase * stepWeight) > 0.0001;
-
                 int  nLights = min(pointLightCount, MAX_POINT_LIGHTS);
                 vec3 totalVolumetric = vec3(0.0);
 
                 for (int i = 0; i < STEPS; i++) {
-                    // Sun
-                    if (doSunShadow) {
-                        totalVolumetric += sunContribPerStep * getSunShadow(currentPos);
-                    }
-
                     // ── 5. POINT LIGHTS — skip loop entirely when none exist ────
                     if (nLights > 0) {
                         for (int j = 0; j < nLights; j++) {
@@ -2734,7 +2699,7 @@ import {
                             if (distSq < 625.0) {
                                 float atten = smoothstep(625.0, 0.0, distSq)
                                             / (0.5 + distSq * 0.05);
-                                totalVolumetric += pointLightsColor[j] * (atten * 0.12 * stepWeight);
+                                totalVolumetric += pointLightsColor[j] * (atten * 0.35 * stepWeight);
                             }
                         }
                     }
@@ -7480,7 +7445,7 @@ import {
 
         // Depth pre-pass: render scene into depthCaptureTarget so the volumetric
         // ShaderPass has a real depth texture to reconstruct world positions from.
-        // Camera matrix uniforms and shadow bindings are also updated here every frame.
+        // Camera matrix uniforms are also updated here every frame.
         if (gfx.volumetrics === 2) {
             renderer.setRenderTarget(depthCaptureTarget);
             renderer.render(scene, activeCamera);
@@ -7488,10 +7453,6 @@ import {
             const volU = volumetricPass.material.uniforms;
             volU.cameraProjectionMatrixInverse.value.copy(activeCamera.projectionMatrixInverse);
             volU.cameraMatrixWorld.value.copy(activeCamera.matrixWorld);
-            if (sunLight && sunLight.shadow && sunLight.shadow.map) {
-                volU.shadowMap.value = sunLight.shadow.map.texture;
-                volU.shadowMatrix.value.copy(sunLight.shadow.matrix);
-            }
         }
 
         composer.render();
