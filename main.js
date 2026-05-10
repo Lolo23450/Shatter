@@ -946,6 +946,7 @@ import {
     let isPaused = true; 
     let volBGM = 0.5; let volSFX = 0.5; let volDyn = 0.5;
     let gfx = { res: 0.75, shadows: 2, bloom: 1, ssao: 1, fxaa: 1, ssr: 0, particles: 2, volumetrics: 2 };
+    let volAdv = { density: 0.003, radius: 25, brightness: 0.35 };
     let _prevShadowType = -1; // Tracks last applied shadow type to avoid full scene.traverse on every resize
 
 
@@ -1229,7 +1230,7 @@ import {
         save() {
             const data = {
                 currentLevel, activeChapter, chaptersUnlocked,
-                gfx, volBGM, volSFX, volDyn,
+                gfx, volAdv, volBGM, volSFX, volDyn,
                 sensitivity: controls ? controls.pointerSpeed : 1.0
             };
             saveHubProgress(hubProgress);
@@ -1251,6 +1252,7 @@ import {
                     activeChapter = data.useV3Layout ? 2 : data.useV2Layout ? 1 : 0;
                 }
                 if (data.gfx) Object.assign(gfx, data.gfx);
+                if (data.volAdv) Object.assign(volAdv, data.volAdv);
                 if (data.volBGM !== undefined) volBGM = data.volBGM;
                 if (data.volSFX !== undefined) volSFX = data.volSFX;
                 if (data.volDyn !== undefined) volDyn = data.volDyn;
@@ -1265,6 +1267,13 @@ import {
                 document.getElementById('set-fxaa').value = gfx.fxaa;
                 document.getElementById('set-ssr').value = gfx.ssr;
                 document.getElementById('set-particles').value = gfx.particles;
+                // Sync volAdv sliders
+                document.getElementById('vol-density').value            = volAdv.density;
+                document.getElementById('vol-density-val').textContent  = volAdv.density.toFixed(4);
+                document.getElementById('vol-radius').value             = volAdv.radius;
+                document.getElementById('vol-radius-val').textContent   = volAdv.radius;
+                document.getElementById('vol-brightness').value         = volAdv.brightness;
+                document.getElementById('vol-brightness-val').textContent = volAdv.brightness.toFixed(2);
                 if (data.sensitivity) {
                     document.getElementById('sensitivity-slider').value = data.sensitivity;
                     document.getElementById('sens-val').innerText = data.sensitivity.toFixed(1);
@@ -1362,6 +1371,31 @@ import {
     const sfxSlider = document.getElementById('sfx-slider'); const sfxVal = document.getElementById('sfx-val');
     sfxSlider.addEventListener('input', e => { volSFX = parseFloat(e.target.value); sfxVal.innerText = Math.round(volSFX * 100) + '%'; });
 
+    // ── VOLUMETRICS ADVANCED SLIDERS ──────────────────────────────────────────
+    const _applyVolAdv = () => {
+        if (volumetricPass) {
+            volumetricPass.material.uniforms.scattering.value    = volAdv.density;
+            volumetricPass.material.uniforms.volRadiusSq.value   = volAdv.radius * volAdv.radius;
+            volumetricPass.material.uniforms.volBrightness.value = volAdv.brightness;
+        }
+        SaveSystem.save();
+    };
+    document.getElementById('vol-density').addEventListener('input', e => {
+        volAdv.density = parseFloat(e.target.value);
+        document.getElementById('vol-density-val').textContent = volAdv.density.toFixed(4);
+        _applyVolAdv();
+    });
+    document.getElementById('vol-radius').addEventListener('input', e => {
+        volAdv.radius = parseFloat(e.target.value);
+        document.getElementById('vol-radius-val').textContent = volAdv.radius;
+        _applyVolAdv();
+    });
+    document.getElementById('vol-brightness').addEventListener('input', e => {
+        volAdv.brightness = parseFloat(e.target.value);
+        document.getElementById('vol-brightness-val').textContent = volAdv.brightness.toFixed(2);
+        _applyVolAdv();
+    });
+
     function applyGraphics() {
         gfx.res = parseFloat(document.getElementById('set-res').value) || 0.75;
         gfx.shadows = parseInt(document.getElementById('set-shadows').value);
@@ -1453,6 +1487,17 @@ import {
         if(ssrPass) ssrPass.enabled = gfx.ssr === 1;
 
         if(volumetricPass) volumetricPass.enabled = (gfx.volumetrics === 2);
+
+        // Show/hide advanced volumetrics section based on toggle
+        const volAdvSection = document.getElementById('vol-adv-section');
+        if (volAdvSection) volAdvSection.classList.toggle('visible', gfx.volumetrics === 2);
+
+        // Push volAdv values into shader uniforms
+        if (volumetricPass) {
+            volumetricPass.material.uniforms.scattering.value    = volAdv.density;
+            volumetricPass.material.uniforms.volRadiusSq.value   = volAdv.radius * volAdv.radius;
+            volumetricPass.material.uniforms.volBrightness.value = volAdv.brightness;
+        }
 
         if(dustMesh) {
             if(gfx.particles === 0) dustMesh.visible = false;
@@ -2575,6 +2620,8 @@ import {
             pointLightCount:               { value: 0 },
             scattering:                    { value: 0.003 },
             maxDistance:                   { value: 90.0 },
+            volRadiusSq:                   { value: 625.0 },
+            volBrightness:                 { value: 0.35  },
             time:                          { value: 0.0 }
         },
         vertexShader: `
@@ -2600,6 +2647,8 @@ import {
 
             uniform float scattering;
             uniform float maxDistance;
+            uniform float volRadiusSq;
+            uniform float volBrightness;
             uniform float time;
             in vec2 vUv;
             layout(location = 0) out vec4 fragColor;
@@ -2696,10 +2745,10 @@ import {
                         for (int j = 0; j < nLights; j++) {
                             vec3  toLight = pointLightsPos[j] - currentPos;
                             float distSq  = dot(toLight, toLight);
-                            if (distSq < 625.0) {
-                                float atten = smoothstep(625.0, 0.0, distSq)
+                            if (distSq < volRadiusSq) {
+                                float atten = smoothstep(volRadiusSq, 0.0, distSq)
                                             / (0.5 + distSq * 0.05);
-                                totalVolumetric += pointLightsColor[j] * (atten * 0.35 * stepWeight);
+                                totalVolumetric += pointLightsColor[j] * (atten * volBrightness * stepWeight);
                             }
                         }
                     }
