@@ -5318,8 +5318,7 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
         customLights.length = 0;
         customPlates.length = 0;
         customDoors.length = 0;
-        if(data.fields) customFields = data.fields;
-        else customFields = [];
+        customFields.length = 0;
 
         if (data) {
             customSpawn = data.spawn || {x:0, y:2, z:0};
