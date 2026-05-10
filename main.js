@@ -3948,6 +3948,7 @@ import {
         }
 
         if (currentGoal) {
+            scene.remove(currentGoal);
             currentGoal.traverse(obj => { if (obj.geometry) obj.geometry.dispose(); if (obj.material) obj.material.dispose(); });
         }
 
@@ -3966,6 +3967,10 @@ import {
         meshToBlock.clear();
         grabbedBlock = null; exitMesh = null; waterMesh = null; currentGoal = null; currentGreenBlock = null;
         pendingBounce = false; pendingBounceBlock = null; AudioSys.focusElement = null;
+
+        // Guard: purge any undefined/null children THREE may have accumulated
+        // (caused by removing objects mid-traversal elsewhere in the codebase)
+        scene.children = scene.children.filter(Boolean);
 
         const coreObjects = [];
         scene.traverse((obj) => { if (obj.userData && obj.userData.core) { coreObjects.push(obj); } });
