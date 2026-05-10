@@ -2731,10 +2731,10 @@ import {
                         for (int j = 0; j < nLights; j++) {
                             vec3  toLight = pointLightsPos[j] - currentPos;
                             float distSq  = dot(toLight, toLight);
-                            if (distSq < 144.0) {
-                                float atten = smoothstep(144.0, 50.0, distSq)
-                                            / (0.5 + distSq * 0.2);
-                                totalVolumetric += pointLightsColor[j] * (atten * 0.014 * stepWeight);
+                            if (distSq < 625.0) {
+                                float atten = smoothstep(625.0, 0.0, distSq)
+                                            / (0.5 + distSq * 0.05);
+                                totalVolumetric += pointLightsColor[j] * (atten * 0.12 * stepWeight);
                             }
                         }
                     }
