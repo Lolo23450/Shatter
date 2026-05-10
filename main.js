@@ -2569,8 +2569,29 @@ import {
     composer.addPass(ssrPass);
 
     const VolumetricShader = {
-        uniforms: { /* unchanged */ },
-        vertexShader: `/* unchanged */`,
+        uniforms: {
+            tDiffuse:                      { value: null },
+            tDepth:                        { value: null },
+            cameraProjectionMatrixInverse: { value: new THREE.Matrix4() },
+            cameraMatrixWorld:             { value: new THREE.Matrix4() },
+            sunDir:                        { value: new THREE.Vector3() },
+            sunColor:                      { value: new THREE.Color(0xe6c3d0) },
+            shadowMap:                     { value: null },
+            shadowMatrix:                  { value: new THREE.Matrix4() },
+            pointLightsPos:                { value: pointPosUniformArray },
+            pointLightsColor:              { value: pointColUniformArray },
+            pointLightCount:               { value: 0 },
+            scattering:                    { value: 0.003 },
+            maxDistance:                   { value: 90.0 },
+            time:                          { value: 0.0 }
+        },
+        vertexShader: `
+            out vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
         fragmentShader: `
             precision highp float;
             precision highp sampler2D;
@@ -2585,7 +2606,7 @@ import {
             uniform vec3 sunColor;
             uniform mat4 shadowMatrix;
 
-            #define MAX_POINT_LIGHTS 12
+            #define MAX_POINT_LIGHTS 16
             uniform vec3 pointLightsPos[MAX_POINT_LIGHTS];
             uniform vec3 pointLightsColor[MAX_POINT_LIGHTS];
             uniform int pointLightCount;
@@ -7449,8 +7470,6 @@ import {
                 }
             }
 
-            volumetricPass.material.uniforms.pointLightsPos.value = pointPosUniformArray;
-            volumetricPass.material.uniforms.pointLightsColor.value = pointColUniformArray;
             volumetricPass.material.uniforms.pointLightCount.value = Math.min(lightCount, MAX_VOL_LIGHTS);
         }
 
