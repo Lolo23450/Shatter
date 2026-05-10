@@ -1457,7 +1457,7 @@ import {
         if(smaaPass) { smaaPass.enabled = gfx.fxaa === 1; }
         if(ssrPass) ssrPass.enabled = gfx.ssr === 1;
 
-        if(volumetricPass) volumetricPass.enabled = (gfx.volumetrics === 2);
+        if(volumetricPass) volumetricPass.enabled = (gfx.s === 2);
 
         if(dustMesh) {
             if(gfx.particles === 0) dustMesh.visible = false;
@@ -2569,29 +2569,8 @@ import {
     composer.addPass(ssrPass);
 
     const VolumetricShader = {
-        uniforms: {
-            tDiffuse: { value: null },
-            tDepth: { value: null },
-            cameraProjectionMatrixInverse: { value: new THREE.Matrix4() },
-            cameraMatrixWorld: { value: new THREE.Matrix4() },
-            sunDir: { value: new THREE.Vector3() },
-            sunColor: { value: new THREE.Color(0xe6c3d0) },
-            shadowMap: { value: null },
-            shadowMatrix: { value: new THREE.Matrix4() },
-            pointLightsPos: { value: [] },
-            pointLightsColor: { value: [] },
-            pointLightCount: { value: 0 },
-            scattering: { value: 0.003 },
-            maxDistance: { value: 90.0 },
-            time: { value: 0.0 }
-        },
-        vertexShader: `
-            out vec2 vUv;
-            void main() {
-                vUv = uv;
-                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-            }
-        `,
+        uniforms: { /* unchanged */ },
+        vertexShader: `/* unchanged */`,
         fragmentShader: `
             precision highp float;
             precision highp sampler2D;
@@ -2617,138 +2596,138 @@ import {
             in vec2 vUv;
             layout(location = 0) out vec4 fragColor;
 
-            const int STEPS = 6;
+            const int STEPS = 8;
 
             vec3 WorldPosFromDepth(vec2 uv, float depth) {
-                vec4 ndc = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+                vec4 ndc  = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
                 vec4 view = cameraProjectionMatrixInverse * ndc;
                 view /= view.w;
                 return (cameraMatrixWorld * view).xyz;
             }
 
             float getSunShadow(vec3 worldPos) {
-                vec4 shadowCoord = shadowMatrix * vec4(worldPos, 1.0);
-                shadowCoord.xyz /= shadowCoord.w;
-                if(shadowCoord.x < 0.0 || shadowCoord.x > 1.0 || shadowCoord.y < 0.0 || shadowCoord.y > 1.0) return 1.0;
-                float shadowDepth = textureLod(shadowMap, shadowCoord.xy, 0.0).r;
-                return shadowDepth < (shadowCoord.z - 0.0015) ? 0.0 : 1.0;
+                vec4 sc = shadowMatrix * vec4(worldPos, 1.0);
+                sc.xyz /= sc.w;
+                if (sc.x < 0.0 || sc.x > 1.0 || sc.y < 0.0 || sc.y > 1.0) return 1.0;
+                return textureLod(shadowMap, sc.xy, 0.0).r < (sc.z - 0.0015) ? 0.0 : 1.0;
             }
 
-            // Hash-based film grain
-            float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+            float IGN(vec2 pixel, float frame) {
+                pixel += frame * vec2(47.0, 17.0);
+                return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+            }
 
-            // Subtle color grading: lift (shadows), gamma (mids), gain (highlights)
             vec3 colorGrade(vec3 col) {
-                // Lift: push shadows slightly warm
-                vec3 lift   = vec3(0.004, 0.002, 0.003);
-                // Gamma: slight cool-mids
-                vec3 gamma  = vec3(0.97, 0.98, 1.02);
-                // Gain: warm highlights
-                vec3 gain   = vec3(1.04, 1.01, 0.98);
-
-                col = col + lift * (1.0 - col);
-                col = pow(max(col, 0.0), 1.0 / gamma);
-                col = col * gain;
+                col = col + vec3(0.004, 0.002, 0.003) * (1.0 - col);
+                col = pow(max(col, 0.0), 1.0 / vec3(0.97, 0.98, 1.02));
+                col = col * vec3(1.04, 1.01, 0.98);
                 return col;
             }
 
             void main() {
                 float depth = texture(tDepth, vUv).r;
+
+                // ── 1. SKY EARLY-OUT ─────────────────────────────────────────────
+                // Sky pixels skip all ray marching, blur, and shadow work entirely.
+                if (depth >= 0.9999) {
+                    fragColor = vec4(colorGrade(texture(tDiffuse, vUv).rgb), 1.0);
+                    return;
+                }
+
                 vec3 cameraPos = cameraMatrixWorld[3].xyz;
-                vec3 worldPos = WorldPosFromDepth(vUv, depth);
+                vec3 worldPos  = WorldPosFromDepth(vUv, depth);
+                vec3 rayDir    = worldPos - cameraPos;
+                float rayLen   = length(rayDir);
+                rayDir        /= rayLen;
 
-                vec3 rayDir = worldPos - cameraPos;
-                float rayLen = length(rayDir);
-
-                // Depth-of-field blur (background softness)
-                float blurStart = 18.0; 
-                float blurEnd = 65.0;   
-                float maxBlur = 2.2;    
-                float blurFactor = smoothstep(blurStart, blurEnd, rayLen) * maxBlur;
-                vec2 texel = 1.0 / vec2(textureSize(tDiffuse, 0));
-
-                // Chromatic aberration — offsets R and B channels slightly from center
+                // ── 2. ADAPTIVE BLUR ────────────────────────────────────────────
+                // Near geometry: 1 sample + chroma shift (saves 7 texture fetches).
+                // Far geometry: full 8-tap blur.
                 vec2 center = vUv - 0.5;
                 float aberrationStrength = 0.0008 + length(center) * 0.003;
                 vec2 aberrOffset = center * aberrationStrength;
 
-                vec4 baseColorR = (
-                    texture(tDiffuse, vUv + aberrOffset + vec2( texel.x,  texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv + aberrOffset + vec2(-texel.x,  texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv + aberrOffset + vec2( texel.x, -texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv + aberrOffset + vec2(-texel.x, -texel.y) * blurFactor)
-                ) * 0.25;
+                float blurFactor = smoothstep(18.0, 65.0, rayLen) * 2.2;
+                vec4 baseColor;
 
-                vec4 baseColorB = (
-                    texture(tDiffuse, vUv - aberrOffset + vec2( texel.x,  texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv - aberrOffset + vec2(-texel.x,  texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv - aberrOffset + vec2( texel.x, -texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv - aberrOffset + vec2(-texel.x, -texel.y) * blurFactor)
-                ) * 0.25;
+                if (blurFactor < 0.01) {
+                    // Fast path: near geometry — single sample per channel
+                    baseColor   = texture(tDiffuse, vUv);
+                    baseColor.r = texture(tDiffuse, vUv + aberrOffset).r;
+                    baseColor.b = texture(tDiffuse, vUv - aberrOffset).b;
+                } else {
+                    // Full path: 8-tap box blur + chromatic aberration
+                    vec2 texel = 1.0 / vec2(textureSize(tDiffuse, 0));
+                    vec2 o0 = vec2( texel.x,  texel.y) * blurFactor;
+                    vec2 o1 = vec2(-texel.x,  texel.y) * blurFactor;
+                    vec2 o2 = vec2( texel.x, -texel.y) * blurFactor;
+                    vec2 o3 = vec2(-texel.x, -texel.y) * blurFactor;
 
-                vec4 baseColor = (
-                    texture(tDiffuse, vUv + vec2( texel.x,  texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv + vec2(-texel.x,  texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv + vec2( texel.x, -texel.y) * blurFactor) +
-                    texture(tDiffuse, vUv + vec2(-texel.x, -texel.y) * blurFactor)
-                ) * 0.25;
+                    vec4 rp = (texture(tDiffuse, vUv + aberrOffset + o0) +
+                            texture(tDiffuse, vUv + aberrOffset + o1) +
+                            texture(tDiffuse, vUv + aberrOffset + o2) +
+                            texture(tDiffuse, vUv + aberrOffset + o3)) * 0.25;
 
-                // Merge channels with chromatic aberration
-                baseColor.r = baseColorR.r;
-                baseColor.b = baseColorB.b;
+                    vec4 rn = (texture(tDiffuse, vUv - aberrOffset + o0) +
+                            texture(tDiffuse, vUv - aberrOffset + o1) +
+                            texture(tDiffuse, vUv - aberrOffset + o2) +
+                            texture(tDiffuse, vUv - aberrOffset + o3)) * 0.25;
 
-                rayDir /= rayLen;
+                    baseColor   = rp;
+                    baseColor.g = (rp.g + rn.g) * 0.5;
+                    baseColor.b = rn.b;
+                }
 
+                // ── 3. VOLUMETRIC SETUP ──────────────────────────────────────────
                 float marchDist = min(rayLen, maxDistance);
-                float stepSize = marchDist / float(STEPS);
+                float stepSize  = marchDist / float(STEPS);
+                float stepWeight = scattering * stepSize;
 
-                float dither = fract(sin(dot(vUv, vec2(12.9898,78.233))) * 43758.5453);
-                vec3 currentPos = cameraPos + rayDir * (stepSize * dither);
+                float dither     = IGN(gl_FragCoord.xy, floor(mod(time * 60.0, 128.0)));
+                vec3  currentPos = cameraPos + rayDir * (stepSize * dither);
 
+                float g          = 0.65;
+                float cosTheta   = dot(rayDir, sunDir);
+                float sunPhase   = (1.0 - g * g) / pow((1.0 + g * g) - 2.0 * g * cosTheta, 1.5);
+
+                // ── 4. SUN PHASE GATE ───────────────────────────────────────────
+                // When looking away from sun, sunPhase is negligible — skip
+                // shadow map fetches entirely and only accumulate a dim ambient term.
+                vec3  sunContribPerStep = sunColor * (sunPhase * stepWeight);
+                bool  doSunShadow       = (sunPhase * stepWeight) > 0.0001;
+
+                int  nLights = min(pointLightCount, MAX_POINT_LIGHTS);
                 vec3 totalVolumetric = vec3(0.0);
 
-                float stepScattering = scattering;
-                float g = 0.65;
-                float phaseScale = (1.0 - g * g);
-                float phaseBase = 1.0 + g * g;
-                float cosTheta = dot(rayDir, sunDir);
-                float sunPhase = phaseScale / pow(phaseBase - 2.0 * g * cosTheta, 1.5);
+                for (int i = 0; i < STEPS; i++) {
+                    // Sun
+                    if (doSunShadow) {
+                        totalVolumetric += sunContribPerStep * getSunShadow(currentPos);
+                    }
 
-                for(int i = 0; i < STEPS; i++) {
-                    float shadow = getSunShadow(currentPos);
-                    totalVolumetric += sunColor * (shadow * sunPhase * stepScattering);
-
-                    if (pointLightCount > 0) {
-                        for(int j = 0; j < MAX_POINT_LIGHTS; j++) {
-                            if(j >= pointLightCount) break;
-
-                            vec3 lPos = pointLightsPos[j];
-                            vec3 toLight = lPos - currentPos;
-                            float distSq = dot(toLight, toLight);
-
-                            if (distSq < 144.0) { 
-                                float atten = 1.0 / (0.5 + distSq * 0.2);
-                                atten *= smoothstep(144.0, 50.0, distSq);
-                                totalVolumetric += pointLightsColor[j] * (atten * 0.014); 
+                    // ── 5. POINT LIGHTS — skip loop entirely when none exist ────
+                    if (nLights > 0) {
+                        for (int j = 0; j < nLights; j++) {
+                            vec3  toLight = pointLightsPos[j] - currentPos;
+                            float distSq  = dot(toLight, toLight);
+                            if (distSq < 144.0) {
+                                float atten = smoothstep(144.0, 50.0, distSq)
+                                            / (0.5 + distSq * 0.2);
+                                totalVolumetric += pointLightsColor[j] * (atten * 0.014 * stepWeight);
                             }
                         }
                     }
+
                     currentPos += rayDir * stepSize;
                 }
 
-                vec3 litColor = baseColor.rgb + (totalVolumetric * stepSize);
+                // ── COMPOSITE ────────────────────────────────────────────────────
+                vec3 litColor = baseColor.rgb + totalVolumetric;
 
-                // Color grading
                 litColor = colorGrade(litColor);
 
-                // Vignette
-                float vignetteDist = length(center) * 1.35;
-                float vignette = 1.0 - smoothstep(0.45, 1.15, vignetteDist);
+                float vignette = 1.0 - smoothstep(0.45, 1.15, length(center) * 1.35);
                 litColor *= (0.88 + 0.12 * vignette);
-
-                // Subtle film grain (animated, very fine)
-                float grain = (hash(vUv + fract(time * 0.017)) - 0.5) * 0.0025;
-                litColor += grain;
 
                 fragColor = vec4(litColor, baseColor.a);
             }
@@ -4474,8 +4453,8 @@ import {
                 const pLight = addVolumetricPointLight(
                     lightPos.clone().addScaledVector(new THREE.Vector3(norm.dx, 0, norm.dz), 0.8), // Pushed out further
                     chColor.getHex(),
-                    2.5 + (rng() * 2.0), // Variable intensity (2.5 to 4.5)
-                    16.0 + (rng() * 10.0) // Variable dropoff (16 to 26 radius)
+                    2.5 + (rng() * 1.0), // Variable intensity
+                    12.0 + (rng() * 8.0) // Variable dropoff
                 );
             }
 
@@ -4495,8 +4474,8 @@ import {
                         const pLight = addVolumetricPointLight(
                             lightPos.clone().addScaledVector(new THREE.Vector3(norm.dx, 0, norm.dz), 0.6),
                             0xffeedd,
-                            4,      
-                            20.0
+                            3.5,      
+                            16.0
                         );
                     }
                 }
