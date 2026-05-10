@@ -465,7 +465,7 @@
         width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-left: 10px;
         background: rgba(68,255,150,0.7); box-shadow: 0 0 6px rgba(68,255,150,0.5);
     }
-.lc-current-dot {
+    .lc-current-dot {
         width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-left: 10px;
         background: white; box-shadow: 0 0 6px rgba(255,255,255,0.7);
         animation: dotPulse 1.4s ease-in-out infinite;
@@ -474,3 +474,6 @@
         0%, 100% { opacity: 1; transform: scale(1); }
         50% { opacity: 0.4; transform: scale(0.7); }
     }
+    .list-card.hub-locked { opacity: 0.35; cursor: not-allowed !important; }
+    .list-card.hub-locked .lc-name { color: rgba(255,255,255,0.18) !important; }
+    #hub-gate-hud { user-select: none; }
