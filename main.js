@@ -1457,7 +1457,7 @@ import {
         if(smaaPass) { smaaPass.enabled = gfx.fxaa === 1; }
         if(ssrPass) ssrPass.enabled = gfx.ssr === 1;
 
-        if(volumetricPass) volumetricPass.enabled = (gfx.s === 2);
+        if(volumetricPass) volumetricPass.enabled = (gfx.volumetrics === 2);
 
         if(dustMesh) {
             if(gfx.particles === 0) dustMesh.visible = false;
