@@ -84,7 +84,7 @@ LevelBuilder(HUB_LEVEL_INDEX, 'THE NEXUS');
 
 builder.setBounds(21, 16, 21)
        .setSpawn(0, 4, 0)
-       .setExit(0, 4, 0)
+       .setExit(0, 600, 0)
        .setCutscene('flyover')
        .setWater(0.6, { color: 0x002233, distortionScale: 1.5, alpha: 0.85 });
 
@@ -291,7 +291,7 @@ init(scene, createCrystalStructure, progress, callbacks) {
     this.progress = progress || defaultHubProgress();
     this._onEnterGate = callbacks.onEnterGate;
 
-    this._buildDecor(scene, createCrystalStructure);
+    // this._buildDecor(scene, createCrystalStructure);
     this._buildPortals(scene, createCrystalStructure);
     this._buildHUD();
     this.active = true;
