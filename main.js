@@ -642,10 +642,6 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
     const g1x1 = new THREE.BoxGeometry(1, 1, 1); const g2x1x2 = new THREE.BoxGeometry(2, 1, 2); const g2x2x1 = new THREE.BoxGeometry(2, 2, 1);
     const g1x2x2 = new THREE.BoxGeometry(1, 2, 2); const halfTileGeo = new THREE.BoxGeometry(0.7, 0.4, 0.7);
 
-    const { albedo: floorTexAlbedo, normal: floorTexNormal, ao: floorTexAo } = createFloorTextures();
-    const { albedo: cleanTexAlbedo, normal: cleanTexNormal, ao: cleanTexAo } = createConcreteTextures();
-
-    // Re-assign the texture results to get height maps
     const concreteTexs = createConcreteTextures();
     const floorTexs = createFloorTextures();
 
@@ -3965,7 +3961,115 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
         return texture;
     }
 
-    // 2. The Main Function
+    // ── CRYSTAL STRUCTURE FACTORY ─────────────────────────────────────────────
+    // Creates an InstancedMesh of hexagonal crystals arranged in clusters.
+    //
+    // pos             – THREE.Vector3  – world-space anchor for the cluster field
+    // spreadRadius    – number         – how far clusters scatter around pos (XZ plane)
+    // clusterCount    – number         – how many crystal clusters to generate
+    // crystalsPerCluster – number      – spires per cluster
+    // hueCenter       – 0-1            – centre HSL hue for color variation
+    // hueRange        – 0-1            – total hue variation around hueCenter
+    // options         – object         – overrides for scale / tilt behaviour:
+    //   mainHeightMin/Max   – height range for the tallest crystal in each cluster
+    //   sideHeightMin/Max   – height range for secondary crystals
+    //   thicknessMin/Max    – XZ scale range (equal for hex cross-section)
+    //   depthVariance       – how many units below pos.y clusters can embed
+    //   tiltMain            – max radians of tilt for the primary crystal
+    //   tiltSide            – max radians of outward splay for secondary crystals
+    function createCrystalStructure(pos, spreadRadius, clusterCount, crystalsPerCluster, hueCenter, hueRange, options) {
+        const opts = Object.assign({
+            mainHeightMin: 100, mainHeightMax: 350,
+            sideHeightMin: 30,  sideHeightMax: 100,
+            thicknessMin: 60,   thicknessMax: 75,
+            depthVariance: 18,
+            tiltMain: 0.2,
+            tiltSide: 0.6
+        }, options);
+
+        const crystalTexture = createProceduralCrystalTexture();
+
+        // Hexagonal prism tapering to a point at the top
+        const crystalGeo = new THREE.CylinderGeometry(0, 0.5, 1, 6);
+        crystalGeo.translate(0, 0.5, 0); // pivot at base
+
+        const crystalMat = new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            flatShading: true,          // keeps facets sharp — critical for the look
+            transparent: true,
+            opacity: 0.85,
+            transmission: 0.9,
+            ior: 2.2,
+            thickness: 15.0,
+            clearcoat: 1.0,
+            clearcoatRoughness: 0.0,
+            metalness: 0.1,
+            roughness: 0.2,
+            roughnessMap: crystalTexture // simulates cloudy internal fractures
+        });
+
+        const totalInstances = clusterCount * crystalsPerCluster;
+        const mesh = new THREE.InstancedMesh(crystalGeo, crystalMat, totalInstances);
+        mesh.userData.mega = true;
+
+        const _d = new THREE.Object3D();
+        const _col = new THREE.Color();
+        let idx = 0;
+
+        for (let c = 0; c < clusterCount; c++) {
+            // Scatter clusters around pos in XZ
+            const angle  = Math.random() * Math.PI * 2;
+            const dist   = spreadRadius * (0.2 + Math.random() * 0.8);
+            const cx     = pos.x + Math.cos(angle) * dist;
+            const cz     = pos.z + Math.sin(angle) * dist;
+            const cy     = pos.y - Math.random() * opts.depthVariance;
+
+            const clusterHue = hueCenter + (Math.random() - 0.5) * hueRange;
+
+            for (let i = 0; i < crystalsPerCluster; i++) {
+                _d.position.set(cx, cy, cz);
+                _d.rotation.set(0, 0, 0);
+
+                const isMain = (i === 0);
+                if (isMain) {
+                    // Primary spire — nearly vertical with subtle wobble
+                    _d.rotateX((Math.random() - 0.5) * opts.tiltMain);
+                    _d.rotateZ((Math.random() - 0.5) * opts.tiltMain);
+                } else {
+                    // Secondary spires — splay outward like a blooming flower
+                    const tiltDir = Math.random() * Math.PI * 2;
+                    const tiltAmt = (opts.tiltSide * 0.5) + Math.random() * (opts.tiltSide * 0.5);
+                    _d.rotation.y = tiltDir;
+                    _d.rotateZ(tiltAmt);
+                }
+                _d.rotateY(Math.random() * Math.PI * 2); // random face rotation
+
+                const thickness = opts.thicknessMin + Math.random() * (opts.thicknessMax - opts.thicknessMin);
+                const height = isMain
+                    ? opts.mainHeightMin + Math.random() * (opts.mainHeightMax - opts.mainHeightMin)
+                    : opts.sideHeightMin + Math.random() * (opts.sideHeightMax - opts.sideHeightMin);
+
+                _d.scale.set(thickness, height, thickness);
+                _d.updateMatrix();
+                mesh.setMatrixAt(idx, _d.matrix);
+
+                const hue        = clusterHue + (Math.random() - 0.5) * 0.05;
+                const saturation = 0.6 + Math.random() * 0.4;
+                const lightness  = 0.4 + Math.random() * 0.4;
+                _col.setHSL(hue, saturation, lightness);
+                mesh.setColorAt(idx, _col);
+
+                idx++;
+            }
+        }
+
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+        return mesh;
+    }
+
+    // 2. The Main Function — populates the far background with crystal fields
     function createMegaStructures() {
         const toRemove = [];
         bgGroup.children.forEach(obj => {
@@ -3981,107 +4085,23 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
             bgGroup.remove(obj);
         });
 
-        const crystalTexture = createProceduralCrystalTexture();
-
-        // --- 3D CRYSTAL GEOMETRY ---
-        // CylinderGeometry(radiusTop, radiusBottom, height, radialSegments)
-        // 0 radius top + 6 segments = Perfect 3D Hexagonal Crystal
-        const megaGeo = new THREE.CylinderGeometry(0, 0.5, 1, 6);
-        megaGeo.translate(0, 0.5, 0); // Set pivot to the bottom base
-        
-        // --- HYPERREALISTIC 3D GLASS/CRYSTAL MATERIAL ---
-        const megaMat = new THREE.MeshPhysicalMaterial({ 
-            color: 0xffffff,
-            flatShading: true,         // CRITICAL: Keeps the 6 crystal facets perfectly sharp
-            
-            // Transparency & Volumetrics
-            transparent: true,
-            opacity: 0.85,
-            transmission: 0.9,         // Light passes through
-            ior: 2.2,                  // High refraction (like diamond or cubic zirconia)
-            thickness: 15.0,           // Tells the renderer these are thick, dense 3D objects
-            
-            // Surface & Fractures
-            clearcoat: 1.0,            // Super glossy exterior
-            clearcoatRoughness: 0.0,
-            metalness: 0.1,
-            roughness: 0.2,            // Base smoothness
-            roughnessMap: crystalTexture // Creates the illusion of cloudy internal fractures!
-        });
-        
-        // Cluster settings
-        const numClusters = 70;
-        const crystalsPerCluster = 8;
-        const totalInstances = numClusters * crystalsPerCluster;
-        
-        const megaMesh = new THREE.InstancedMesh(megaGeo, megaMat, totalInstances);
-        megaMesh.userData.mega = true;
-
-        const dummy = new THREE.Object3D();
-        const color = new THREE.Color();
-        let instanceIndex = 0;
-
-        for (let c = 0; c < numClusters; c++) {
-            // --- CLUSTER POSITION ---
-            const radius = 80 + Math.random() * 180; 
-            const angle = Math.random() * Math.PI * 2; 
-            const cx = Math.cos(angle) * radius;
-            const cz = Math.sin(angle) * radius;
-            const cy = -65 - (Math.random() * 18); // Deep in the ground
-
-            // Pick a base color for the entire cluster (Cyan, Emerald, Amethyst, etc.)
-            const clusterHue = 0.45 + (Math.random() * 0.45); 
-
-            for (let i = 0; i < crystalsPerCluster; i++) {
-                dummy.position.set(cx, cy, cz);
-                dummy.rotation.set(0, 0, 0); // Reset rotation
-
-                const isMainCrystal = (i === 0);
-
-                // --- SPLAY / TILT LOGIC ---
-                if (isMainCrystal) {
-                    // The main crystal points mostly straight up
-                    dummy.rotateX((Math.random() - 0.5) * 0.2);
-                    dummy.rotateZ((Math.random() - 0.5) * 0.2);
-                } else {
-                    // Secondary crystals splay outward like a blooming flower
-                    const tiltDirection = Math.random() * Math.PI * 2; // Random direction outward
-                    const tiltAmount = 0.3 + Math.random() * 0.3;      // Tilt heavily
-                    
-                    dummy.rotation.y = tiltDirection;
-                    dummy.rotateZ(tiltAmount);
-                }
-                
-                // Randomly twist the crystal on its own axis so the hexagons misalign
-                dummy.rotateY(Math.random() * Math.PI * 2);
-
-                // --- 3D SCALE ---
-                // Hexagons need X and Z to be equal (or close) to look right
-                const thickness = 60 + Math.random() * 15; 
-                const height = isMainCrystal ? 
-                    (100 + Math.random() * 250) : // Main crystal is massive
-                    (30 + Math.random() * 100);   // Side crystals are smaller
-
-                dummy.scale.set(thickness, height, thickness);
-                dummy.updateMatrix();
-                
-                megaMesh.setMatrixAt(instanceIndex, dummy.matrix);
-
-                // --- COLOR VARIATION WITHIN CLUSTER ---
-                // Slightly shift the hue/lightness of sub-crystals so they aren't completely uniform
-                const hue = clusterHue + (Math.random() - 0.5) * 0.05;
-                const saturation = 0.6 + Math.random() * 0.4; 
-                const lightness = 0.4 + Math.random() * 0.4;
-                
-                color.setHSL(hue, saturation, lightness);
-                megaMesh.setColorAt(instanceIndex, color);
-
-                instanceIndex++;
+        // Single large InstancedMesh — 70 clusters × 8 crystals = 560 instances
+        const megaMesh = createCrystalStructure(
+            new THREE.Vector3(0, -65, 0), // anchor deep underground at world origin
+            220,  // scatter radius 80-260 units from centre
+            70,   // clusters
+            8,    // crystals per cluster
+            0.55, // hue centre (cyan-teal)
+            0.45, // wide hue range (cyan → amethyst)
+            {
+                mainHeightMin: 100, mainHeightMax: 350,
+                sideHeightMin: 30,  sideHeightMax: 100,
+                thicknessMin: 60,   thicknessMax: 75,
+                depthVariance: 18,
+                tiltMain: 0.2,
+                tiltSide: 0.6
             }
-        }
-
-        megaMesh.instanceMatrix.needsUpdate = true;
-        if (megaMesh.instanceColor) megaMesh.instanceColor.needsUpdate = true;
+        );
 
         bgGroup.add(megaMesh);
     }
@@ -5320,7 +5340,7 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
         customDoors.length = 0;
         customFields.length = 0;
 
-        if (data) {
+        if(data) { 
             customSpawn = data.spawn || {x:0, y:2, z:0};
             customExit = data.exit || {x:0, y:5, z:-8};
             customWaterY = data.waterY;
@@ -5330,12 +5350,18 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
             if(data.lights) customLights = data.lights;
             if(data.plates) customPlates = data.plates;
             if(data.doors) customDoors = data.doors;
-            if(data.fields) customFields = data.fields; // <--- LOADS FIELDS
-        else customFields = [];
+            if(data.fields) customFields = data.fields;
+            else customFields = [];  // ← moved outside the brace-less if, still inside if(data)
         } else {
             customSpawn = {x:0, y:2, z:0};
             customExit = {x:0, y:5, z:-8};
             customWaterY = undefined;
+        }
+
+        logicNodes.configs = {};
+        // ↓ Guard with if(data) — data is null for new levels
+        if (data && data.logic) {
+            logicNodes.configs = JSON.parse(JSON.stringify(data.logic));
         }
 
         logicNodes.configs = {}; 
@@ -5664,12 +5690,6 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
         document.getElementById('tp-red-scale-val').textContent = redStartScale.toFixed(1);
     });
 
-    // Light Intensity
-    document.getElementById('tp-light-intensity').addEventListener('input', e => {
-        lightIntensity = parseFloat(e.target.value);
-        document.getElementById('tp-light-intensity-val').textContent = lightIntensity.toFixed(1);
-    });
-
     // Light Radius
     document.getElementById('tp-light-radius').addEventListener('input', e => {
         lightRadius = parseFloat(e.target.value);
@@ -5983,13 +6003,14 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
         editorMeshesGroup.add(mesh);
     }
 
-    const keys = { w: false, a: false, s: false, d: false, space: false };
+    const keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
     document.addEventListener('keydown', e => {
         if (e.code === 'KeyW' || e.code === 'KeyZ' || e.code === 'ArrowUp') keys.w = true;
         if (e.code === 'KeyA' || e.code === 'KeyQ' || e.code === 'ArrowLeft') keys.a = true;
         if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = true;
         if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = true;
         if (e.code === 'Space' && !isTransitioning && !isCutscene && !isPaused) keys.space = true; 
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
         if (e.code === 'KeyR' && controls.isLocked && !isTransitioning && !isCutscene && !isPaused) isRKeyDown = true; 
     });
     document.addEventListener('keyup', e => {
@@ -5998,6 +6019,7 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
         if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = false;
         if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = false;
         if (e.code === 'Space') keys.space = false;
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = false;
         if (e.code === 'KeyR') { isRKeyDown = false; rKeyTimer = 0; document.getElementById('scale-hud').style.opacity = '0'; }
 
         // TAB RELEASE: close tool selector
@@ -6382,19 +6404,25 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
         customEntities.forEach(ent => placeInstance(ent.x, ent.y, ent.z, ent.type));
         customDestruction.forEach(bomb => placeInstance(bomb.cx, bomb.cy, bomb.cz, 'bomb'));
 
-        // Build Light markers — small sphere-like box, colored per-light
-        if (editorInstancedMeshes['light']) {
-            // Reset to neutral yellow; will be set per-light below
-            editorInstancedMeshes['light'].material.color.setHex(0xffee44);
-        }
+        // Build Light markers — small box per light, per-instance color via setColorAt
+        const _editorLightColor = new THREE.Color();
         customLights.forEach(light => {
-            // Tint the instanced mesh to the last placed light's color (approximation)
-            if (editorInstancedMeshes['light']) {
-                editorInstancedMeshes['light'].material.color.setHex(light.color);
-                editorInstancedMeshes['light'].material.needsUpdate = true;
+            const im = editorInstancedMeshes['light'];
+            if (im && im.count < MAX_EDITOR_BLOCKS) {
+                dummy.position.set(light.x, light.y, light.z);
+                dummy.rotation.set(0, 0, 0);
+                dummy.scale.setScalar(0.45);
+                dummy.updateMatrix();
+                const idx = im.count;
+                im.setMatrixAt(idx, dummy.matrix);
+                _editorLightColor.setHex(light.color);
+                im.setColorAt(idx, _editorLightColor);
+                im.count++;
             }
-            placeInstance(light.x, light.y, light.z, 'light', 0.45);
         });
+        if (editorInstancedMeshes['light'] && editorInstancedMeshes['light'].instanceColor) {
+            editorInstancedMeshes['light'].instanceColor.needsUpdate = true;
+        }
 
         customPlates.forEach(p => placeInstance(p.x, p.y, p.z, 'plate', 0.8));
         customDoors.forEach(d => {
@@ -6736,7 +6764,6 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
             logicNodes.inputs.fill(false);
 
             // 2. Check Plates (Updated to set logicNodes.inputs)
-            logicNodes.inputs.fill(false);
             activePlates.forEach(p => {
                 let block = null;
 
@@ -7010,7 +7037,8 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
                     if (keys.w) targetVel.add(fwd); if (keys.s) targetVel.sub(fwd);
                     if (keys.d) targetVel.add(rgt); if (keys.a) targetVel.sub(rgt);
                 }
-                if (targetVel.lengthSq() > 0) targetVel.normalize().multiplyScalar(6.8);
+                const isSprinting = keys.shift && currentlyGrounded && !isCutscene && targetVel.lengthSq() > 0;
+                if (targetVel.lengthSq() > 0) targetVel.normalize().multiplyScalar(isSprinting ? 11.5 : 6.8);
 
                 for (let i = 0; i < world.contacts.length; i++) {
                     const c = world.contacts[i]; let nx = 0, ny = 0, nz = 0; let contactRelY = 0;
@@ -7075,7 +7103,7 @@ import { OptimizedSSRPass } from './OptimizedSSRPass.js';
                 _v1.set(playerBody.position.x, playerBody.position.y + playerHalfH * 0.85, playerBody.position.z);
                 activeCamera.position.lerp(_v1, 0.4);
 
-                let targetFov = (currentlyGrounded && speedSq > 1) ? 85 : 75;
+                let targetFov = isSprinting ? 92 : (currentlyGrounded && speedSq > 1) ? 85 : 75;
                 if (Math.abs(activeCamera.fov - targetFov) > 0.1) { activeCamera.fov += (targetFov - activeCamera.fov) * 0.1; activeCamera.updateProjectionMatrix(); }
 
                 // --- REMOVE THE OLD DOUBLE-GOAL LOGIC AND REPLACE WITH THIS ---
