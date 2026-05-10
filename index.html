@@ -4,19 +4,750 @@
     <meta charset="UTF-8">
     <title>Shatter</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ═══════════════════════════════════════════════════════
+           SHATTER — SETTINGS PANEL OVERHAUL
+           ═══════════════════════════════════════════════════════ */
+
+        #settings-panel {
+            background: linear-gradient(160deg, rgba(8,14,26,0.97) 0%, rgba(5,10,20,0.99) 100%);
+            border: 1px solid rgba(100,180,255,0.18);
+            border-radius: 4px;
+            box-shadow: 0 0 60px rgba(60,140,255,0.12), 0 0 0 1px rgba(255,255,255,0.04) inset;
+            padding: 28px 32px 28px;
+            min-width: 480px;
+            max-width: 520px;
+            position: relative;
+            font-family: 'Rajdhani', 'Share Tech Mono', monospace;
+            overflow: hidden;
+        }
+
+        /* corner accents */
+        #settings-panel::before, #settings-panel::after {
+            content: '';
+            position: absolute;
+            width: 16px; height: 16px;
+            border-color: rgba(100,180,255,0.5);
+            border-style: solid;
+        }
+        #settings-panel::before { top: 0; left: 0; border-width: 2px 0 0 2px; }
+        #settings-panel::after  { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+        /* ── HEADER ── */
+        #settings-panel .sett-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+        #settings-panel .sett-header h2 {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            letter-spacing: 6px;
+            color: rgba(255,255,255,0.9);
+            margin: 0;
+            font-weight: 400;
+            text-shadow: 0 0 12px rgba(100,180,255,0.6);
+        }
+        #settings-panel .sett-header-line {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(100,180,255,0.4), transparent);
+        }
+        #settings-panel .sett-header-dot {
+            width: 6px; height: 6px;
+            background: #4ab4ff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #4ab4ff;
+            animation: sett-pulse 2s ease-in-out infinite;
+        }
+        @keyframes sett-pulse {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.7); }
+        }
+
+        /* ── TABS ── */
+        .settings-tabs {
+            display: flex;
+            position: relative;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(100,180,255,0.12);
+            border-radius: 3px;
+            padding: 3px;
+            gap: 2px;
+            margin-bottom: 22px;
+        }
+        .settings-tabs::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(100,180,255,0.3), transparent);
+        }
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: rgba(160,200,255,0.45);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            padding: 9px 4px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: color 0.2s, background 0.2s;
+            position: relative;
+        }
+        .tab-btn:hover:not(.active) {
+            color: rgba(160,200,255,0.7);
+            background: rgba(100,180,255,0.05);
+        }
+        .tab-btn.active {
+            color: #fff;
+            background: rgba(100,180,255,0.12);
+            text-shadow: 0 0 10px rgba(100,180,255,0.5);
+        }
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px; left: 20%; right: 20%;
+            height: 1px;
+            background: #4ab4ff;
+            box-shadow: 0 0 6px #4ab4ff;
+        }
+
+        .settings-content { display: none; }
+        .settings-content.active { display: block; }
+
+        /* ── SECTION HEADER ── */
+        .sett-section-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 4px;
+            color: rgba(100,180,255,0.5);
+            text-transform: uppercase;
+            margin: 0 0 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sett-section-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(100,180,255,0.15);
+        }
+
+        /* ── PRESET CARDS ── */
+        .preset-label {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 4px;
+            color: rgba(100,180,255,0.5);
+            margin-bottom: 10px;
+        }
+        .preset-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            margin-bottom: 20px;
+        }
+        .preset-btn {
+            background: rgba(255,255,255,0.03) !important;
+            border: 1px solid rgba(100,180,255,0.15) !important;
+            color: rgba(160,200,255,0.5) !important;
+            font-family: 'Share Tech Mono', monospace !important;
+            font-size: 9px !important;
+            letter-spacing: 2px !important;
+            padding: 10px 4px !important;
+            cursor: pointer;
+            border-radius: 3px !important;
+            transition: all 0.15s !important;
+            text-align: center;
+            margin: 0 !important;
+        }
+        .preset-btn:hover:not(.active) {
+            border-color: rgba(100,180,255,0.4) !important;
+            color: rgba(160,200,255,0.85) !important;
+            background: rgba(100,180,255,0.06) !important;
+        }
+        .preset-btn.active {
+            background: rgba(74,180,255,0.12) !important;
+            border-color: rgba(74,180,255,0.6) !important;
+            color: #4ab4ff !important;
+            text-shadow: 0 0 8px rgba(74,180,255,0.6) !important;
+            box-shadow: 0 0 12px rgba(74,180,255,0.1) inset !important;
+        }
+
+        /* ── SETTINGS GRID ── */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 16px;
+            align-items: center;
+        }
+        .settings-grid label {
+            font-family: 'Rajdhani', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: rgba(160,200,255,0.65);
+            text-transform: uppercase;
+        }
+        .settings-grid select {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(100,180,255,0.2);
+            color: rgba(200,230,255,0.85);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 1px;
+            padding: 7px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            outline: none;
+            width: 100%;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(100,180,255,0.5)'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 28px;
+        }
+        .settings-grid select:focus {
+            border-color: rgba(100,180,255,0.5);
+            box-shadow: 0 0 0 1px rgba(100,180,255,0.15);
+        }
+        .settings-grid select option {
+            background: #0a0f1e;
+            color: #a0c8ff;
+        }
+
+        /* toggle buttons in grid */
+        .settings-grid .toggle-row {
+            display: flex;
+            gap: 4px;
+            width: 100%;
+        }
+        .settings-grid .toggle-btn {
+            flex: 1;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(100,180,255,0.15);
+            color: rgba(160,200,255,0.45);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 2px;
+            padding: 7px 2px;
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.15s;
+        }
+        .settings-grid .toggle-btn:hover:not(.active) {
+            color: rgba(160,200,255,0.8);
+            border-color: rgba(100,180,255,0.3);
+        }
+        .settings-grid .toggle-btn.active {
+            background: rgba(74,180,255,0.12);
+            border-color: rgba(74,180,255,0.5);
+            color: #4ab4ff;
+        }
+        .settings-grid .toggle-btn.warn.active {
+            background: rgba(255,160,40,0.1);
+            border-color: rgba(255,160,40,0.5);
+            color: #ffa028;
+        }
+
+        /* ── AUDIO SLIDERS ── */
+        .audio-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+        .audio-item {
+            display: grid;
+            grid-template-columns: 100px 1fr 44px;
+            align-items: center;
+            gap: 12px;
+        }
+        .audio-item label {
+            font-family: 'Rajdhani', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: rgba(160,200,255,0.65);
+            text-transform: uppercase;
+        }
+        .audio-item .audio-val {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            color: #4ab4ff;
+            text-align: right;
+            min-width: 36px;
+        }
+
+        /* ── CUSTOM SLIDER ── */
+        .slider-wrapper { position: relative; }
+        input[type="range"].sett-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 3px;
+            background: rgba(100,180,255,0.12);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+        }
+        input[type="range"].sett-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            background: #4ab4ff;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(74,180,255,0.7);
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        input[type="range"].sett-slider:hover::-webkit-slider-thumb,
+        input[type="range"].sett-slider:active::-webkit-slider-thumb {
+            transform: scale(1.25);
+            box-shadow: 0 0 14px rgba(74,180,255,0.9);
+        }
+        input[type="range"].sett-slider::-moz-range-thumb {
+            width: 14px; height: 14px;
+            background: #4ab4ff;
+            border: none;
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(74,180,255,0.7);
+            cursor: pointer;
+        }
+
+        /* sensitivity */
+        .game-grid {
+            display: grid;
+            grid-template-columns: 120px 1fr 44px;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .game-grid label {
+            font-family: 'Rajdhani', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: rgba(160,200,255,0.65);
+            text-transform: uppercase;
+        }
+        .game-grid .sens-val {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 11px;
+            color: #4ab4ff;
+            text-align: right;
+        }
+
+        /* ── DANGER ZONE ── */
+        .danger-zone {
+            border: 1px solid rgba(255,68,68,0.2);
+            border-radius: 3px;
+            padding: 14px 16px;
+            background: rgba(255,40,40,0.03);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-top: 4px;
+        }
+        .danger-zone-label {
+            font-family: 'Rajdhani', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            color: rgba(255,100,100,0.7);
+            text-transform: uppercase;
+        }
+        .danger-zone-sub {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 9px;
+            color: rgba(255,100,100,0.4);
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+        #btn-reset-data {
+            background: transparent !important;
+            border: 1px solid rgba(255,68,68,0.4) !important;
+            color: rgba(255,100,100,0.8) !important;
+            font-family: 'Share Tech Mono', monospace !important;
+            font-size: 9px !important;
+            letter-spacing: 3px !important;
+            padding: 8px 16px !important;
+            cursor: pointer;
+            border-radius: 2px !important;
+            transition: all 0.15s !important;
+            white-space: nowrap;
+            width: auto !important;
+            margin: 0 !important;
+        }
+        #btn-reset-data:hover {
+            background: rgba(255,68,68,0.1) !important;
+            border-color: rgba(255,68,68,0.7) !important;
+            color: #ff6464 !important;
+        }
+
+        /* ── APPLY BUTTON ── */
+        #btn-hide-settings {
+            display: block;
+            width: 100%;
+            margin-top: 22px !important;
+            background: transparent !important;
+            border: 1px solid rgba(100,180,255,0.3) !important;
+            color: rgba(160,200,255,0.8) !important;
+            font-family: 'Share Tech Mono', monospace !important;
+            font-size: 10px !important;
+            letter-spacing: 5px !important;
+            padding: 12px !important;
+            cursor: pointer;
+            border-radius: 3px !important;
+            transition: all 0.2s !important;
+            position: relative;
+            overflow: hidden;
+        }
+        #btn-hide-settings::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(100,180,255,0.08), transparent);
+            transition: left 0.4s;
+        }
+        #btn-hide-settings:hover {
+            border-color: rgba(100,180,255,0.6) !important;
+            color: #fff !important;
+            background: rgba(100,180,255,0.06) !important;
+            box-shadow: 0 0 16px rgba(100,180,255,0.1) !important;
+        }
+        #btn-hide-settings:hover::before { left: 100%; }
+
+        /* ═══════════════════════════════════════════════════════
+           SHATTER — MAIN MENU OVERHAUL
+           ═══════════════════════════════════════════════════════ */
+
+        #main-menu {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            overflow: hidden;
+            background: #020508;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* ── PARTICLE CANVAS ── */
+        #mm-canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── SCAN LINES ── */
+        #main-menu::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 3px,
+                rgba(0,0,0,0.08) 3px,
+                rgba(0,0,0,0.08) 4px
+            );
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* ── SWEEP LINE ── */
+        #main-menu::after {
+            content: '';
+            position: absolute;
+            left: 0; right: 0;
+            height: 160px;
+            background: linear-gradient(180deg,
+                transparent 0%,
+                rgba(74,180,255,0.03) 40%,
+                rgba(74,180,255,0.06) 50%,
+                rgba(74,180,255,0.03) 60%,
+                transparent 100%
+            );
+            animation: mm-sweep 8s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+        @keyframes mm-sweep {
+            0%   { top: -160px; }
+            100% { top: 100vh; }
+        }
+
+        /* ── CONTENT WRAPPER ── */
+        #mm-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+            animation: mm-enter 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        @keyframes mm-enter {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── PRE-TITLE TAG ── */
+        #mm-pretitle {
+            font-size: 9px;
+            letter-spacing: 8px;
+            color: rgba(74,180,255,0.55);
+            text-transform: uppercase;
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: mm-enter 1.2s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        #mm-pretitle::before, #mm-pretitle::after {
+            content: '';
+            width: 32px; height: 1px;
+            background: rgba(74,180,255,0.3);
+        }
+
+        /* ── LOGO ── */
+        #mm-logo {
+            position: relative;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: clamp(52px, 8vw, 96px);
+            font-weight: 400;
+            letter-spacing: 0.22em;
+            color: #fff;
+            line-height: 1;
+            text-shadow:
+                0 0 30px rgba(74,180,255,0.35),
+                0 0 80px rgba(74,180,255,0.12);
+            user-select: none;
+            animation: mm-enter 1.2s 0s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        /* glitch layers */
+        #mm-logo::before, #mm-logo::after {
+            content: 'SHATTER';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            letter-spacing: 0.22em;
+            overflow: hidden;
+        }
+        #mm-logo::before {
+            color: rgba(74,180,255,0.6);
+            clip-path: polygon(0 15%, 100% 15%, 100% 30%, 0 30%);
+            animation: mm-glitch-a 6s infinite;
+        }
+        #mm-logo::after {
+            color: rgba(255,100,140,0.4);
+            clip-path: polygon(0 60%, 100% 60%, 100% 72%, 0 72%);
+            animation: mm-glitch-b 6s infinite;
+        }
+        @keyframes mm-glitch-a {
+            0%,86%,88%,100% { transform: translate(0); opacity: 0; }
+            87% { transform: translate(-3px, 1px); opacity: 1; }
+        }
+        @keyframes mm-glitch-b {
+            0%,86%,89%,100% { transform: translate(0); opacity: 0; }
+            87.5% { transform: translate(3px, -1px); opacity: 1; }
+            88.5% { transform: translate(-2px, 0); opacity: 1; }
+        }
+
+        /* ── SUBTITLE ── */
+        #mm-subtitle {
+            font-size: 10px;
+            letter-spacing: 5px;
+            color: rgba(160,200,255,0.4);
+            text-transform: uppercase;
+            margin-top: 12px;
+            margin-bottom: 52px;
+            animation: mm-enter 1.2s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        /* ── DIVIDER ── */
+        #mm-divider {
+            width: 1px;
+            height: 28px;
+            background: linear-gradient(180deg, rgba(74,180,255,0.5), transparent);
+            margin-bottom: 36px;
+            animation: mm-enter 1.2s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        /* ── NAV BUTTONS ── */
+        #mm-nav {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            animation: mm-enter 1.2s 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        #btn-play {
+            position: relative;
+            background: transparent !important;
+            border: 1px solid rgba(74,180,255,0.5) !important;
+            color: #fff !important;
+            font-family: 'Share Tech Mono', monospace !important;
+            font-size: 11px !important;
+            letter-spacing: 8px !important;
+            padding: 16px 56px !important;
+            cursor: pointer;
+            border-radius: 2px !important;
+            overflow: hidden;
+            transition: border-color 0.2s, box-shadow 0.2s !important;
+            text-indent: 8px;
+        }
+        #btn-play::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(74,180,255,0.12) 0%, transparent 60%);
+            transition: opacity 0.2s;
+        }
+        #btn-play::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(74,180,255,0.15), transparent);
+            transition: left 0.5s;
+        }
+        #btn-play:hover {
+            border-color: rgba(74,180,255,0.9) !important;
+            box-shadow: 0 0 24px rgba(74,180,255,0.2), 0 0 60px rgba(74,180,255,0.08) !important;
+        }
+        #btn-play:hover::after { left: 100%; }
+
+        /* corner ticks on play button */
+        .mm-btn-corner {
+            position: absolute;
+            width: 8px; height: 8px;
+            border-color: rgba(74,180,255,0.8);
+            border-style: solid;
+            transition: width 0.2s, height 0.2s;
+        }
+        .mm-btn-corner.tl { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+        .mm-btn-corner.tr { top: -1px; right: -1px; border-width: 1px 1px 0 0; }
+        .mm-btn-corner.bl { bottom: -1px; left: -1px; border-width: 0 0 1px 1px; }
+        .mm-btn-corner.br { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+        #btn-play:hover .mm-btn-corner { width: 14px; height: 14px; }
+
+        #btn-enter-hub {
+            background: transparent !important;
+            border: 1px solid rgba(160,200,255,0.18) !important;
+            color: rgba(160,200,255,0.5) !important;
+            font-family: 'Share Tech Mono', monospace !important;
+            font-size: 9px !important;
+            letter-spacing: 5px !important;
+            padding: 10px 40px !important;
+            cursor: pointer;
+            border-radius: 2px !important;
+            transition: all 0.2s !important;
+            text-indent: 5px;
+        }
+        #btn-enter-hub:hover {
+            color: rgba(160,200,255,0.85) !important;
+            border-color: rgba(160,200,255,0.4) !important;
+            background: rgba(160,200,255,0.04) !important;
+        }
+
+        /* ── BOTTOM META ── */
+        #mm-footer {
+            position: absolute;
+            bottom: 28px;
+            left: 0; right: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 36px;
+            z-index: 2;
+            animation: mm-enter 1.4s 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .mm-footer-item {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 3px;
+            color: rgba(100,140,180,0.35);
+            text-transform: uppercase;
+        }
+
+        /* ── CORNER DECORATIONS ── */
+        .mm-corner {
+            position: absolute;
+            width: 24px; height: 24px;
+            z-index: 2;
+            border-color: rgba(74,180,255,0.25);
+            border-style: solid;
+        }
+        .mm-corner.tl { top: 24px; left: 24px; border-width: 1px 0 0 1px; }
+        .mm-corner.tr { top: 24px; right: 24px; border-width: 1px 1px 0 0; }
+        .mm-corner.bl { bottom: 24px; left: 24px; border-width: 0 0 1px 1px; }
+        .mm-corner.br { bottom: 24px; right: 24px; border-width: 0 1px 1px 0; }
+
+        /* ── SIDE RULES ── */
+        .mm-rule {
+            position: absolute;
+            z-index: 2;
+        }
+        .mm-rule.left {
+            left: 36px; top: 50%; transform: translateY(-50%);
+            width: 1px; height: 120px;
+            background: linear-gradient(180deg, transparent, rgba(74,180,255,0.2), transparent);
+        }
+        .mm-rule.right {
+            right: 36px; top: 50%; transform: translateY(-50%);
+            width: 1px; height: 120px;
+            background: linear-gradient(180deg, transparent, rgba(74,180,255,0.2), transparent);
+        }
+    </style>
 </head>
 <body>
     <div id="vignette"></div>
 
     <div id="main-menu">
-        <h1>SHATTER</h1>
-        <p class="subtitle">A Physics Puzzle Experience</p>
-        <button id="btn-play" class="menu-btn">PLAY</button>
-        <button id="btn-enter-hub" style="
-            margin-top: 8px; background: transparent;
-            border: 1px solid rgba(160,200,255,0.35); color: #a0c8ff;
-            letter-spacing: 4px; padding: 10px 28px; cursor: pointer;
-            font-family: monospace; font-size: 12px;      ">ENTER HUB</button>
+        <canvas id="mm-canvas"></canvas>
+
+        <!-- corner decorations -->
+        <div class="mm-corner tl"></div>
+        <div class="mm-corner tr"></div>
+        <div class="mm-corner bl"></div>
+        <div class="mm-corner br"></div>
+        <div class="mm-rule left"></div>
+        <div class="mm-rule right"></div>
+
+        <div id="mm-content">
+            <div id="mm-pretitle">PHYSICS PUZZLE</div>
+            <div id="mm-logo">SHATTER</div>
+            <div id="mm-subtitle">A Physics Puzzle Experience</div>
+            <div id="mm-divider"></div>
+            <div id="mm-nav">
+                <button id="btn-play" class="menu-btn">
+                    <span class="mm-btn-corner tl"></span>
+                    <span class="mm-btn-corner tr"></span>
+                    <span class="mm-btn-corner bl"></span>
+                    <span class="mm-btn-corner br"></span>
+                    PLAY
+                </button>
+                <button id="btn-enter-hub">ENTER HUB</button>
+            </div>
+        </div>
+
+        <div id="mm-footer">
+            <span class="mm-footer-item">v1.0</span>
+            <span class="mm-footer-item">WASD · SPACE · ESC</span>
+            <span class="mm-footer-item">© SHATTER</span>
+        </div>
     </div>
 
     <div id="ui"><div id="crosshair"></div></div>
@@ -213,17 +944,23 @@
         </div>
 
         <div id="settings-panel">
-            <h2 style="letter-spacing: 5px; margin: 0 0 15px 0; font-weight: bold; text-shadow: 0 0 10px rgba(255,255,255,0.5);">SETTINGS</h2>
-            
-            <div class="settings-tabs">
-                <button class="tab-btn active" data-target="tab-video">Video</button>
-                <button class="tab-btn" data-target="tab-audio">Audio</button>
-                <button class="tab-btn" data-target="tab-game">Gameplay</button>
+            <!-- Header -->
+            <div class="sett-header">
+                <div class="sett-header-dot"></div>
+                <h2>SETTINGS</h2>
+                <div class="sett-header-line"></div>
             </div>
 
+            <!-- Tabs -->
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-target="tab-video">VIDEO</button>
+                <button class="tab-btn" data-target="tab-audio">AUDIO</button>
+                <button class="tab-btn" data-target="tab-game">GAMEPLAY</button>
+            </div>
+
+            <!-- ── VIDEO TAB ── -->
             <div id="tab-video" class="settings-content active">
-                <!-- Graphic Presets -->
-                <div class="preset-label">GRAPHIC PRESET</div>
+                <div class="sett-section-label">PRESET</div>
                 <div class="preset-row">
                     <button class="preset-btn menu-btn" data-preset="potato">POTATO</button>
                     <button class="preset-btn menu-btn" data-preset="low">LOW</button>
@@ -231,17 +968,19 @@
                     <button class="preset-btn menu-btn" data-preset="high">HIGH</button>
                     <button class="preset-btn menu-btn" data-preset="ultra">ULTRA</button>
                 </div>
+
+                <div class="sett-section-label">RENDERING</div>
                 <div class="settings-grid">
-                    <label>Resolution Scale</label>
+                    <label>Resolution</label>
                     <select id="set-res">
-                        <option value="0.5">50% · Performance</option>
-                        <option value="0.75" selected>75% · Balanced</option>
-                        <option value="1.0">100% · Native</option>
-                        <option value="1.25">125% · Supersampled</option>
-                        <option value="1.50">150% · Ultra</option>
+                        <option value="0.5">50% — Performance</option>
+                        <option value="0.75" selected>75% — Balanced</option>
+                        <option value="1.0">100% — Native</option>
+                        <option value="1.25">125% — Supersampled</option>
+                        <option value="1.50">150% — Ultra</option>
                     </select>
 
-                    <label>Shadow Quality</label>
+                    <label>Shadows</label>
                     <select id="set-shadows">
                         <option value="0">Off</option>
                         <option value="1">Low</option>
@@ -256,7 +995,10 @@
                         <option value="1">Low</option>
                         <option value="2" selected>High</option>
                     </select>
+                </div>
 
+                <div class="sett-section-label" style="margin-top:16px;">POST-PROCESSING</div>
+                <div class="settings-grid">
                     <label>Volumetrics</label>
                     <div class="toggle-row" id="toggle-volumetrics">
                         <button class="toggle-btn" data-val="0">OFF</button>
@@ -281,6 +1023,7 @@
                         <button class="toggle-btn warn" data-val="1">ON ⚠</button>
                     </div>
                 </div>
+
                 <!-- Hidden selects keep applyGraphics() working unchanged -->
                 <select id="set-volumetrics" style="display:none"><option value="0">0</option><option value="2" selected>2</option></select>
                 <select id="set-bloom" style="display:none"><option value="0">0</option><option value="1" selected>1</option></select>
@@ -289,40 +1032,48 @@
                 <select id="set-ssr" style="display:none"><option value="0" selected>0</option><option value="1">1</option></select>
             </div>
 
+            <!-- ── AUDIO TAB ── -->
             <div id="tab-audio" class="settings-content">
-                <div class="settings-grid">
-                    <label>Music Volume</label>
-                    <div class="slider-wrapper">
-                        <input type="range" id="bgm-slider" min="0" max="1.0" step="0.05" value="0.5">
-                        <span id="bgm-val">50%</span>
+                <div class="sett-section-label">LEVELS</div>
+                <div class="audio-row">
+                    <div class="audio-item">
+                        <label>Music</label>
+                        <input type="range" id="bgm-slider" class="sett-slider" min="0" max="1.0" step="0.05" value="0.5">
+                        <span class="audio-val" id="bgm-val">50%</span>
                     </div>
-                    
-                    <label>Synth Volume</label>
-                    <div class="slider-wrapper">
-                        <input type="range" id="dyn-slider" min="0" max="1.0" step="0.05" value="0.5">
-                        <span id="dyn-val">50%</span>
+                    <div class="audio-item">
+                        <label>Synth</label>
+                        <input type="range" id="dyn-slider" class="sett-slider" min="0" max="1.0" step="0.05" value="0.5">
+                        <span class="audio-val" id="dyn-val">50%</span>
                     </div>
-                    
-                    <label>SFX Volume</label>
-                    <div class="slider-wrapper">
-                        <input type="range" id="sfx-slider" min="0" max="1.0" step="0.05" value="0.5">
-                        <span id="sfx-val">50%</span>
+                    <div class="audio-item">
+                        <label>SFX</label>
+                        <input type="range" id="sfx-slider" class="sett-slider" min="0" max="1.0" step="0.05" value="0.5">
+                        <span class="audio-val" id="sfx-val">50%</span>
                     </div>
                 </div>
             </div>
 
+            <!-- ── GAMEPLAY TAB ── -->
             <div id="tab-game" class="settings-content">
-                <div class="settings-grid">
-                    <label>Mouse Sensitivity</label>
-                    <div class="slider-wrapper">
-                        <input type="range" id="sensitivity-slider" min="0.1" max="3.0" step="0.1" value="1.0">
-                        <span id="sens-val">1.0</span>
-                    </div>
+                <div class="sett-section-label">CONTROLS</div>
+                <div class="game-grid">
+                    <label>Sensitivity</label>
+                    <input type="range" id="sensitivity-slider" class="sett-slider" min="0.1" max="3.0" step="0.1" value="1.0">
+                    <span class="sens-val" id="sens-val">1.0</span>
                 </div>
-                <button id="btn-reset-data" class="menu-btn" style="border-color: #ff4444; color: #ff4444; margin-top: 20px; width: 100%;">RESET PROGRESS</button>
+
+                <div class="sett-section-label" style="margin-top:10px;">DANGER ZONE</div>
+                <div class="danger-zone">
+                    <div>
+                        <div class="danger-zone-label">Reset Progress</div>
+                        <div class="danger-zone-sub">Wipes all level data &amp; unlocks</div>
+                    </div>
+                    <button id="btn-reset-data" class="menu-btn">RESET</button>
+                </div>
             </div>
 
-            <button id="btn-hide-settings" class="menu-btn" style="margin-top: 25px; width: 100%;">APPLY & BACK</button>
+            <button id="btn-hide-settings" class="menu-btn">APPLY &amp; BACK</button>
         </div>
     </div>
 
@@ -384,6 +1135,99 @@
             </div>
         </div>
     </div>
+    <script>
+    /* ── MAIN MENU PARTICLE FIELD ── */
+    (function() {
+        function init() {
+            const canvas = document.getElementById('mm-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let W, H, particles = [], shards = [];
+
+            function resize() {
+                W = canvas.width  = window.innerWidth;
+                H = canvas.height = window.innerHeight;
+            }
+            resize();
+            window.addEventListener('resize', resize);
+
+            // Floating dust particles
+            for (let i = 0; i < 90; i++) {
+                particles.push({
+                    x: Math.random() * 1000,
+                    y: Math.random() * 1000,
+                    vx: (Math.random() - 0.5) * 0.18,
+                    vy: -Math.random() * 0.22 - 0.05,
+                    size: Math.random() * 1.4 + 0.3,
+                    alpha: Math.random() * 0.5 + 0.1,
+                    twinkle: Math.random() * Math.PI * 2,
+                    twinkleSpeed: 0.005 + Math.random() * 0.015,
+                });
+            }
+
+            // Static shard lines (glass-fracture aesthetic)
+            for (let i = 0; i < 18; i++) {
+                const cx = Math.random() * 1000;
+                const cy = Math.random() * 1000;
+                const len = 20 + Math.random() * 80;
+                const angle = Math.random() * Math.PI;
+                shards.push({
+                    x1: cx + Math.cos(angle) * len * 0.5,
+                    y1: cy + Math.sin(angle) * len * 0.5,
+                    x2: cx - Math.cos(angle) * len * 0.5,
+                    y2: cy - Math.sin(angle) * len * 0.5,
+                    alpha: 0.04 + Math.random() * 0.06,
+                });
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, W, H);
+
+                // draw shards (scaled to canvas)
+                const sx = W / 1000, sy = H / 1000;
+                shards.forEach(s => {
+                    ctx.beginPath();
+                    ctx.moveTo(s.x1 * sx, s.y1 * sy);
+                    ctx.lineTo(s.x2 * sx, s.y2 * sy);
+                    ctx.strokeStyle = `rgba(74,180,255,${s.alpha})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                });
+
+                // draw particles
+                particles.forEach(p => {
+                    p.x += p.vx; p.y += p.vy;
+                    p.twinkle += p.twinkleSpeed;
+                    if (p.y < -10) { p.y = 1010; p.x = Math.random() * 1000; }
+                    if (p.x < -10) p.x = 1010;
+                    if (p.x > 1010) p.x = -10;
+                    const a = p.alpha * (0.6 + 0.4 * Math.sin(p.twinkle));
+                    ctx.beginPath();
+                    ctx.arc(p.x * sx, p.y * sy, p.size, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(160,210,255,${a})`;
+                    ctx.fill();
+                });
+
+                requestAnimationFrame(draw);
+            }
+
+            // Only run while main menu is visible
+            const menu = document.getElementById('main-menu');
+            const obs = new MutationObserver(() => {
+                if (menu.style.display === 'none') cancelAnimationFrame(raf);
+            });
+            obs.observe(menu, { attributes: true, attributeFilter: ['style'] });
+
+            let raf;
+            function loop() { draw(); raf = requestAnimationFrame(loop); }
+            // kick off after first frame
+            requestAnimationFrame(() => { draw(); });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else { init(); }
+    })();
+    </script>
     <script type="importmap">
     {
         "imports": {

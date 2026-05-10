@@ -945,7 +945,8 @@ import {
 
     let isPaused = true; 
     let volBGM = 0.5; let volSFX = 0.5; let volDyn = 0.5;
-    let gfx = { res: 0.75, shadows: 1, bloom: 1, ssao: 1, fxaa: 1, ssr: 0, particles: 2, volumetrics: 2 };
+    let gfx = { res: 0.75, shadows: 2, bloom: 1, ssao: 1, fxaa: 1, ssr: 0, particles: 2, volumetrics: 2 };
+    let _prevShadowType = -1; // Tracks last applied shadow type to avoid full scene.traverse on every resize
 
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -1329,9 +1330,9 @@ import {
     const GFX_PRESETS = {
         potato: { res:0.5,  shadows:0, bloom:0, ssao:0, fxaa:0, ssr:0, particles:0, volumetrics:0 },
         low:    { res:0.5,  shadows:1, bloom:0, ssao:0, fxaa:1, ssr:0, particles:1, volumetrics:0 },
-        medium: { res:0.75, shadows:2, bloom:0, ssao:1, fxaa:1, ssr:0, particles:2, volumetrics:2 },
+        medium: { res:0.75, shadows:2, bloom:1, ssao:1, fxaa:1, ssr:0, particles:2, volumetrics:2 },
         high:   { res:1.0,  shadows:3, bloom:1, ssao:1, fxaa:1, ssr:0, particles:2, volumetrics:2 },
-        ultra:  { res:1.25, shadows:4, bloom:1, ssao:1, fxaa:1, ssr:0, particles:2, volumetrics:2 },
+        ultra:  { res:1.0,  shadows:4, bloom:1, ssao:1, fxaa:1, ssr:0, particles:2, volumetrics:2 },
     };
     document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -1429,8 +1430,8 @@ import {
                         break;
                     case 4: // Ultra
                         sunLight.shadow.mapSize.set(4096, 4096);
-                        renderer.shadowMap.type = THREE.PCFShadowMap;
-                        sunLight.shadow.bias = -0.0002;
+                        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                        sunLight.shadow.bias = -0.0001;
                         break;
                 }
 
@@ -1443,12 +1444,13 @@ import {
             }
         }
 
-        // Update materials if shadow type changed
-        scene.traverse((child) => {
-            if (child.isMesh) {
-                child.material.needsUpdate = true;
-            }
-        });
+        // Update materials only when shadow map type changed — avoids a full scene.traverse on every resize/settings call
+        if (_prevShadowType !== renderer.shadowMap.type) {
+            _prevShadowType = renderer.shadowMap.type;
+            scene.traverse((child) => {
+                if (child.isMesh) child.material.needsUpdate = true;
+            });
+        }
 
         if(bloomPass) bloomPass.enabled = gfx.bloom === 1;
         if(ssaoPass) ssaoPass.enabled = gfx.ssao === 1;
@@ -2562,7 +2564,7 @@ import {
     ssrPass.thickness = 0.5;       // How thick geometry is assumed to be to prevent rays shooting through
     ssrPass.maxDistance = 90.0;    // How far reflections go
     ssrPass.opacity = 1.0;         // Visibility of reflection
-    ssrPass.setSize(window.innerWidth * 4, window.innerHeight * 4);
+    ssrPass.setSize(window.innerWidth, window.innerHeight);
 
     composer.addPass(ssrPass);
 
@@ -2759,7 +2761,7 @@ import {
     composer.addPass(volumetricPass);
 
     const bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth / 4, window.innerHeight / 4), 
+        new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 
         0.22,  // Strength: Lowered (from 0.32) to make the glow more subtle
         1.15,  // Radius: Increased (from 0.65) to make the glow spread out and "soften"
         0.94   // Threshold: Slightly higher (from 0.82) so only the brightest highlights bleed
@@ -6954,11 +6956,11 @@ import {
                 p.group.position.y = yOffset;
 
                 // Sync Kinematic Physics body position with visual animation
-                const worldOffset = new THREE.Vector3(0, yOffset, 0).applyQuaternion(globalTiltThree);
+                _v1.set(0, yOffset, 0).applyQuaternion(globalTiltThree);
                 p.body.position.set(
-                    p.basePos.x + worldOffset.x,
-                    p.basePos.y + worldOffset.y,
-                    p.basePos.z + worldOffset.z
+                    p.basePos.x + _v1.x,
+                    p.basePos.y + _v1.y,
+                    p.basePos.z + _v1.z
                 );
 
                 // Physical Gear Simulation
@@ -7477,6 +7479,22 @@ import {
         renderPass.camera = activeCamera;
         ssaoPass.camera = activeCamera;
         ssrPass.camera = activeCamera;
+
+        // Depth pre-pass: render scene into depthCaptureTarget so the volumetric
+        // ShaderPass has a real depth texture to reconstruct world positions from.
+        // Camera matrix uniforms and shadow bindings are also updated here every frame.
+        if (gfx.volumetrics === 2) {
+            renderer.setRenderTarget(depthCaptureTarget);
+            renderer.render(scene, activeCamera);
+            renderer.setRenderTarget(null);
+            const volU = volumetricPass.material.uniforms;
+            volU.cameraProjectionMatrixInverse.value.copy(activeCamera.projectionMatrixInverse);
+            volU.cameraMatrixWorld.value.copy(activeCamera.matrixWorld);
+            if (sunLight && sunLight.shadow && sunLight.shadow.map) {
+                volU.shadowMap.value = sunLight.shadow.map.texture;
+                volU.shadowMatrix.value.copy(sunLight.shadow.matrix);
+            }
+        }
 
         composer.render();
     }
