@@ -12,58 +12,58 @@ export const HUB_LEVEL_INDEX = 'HUB';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const HUB_GATES = [ /* ── CHAPTER 1 ── The Fundamentals (North sector) */
-{ id: '0_0', ch: 0, gate: 0, levels: [0, 1, 2], pos: { x: -8, y: 1, z: -15 },
+{ id: '0_0', ch: 0, gate: 0, levels: [0, 1, 2], pos: { x: -5, y: 1, z: -9 },
 name: 'GATE Ⅰ', subtitle: 'THE FUNDAMENTALS', color: 0xa0c8ff, hue: 0.60,
 requiresCubes: [], reward: 'blue' }, { id: '0_1', ch: 0, gate: 1, levels:
-[3, 4, 5], pos: { x: 0, y: 1, z: -18 }, name: 'GATE Ⅱ', subtitle: 'THE FUNDAMENTALS',
+[3, 4, 5], pos: { x: 0, y: 1, z: -11 }, name: 'GATE Ⅱ', subtitle: 'THE FUNDAMENTALS',
  color: 0xa0c8ff, hue: 0.58, requiresCubes: ['blue'], reward:
-'green' }, { id: '0_2', ch: 0, gate: 2, levels: [6, 7, 8], pos: { x: 8, y: 1, z:
--15 }, name: 'GATE Ⅲ', subtitle: 'THE FUNDAMENTALS', color: 0xa0c8ff, hue: 0.56,
+'green' }, { id: '0_2', ch: 0, gate: 2, levels: [6, 7, 8], pos: { x: 5, y: 1, z:
+-9 }, name: 'GATE Ⅲ', subtitle: 'THE FUNDAMENTALS', color: 0xa0c8ff, hue: 0.56,
 requiresCubes: ['green'], reward: 'red' }, { id: '0_3', ch: 0, gate: 3, levels:
-[9], pos: { x: 0, y: 5, z: -28 }, name: 'GATE Ⅳ', subtitle: 'THE FUNDAMENTALS',
+[9], pos: { x: 0, y: 5, z: -17 }, name: 'GATE Ⅳ', subtitle: 'THE FUNDAMENTALS',
 color: 0xa0c8ff, hue: 0.55, requiresCubes: ['red'], reward: 'yellow' },
 
 /* ── CHAPTER 2 ── The Archive (East sector) */
 {
     id: '1_0', ch: 1, gate: 0, levels: [0, 1, 2],
-    pos: { x: 15, y: 1, z: -8 }, name: 'GATE Ⅴ', subtitle: 'THE ARCHIVE',
+    pos: { x: 9, y: 1, z: -5 }, name: 'GATE Ⅴ', subtitle: 'THE ARCHIVE',
     color: 0x4ade80, hue: 0.37, requiresCubes: ['yellow'], reward: 'cyan'
 },
 {
     id: '1_1', ch: 1, gate: 1, levels: [3, 4, 5],
-    pos: { x: 18, y: 1, z: 0 }, name: 'GATE Ⅵ', subtitle: 'THE ARCHIVE',
+    pos: { x: 11, y: 1, z: 0 }, name: 'GATE Ⅵ', subtitle: 'THE ARCHIVE',
     color: 0x4ade80, hue: 0.39, requiresCubes: ['cyan'], reward: 'gray'
 },
 {
     id: '1_2', ch: 1, gate: 2, levels: [6, 7, 8],
-    pos: { x: 15, y: 1, z: 8 }, name: 'GATE Ⅶ', subtitle: 'THE ARCHIVE',
+    pos: { x: 9, y: 1, z: 5 }, name: 'GATE Ⅶ', subtitle: 'THE ARCHIVE',
     color: 0x4ade80, hue: 0.41, requiresCubes: ['gray'], reward: null
 },
 {
     id: '1_3', ch: 1, gate: 3, levels: [9],
-    pos: { x: 28, y: 5, z: 0 }, name: 'GATE Ⅷ', subtitle: 'THE ARCHIVE',
+    pos: { x: 17, y: 5, z: 0 }, name: 'GATE Ⅷ', subtitle: 'THE ARCHIVE',
     color: 0x4ade80, hue: 0.42, requiresCubes: ['gray'], reward: null
 },
 
 /* ── CHAPTER 3 ── The Citadel (West sector) */
 {
     id: '2_0', ch: 2, gate: 0, levels: [0, 1, 2],
-    pos: { x: -15, y: 1, z: 8 }, name: 'GATE Ⅸ', subtitle: 'THE CITADEL',
+    pos: { x: -9, y: 1, z: 5 }, name: 'GATE Ⅸ', subtitle: 'THE CITADEL',
     color: 0xff5080, hue: 0.95, requiresCubes: ['gray'], reward: null
 },
 {
     id: '2_1', ch: 2, gate: 1, levels: [3, 4, 5],
-    pos: { x: -18, y: 1, z: 0 }, name: 'GATE Ⅹ', subtitle: 'THE CITADEL',
+    pos: { x: -11, y: 1, z: 0 }, name: 'GATE Ⅹ', subtitle: 'THE CITADEL',
     color: 0xff5080, hue: 0.97, requiresCubes: ['gray'], reward: null
 },
 {
     id: '2_2', ch: 2, gate: 2, levels: [6, 7, 8],
-    pos: { x: -15, y: 1, z: -8 }, name: 'GATE Ⅺ', subtitle: 'THE CITADEL',
+    pos: { x: -9, y: 1, z: -5 }, name: 'GATE Ⅺ', subtitle: 'THE CITADEL',
     color: 0xff5080, hue: 0.99, requiresCubes: ['gray'], reward: null
 },
 {
     id: '2_3', ch: 2, gate: 3, levels: [9],
-    pos: { x: -28, y: 5, z: 0 }, name: 'GATE Ⅻ', subtitle: 'THE CITADEL',
+    pos: { x: -17, y: 5, z: 0 }, name: 'GATE Ⅻ', subtitle: 'THE CITADEL',
     color: 0xff5080, hue: 0.02, requiresCubes: ['gray'], reward: null
 },
 
@@ -82,60 +82,60 @@ returnLevel: 0, }; }
 export function getHubWorldParams() { const builder = new
 LevelBuilder(HUB_LEVEL_INDEX, 'THE NEXUS');
 
-builder.setBounds(34, 16, 34)
+builder.setBounds(21, 16, 21)
        .setSpawn(0, 4, 0)
        .setExit(0, 4, 0)
        .setCutscene('flyover')
        .setWater(0.6, { color: 0x002233, distortionScale: 1.5, alpha: 0.85 });
 
-builder.flyCamStart.set(0, 25, 30);
+builder.flyCamStart.set(0, 18, 20);
 builder.flyCamLook.set(0, 3, 0);
 
 builder.addCustomLogic((x, y, z) => {
     const r = Math.sqrt(x * x + z * z);
     
     // Outer enclosing temple wall
-    if (r > 32) return y <= 15;
+    if (r > 20) return y <= 15;
 
     let floorY = 1; // Default outer ring height
 
     // Central Spawn Dais
-    if (r <= 4) floorY = 3;
-    else if (r <= 5) floorY = 2;
+    if (r <= 2.5) floorY = 3;
+    else if (r <= 3) floorY = 2;
 
     // Circular Moat with Properly Aligned Bridges
-    if (r > 5 && r < 12) {
+    if (r > 3 && r < 7) {
         floorY = 0; // Drops below the water line
         
         // Fixed: Bridges now radiate perfectly from the center
-        if (Math.abs(x) <= 3 && z < 0) floorY = 1; // North Bridge
-        if (Math.abs(z) <= 3 && x > 0) floorY = 1; // East Bridge
-        if (Math.abs(z) <= 3 && x < 0) floorY = 1; // West Bridge
+        if (Math.abs(x) <= 2 && z < 0) floorY = 1; // North Bridge
+        if (Math.abs(z) <= 2 && x > 0) floorY = 1; // East Bridge
+        if (Math.abs(z) <= 2 && x < 0) floorY = 1; // West Bridge
     }
 
     // North High Platform (Gate IV)
-    if (Math.abs(x) <= 6 && z <= -19 && z >= -32) {
+    if (Math.abs(x) <= 4 && z <= -12 && z >= -20) {
         let py = 5;
-        if (z > -23) py = 5 - Math.floor(z + 23); // Stairs
+        if (z > -14) py = 5 - Math.floor(z + 14); // Stairs
         if (py > floorY) floorY = Math.min(py, 5);
     }
 
     // East High Platform (Gate VIII)
-    if (x >= 19 && x <= 32 && Math.abs(z) <= 6) {
+    if (x >= 12 && x <= 20 && Math.abs(z) <= 4) {
         let py = 5;
-        if (x < 23) py = 5 - Math.floor(23 - x); // Stairs
+        if (x < 14) py = 5 - Math.floor(14 - x); // Stairs
         if (py > floorY) floorY = Math.min(py, 5);
     }
 
     // West High Platform (Gate XII)
-    if (x <= -19 && x >= -32 && Math.abs(z) <= 6) {
+    if (x <= -12 && x >= -20 && Math.abs(z) <= 4) {
         let py = 5;
-        if (x > -23) py = 5 - Math.floor(x + 23); // Stairs
+        if (x > -14) py = 5 - Math.floor(x + 14); // Stairs
         if (py > floorY) floorY = Math.min(py, 5);
     }
 
     // Majestic Perimeter Columns
-    if (r >= 30 && r <= 32) {
+    if (r >= 18 && r <= 20) {
         const angle = Math.atan2(z, x);
         if (Math.abs(Math.sin(angle * 6)) > 0.9 && y <= 12) return true;
     }
@@ -144,10 +144,10 @@ builder.addCustomLogic((x, y, z) => {
 });
 
 builder
-    .addLight(  0,  6,   0, 0xffeedd, 3.5, 20)   // Atrium center
-    .addLight(  0,  6, -18, 0xa0c8ff, 4.0, 20)   // Ch1 North
-    .addLight( 18,  6,   0, 0x4ade80, 4.0, 20)   // Ch2 East
-    .addLight(-18,  6,   0, 0xff5080, 4.0, 20);  // Ch3 West
+    .addLight(  0,  6,   0, 0xffeedd, 3.5, 14)   // Atrium center
+    .addLight(  0,  6, -11, 0xa0c8ff, 4.0, 14)   // Ch1 North
+    .addLight( 11,  6,   0, 0x4ade80, 4.0, 14)   // Ch2 East
+    .addLight(-11,  6,   0, 0xff5080, 4.0, 14);  // Ch3 West
 
 return builder.build();
 
@@ -301,11 +301,11 @@ _buildDecor(scene, createCrystalStructure) {
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0x8a8a82, roughness: 0.9, metalness: 0.05 });
     const rubbleMat = new THREE.MeshStandardMaterial({ color: 0x6e6e68, roughness: 1.0 });
 
-    const northCrystals = createCrystalStructure(new THREE.Vector3(0, -10, -45), 25, 15, 6, 0.62, 0.15,
+    const northCrystals = createCrystalStructure(new THREE.Vector3(0, -10, -27), 25, 15, 6, 0.62, 0.15,
         { mainHeightMin: 20, mainHeightMax: 50, sideHeightMin: 5, sideHeightMax: 18, thicknessMin: 2.5, thicknessMax: 5, depthVariance: 6, tiltMain: 0.15, tiltSide: 0.5 });
-    const eastCrystals = createCrystalStructure(new THREE.Vector3(45, -10, 0), 20, 12, 5, 0.38, 0.08,
+    const eastCrystals = createCrystalStructure(new THREE.Vector3(27, -10, 0), 20, 12, 5, 0.38, 0.08,
         { mainHeightMin: 15, mainHeightMax: 40, sideHeightMin: 4, sideHeightMax: 14, thicknessMin: 2, thicknessMax: 4.5, depthVariance: 4, tiltMain: 0.15, tiltSide: 0.6 });
-    const westCrystals = createCrystalStructure(new THREE.Vector3(-45, -10, 0), 25, 14, 5, 0.96, 0.06,
+    const westCrystals = createCrystalStructure(new THREE.Vector3(-27, -10, 0), 25, 14, 5, 0.96, 0.06,
         { mainHeightMin: 18, mainHeightMax: 45, sideHeightMin: 5, sideHeightMax: 16, thicknessMin: 2, thicknessMax: 5, depthVariance: 5, tiltMain: 0.15, tiltSide: 0.6 });
     const centreCrystals = createCrystalStructure(new THREE.Vector3(0, -3, 0), 6, 6, 3, 0.08, 0.12,
         { mainHeightMin: 2, mainHeightMax: 5, sideHeightMin: 0.8, sideHeightMax: 2.0, thicknessMin: 0.2, thicknessMax: 0.4, depthVariance: 0.5, tiltMain: 0.1, tiltSide: 0.5 });
@@ -314,9 +314,9 @@ _buildDecor(scene, createCrystalStructure) {
 
     // Flanking Pillars for the Grand Stairs
     const columnPos = [
-        { x: -5, y: 1, z: -15 }, { x: 5, y: 1, z: -15 }, // North stairs
-        { x: 15, y: 1, z: -5 },  { x: 15, y: 1, z: 5 },  // East stairs
-        { x: -15, y: 1, z: -5 }, { x: -15, y: 1, z: 5 }  // West stairs
+        { x: -3, y: 1, z: -9 }, { x: 3, y: 1, z: -9 }, // North stairs
+        { x: 9, y: 1, z: -3 },  { x: 9, y: 1, z: 3 },  // East stairs
+        { x: -9, y: 1, z: -3 }, { x: -9, y: 1, z: 3 }  // West stairs
     ];
     columnPos.forEach((p, i) => {
         const col = createRuinColumn(scene, p, 5 + (i % 2) * 2, 0.45 + (i % 2) * 0.25, stoneMat);
@@ -324,7 +324,7 @@ _buildDecor(scene, createCrystalStructure) {
     });
 
     // Small rubble piles
-    [{ x: 18, y: 1, z: -18 }, { x: -18, y: 1, z: -18 }, { x: 0, y: 1, z: 22 }].forEach(p => {
+    [{ x: 11, y: 1, z: -11 }, { x: -11, y: 1, z: -11 }, { x: 0, y: 1, z: 13 }].forEach(p => {
         const rb = createRubbleField(scene, new THREE.Vector3(p.x, p.y, p.z), 10, 5, rubbleMat);
         this.decorObjects.push(rb);
     });
