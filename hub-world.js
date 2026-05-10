@@ -157,7 +157,6 @@ export function getHubWorldParams() {
             Math.sin(gx * 0.22 + 1.3) * Math.cos(gz * 0.19 + 0.7) * 2.0 +
             Math.sin(gx * 0.41 - 0.9) * Math.cos(gz * 0.38 + 1.8) * 1.0
         );
-        const groundY = Math.round(Math.max(0, noiseVal * 0.55));
 
         // Base floor
         if (y <= groundY) return true;

@@ -3967,7 +3967,9 @@ import {
         grabbedBlock = null; exitMesh = null; waterMesh = null; currentGoal = null; currentGreenBlock = null;
         pendingBounce = false; pendingBounceBlock = null; AudioSys.focusElement = null;
 
-        scene.traverse((obj) => { if (obj.userData && obj.userData.core) { scene.remove(obj); } });
+        const coreObjects = [];
+        scene.traverse((obj) => { if (obj.userData && obj.userData.core) { coreObjects.push(obj); } });
+        coreObjects.forEach(obj => scene.remove(obj));
     }
 
     const bgGroup = new THREE.Group();
