@@ -106,6 +106,7 @@ import {
     let customExit = { x: 0, y: 5, z: -8 };
     let customLights = []; // Array of {x, y, z, color, intensity, radius}
     let customFields = [];
+    let customDecorations = []; // Array of {type, x, y, z, rotY}
     let lightColor = 0xffffff;
     let lightIntensity = 3.0;
     let lightRadius = 8.0;
@@ -188,7 +189,13 @@ import {
         'water': 0x0055ff,
         'logic': 0x9966ff, // <--- ADD THIS
         'aero': 0x00ffff,   // <--- ADD THIS
-        'oneway': 0xffaa00  // <--- ADD THIS
+        'oneway': 0xffaa00,  // <--- ADD THIS
+        // ── DECORATION PROPS ──
+        'decor_rubble':    0x8a7266,
+        'decor_shattered': 0xb8a898,
+        'decor_bush':      0x2d8a3c,
+        'decor_fern':      0x3acc50,
+        'decor_tree':      0x1a6628,
     };
 
     function applyPOM(material, heightMap, scale = 0.05) {
@@ -4215,6 +4222,23 @@ import {
                 if (f.type === 'oneway') createOneWayField(f);
             });
         }
+
+        // Spawn decoration props for custom levels (not during preview)
+        if ((lvlIndex === 'CUSTOM' || (typeof lvlIndex === 'string' && lvlIndex.startsWith('CUSTOM_'))) && !isPreview) {
+            // For CUSTOM_ slots, load decorations from saved data
+            if (typeof lvlIndex === 'string' && lvlIndex.startsWith('CUSTOM_')) {
+                const slot = parseInt(lvlIndex.replace('CUSTOM_', ''));
+                const savedData = customLevels[slot];
+                if (savedData && savedData.decorations) {
+                    const savedDecs = customDecorations;
+                    customDecorations = savedData.decorations;
+                    spawnCustomDecorations();
+                    customDecorations = savedDecs;
+                }
+            } else {
+                spawnCustomDecorations();
+            }
+        }
         // Reset logic configs before loading level-specific ones
         logicNodes.configs = {}; 
         if (currentParams.logic) {
@@ -5520,6 +5544,7 @@ import {
         customPlates.length = 0;
         customDoors.length = 0;
         customFields.length = 0;
+        customDecorations.length = 0;
 
         if(data) { 
             customSpawn = data.spawn || {x:0, y:2, z:0};
@@ -5533,6 +5558,8 @@ import {
             if(data.doors) customDoors = data.doors;
             if(data.fields) customFields = data.fields;
             else customFields = [];  // ← moved outside the brace-less if, still inside if(data)
+            if(data.decorations) customDecorations = data.decorations;
+            else customDecorations = [];
         } else {
             customSpawn = {x:0, y:2, z:0};
             customExit = {x:0, y:5, z:-8};
@@ -5726,7 +5753,8 @@ import {
                 destruction: customDestruction, lights: customLights,
                 plates: customPlates, doors: customDoors, waterY: customWaterY,
                 fields: customFields, // <--- SAVES FIELDS
-                logic: logicNodes.configs 
+                logic: logicNodes.configs,
+                decorations: customDecorations, // <--- SAVES DECORATIONS
             };
             customLevels[slot] = data;
             localStorage.setItem('shatter_custom_levels', JSON.stringify(customLevels));
@@ -5802,6 +5830,12 @@ import {
         { tool: 'logic',      label: 'LOGIC',     key: 'L'  },
         { tool: 'aero',       label: 'Aero Filter',      key: '-'  },
         { tool: 'oneway',      label: 'One Way Field',      key: '-'  },
+        // ── DECORATION PROPS ──
+        { tool: 'decor_rubble',    label: 'Rubble',         key: '-', category: 'decor' },
+        { tool: 'decor_shattered', label: 'Shattered Wall', key: '-', category: 'decor' },
+        { tool: 'decor_bush',      label: 'Bush',           key: '-', category: 'decor' },
+        { tool: 'decor_fern',      label: 'Fern',           key: '-', category: 'decor' },
+        { tool: 'decor_tree',      label: 'Tree',           key: '-', category: 'decor' },
     ];
 
     function hexToCSS(hex) {
@@ -6078,6 +6112,261 @@ import {
         }
     }
 
+    // ── DECORATION PROP GEOMETRY BUILDERS ────────────────────────────────────────
+    function _makeRng(seed) {
+        let s = seed;
+        return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
+    }
+
+    function buildDecoRubble(rng = _makeRng(77)) {
+        const group = new THREE.Group();
+        const darkConcrete = new THREE.MeshStandardMaterial({ color: 0x7a6a5a, roughness: 0.98, metalness: 0.0 });
+        const lightConcrete = new THREE.MeshStandardMaterial({ color: 0x9a8a7a, roughness: 0.95, metalness: 0.0 });
+        const count = 6 + Math.floor(rng() * 6);
+        for (let i = 0; i < count; i++) {
+            const w = 0.12 + rng() * 0.52, h = 0.06 + rng() * 0.22, d = 0.1 + rng() * 0.44;
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mesh = new THREE.Mesh(geo, rng() > 0.5 ? darkConcrete : lightConcrete);
+            mesh.position.set((rng() - 0.5) * 1.3, h * 0.5 + rng() * 0.05, (rng() - 0.5) * 1.3);
+            mesh.rotation.y = rng() * Math.PI * 2;
+            mesh.rotation.x = (rng() - 0.5) * 0.5;
+            mesh.rotation.z = (rng() - 0.5) * 0.3;
+            mesh.castShadow = true; mesh.receiveShadow = true;
+            group.add(mesh);
+        }
+        // Dust particle (flat disc)
+        const discGeo = new THREE.CircleGeometry(0.7, 8);
+        const discMat = new THREE.MeshStandardMaterial({ color: 0x887060, roughness: 1.0, transparent: true, opacity: 0.45, depthWrite: false });
+        const disc = new THREE.Mesh(discGeo, discMat);
+        disc.rotation.x = -Math.PI / 2; disc.position.y = 0.01;
+        group.add(disc);
+        return group;
+    }
+
+    function buildDecoShattered(rng = _makeRng(42)) {
+        const group = new THREE.Group();
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0xb0a090, roughness: 0.93, metalness: 0.0 });
+        const darkMat     = new THREE.MeshStandardMaterial({ color: 0x888070, roughness: 0.98, metalness: 0.0 });
+        // Main tilted slab
+        const slabGeo = new THREE.BoxGeometry(1.1 + rng()*0.3, 1.6 + rng()*0.5, 0.22);
+        const slab = new THREE.Mesh(slabGeo, concreteMat);
+        slab.rotation.z = (rng() - 0.5) * 0.7; slab.rotation.y = (rng() - 0.5) * 0.4;
+        slab.position.y = 0.95; slab.castShadow = true; slab.receiveShadow = true;
+        group.add(slab);
+        // Rebar streaks (thin cylinders)
+        for (let i = 0; i < 3; i++) {
+            const rbarGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.6 + rng()*0.8, 4);
+            const rbar = new THREE.Mesh(rbarGeo, new THREE.MeshStandardMaterial({ color: 0x554444, roughness: 0.8, metalness: 0.4 }));
+            rbar.position.set((rng()-0.5)*0.6, 0.4 + rng()*0.6, (rng()-0.5)*0.15);
+            rbar.rotation.z = (rng()-0.5)*1.2; rbar.rotation.x = (rng()-0.5)*0.4;
+            group.add(rbar);
+        }
+        // Scattered broken pieces around base
+        for (let i = 0; i < 5; i++) {
+            const pw = 0.18 + rng()*0.5, ph = 0.12 + rng()*0.3;
+            const pGeo = new THREE.BoxGeometry(pw, ph, 0.18);
+            const piece = new THREE.Mesh(pGeo, i % 2 === 0 ? concreteMat : darkMat);
+            piece.position.set((rng()-0.5)*1.2, ph*0.5, (rng()-0.5)*0.8);
+            piece.rotation.set((rng()-0.5)*0.6, rng()*Math.PI*2, (rng()-0.5)*0.4);
+            piece.castShadow = true;
+            group.add(piece);
+        }
+        return group;
+    }
+
+    function buildDecoBush(rng = _makeRng(55)) {
+        const group = new THREE.Group();
+        const leafPalette = [0x267a30, 0x2d9438, 0x1f6826, 0x3db84e, 0x224e1e, 0x4acc5e];
+        // Stem cluster
+        for (let s = 0; s < 4; s++) {
+            const sh = 0.2 + rng()*0.35;
+            const sGeo = new THREE.CylinderGeometry(0.02, 0.05, sh, 4);
+            const sMesh = new THREE.Mesh(sGeo, new THREE.MeshStandardMaterial({ color: 0x3a2818, roughness: 1.0 }));
+            sMesh.position.set((rng()-0.5)*0.25, sh*0.5, (rng()-0.5)*0.25);
+            sMesh.rotation.z = (rng()-0.5)*0.3;
+            group.add(sMesh);
+        }
+        // Dense leaf spheres
+        for (let i = 0; i < 11; i++) {
+            const r = 0.18 + rng() * 0.38;
+            const geo = new THREE.SphereGeometry(r, 6, 5);
+            const mat = new THREE.MeshStandardMaterial({ color: leafPalette[Math.floor(rng()*leafPalette.length)], roughness: 0.88, flatShading: true });
+            const sphere = new THREE.Mesh(geo, mat);
+            const angle = rng() * Math.PI * 2;
+            const rad = rng() * 0.55;
+            sphere.position.set(Math.cos(angle)*rad, 0.35 + rng()*0.7, Math.sin(angle)*rad);
+            sphere.castShadow = true;
+            group.add(sphere);
+        }
+        return group;
+    }
+
+    function buildDecoFern(rng = _makeRng(33)) {
+        const group = new THREE.Group();
+        const stemColors = [0x2a4c1c, 0x1e3a14];
+        const leafColors  = [0x2e9440, 0x3db858, 0x247832, 0x4acc66, 0x1e6028];
+        const leafCount = 9 + Math.floor(rng() * 6);
+        // Center stub
+        const centerGeo = new THREE.CylinderGeometry(0.03, 0.06, 0.18, 5);
+        const centerMesh = new THREE.Mesh(centerGeo, new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 1.0 }));
+        centerMesh.position.y = 0.09;
+        group.add(centerMesh);
+
+        for (let i = 0; i < leafCount; i++) {
+            const angle = (i / leafCount) * Math.PI * 2 + rng() * 0.4;
+            const stemLen = 0.45 + rng() * 0.9;
+            const tilt = 0.35 + rng() * 0.5; // how much frond droops outward
+
+            // Stem
+            const sGeo = new THREE.CylinderGeometry(0.012, 0.022, stemLen, 3);
+            const sMat = new THREE.MeshStandardMaterial({ color: stemColors[Math.floor(rng()*stemColors.length)], roughness: 1.0 });
+            const stemMesh = new THREE.Mesh(sGeo, sMat);
+            stemMesh.position.set(Math.cos(angle)*stemLen*0.42, stemLen*0.42, Math.sin(angle)*stemLen*0.42);
+            stemMesh.rotation.z = Math.cos(angle) * tilt;
+            stemMesh.rotation.x = -Math.sin(angle) * tilt;
+            group.add(stemMesh);
+
+            // Pinnate leaf blade using a row of small ellipses
+            const pinnaeCount = 4 + Math.floor(rng() * 4);
+            for (let p = 0; p < pinnaeCount; p++) {
+                const t = (p + 1) / (pinnaeCount + 1);
+                const pw = 0.08 + rng()*0.10, ph = 0.18 + rng()*0.14;
+                const pGeo = new THREE.PlaneGeometry(pw, ph);
+                const pMat = new THREE.MeshStandardMaterial({ color: leafColors[Math.floor(rng()*leafColors.length)], roughness: 0.85, side: THREE.DoubleSide });
+                const pMesh = new THREE.Mesh(pGeo, pMat);
+                const lx = Math.cos(angle)*stemLen*t*0.85;
+                const lz = Math.sin(angle)*stemLen*t*0.85;
+                pMesh.position.set(lx, stemLen*t*0.8, lz);
+                pMesh.rotation.y = angle + Math.PI * 0.5;
+                pMesh.rotation.x = -tilt * t * 0.8;
+                pMesh.castShadow = false;
+                group.add(pMesh);
+            }
+        }
+        return group;
+    }
+
+    function buildDecoTree(rng = _makeRng(99)) {
+        const group = new THREE.Group();
+        const trunkH = 2.0 + rng() * 1.4;
+        // Trunk with subtle taper and facets
+        const trunkGeo = new THREE.CylinderGeometry(0.10, 0.24, trunkH, 8);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1.0, flatShading: true });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = trunkH * 0.5;
+        trunk.castShadow = true; trunk.receiveShadow = true;
+        group.add(trunk);
+        // Root buttresses
+        for (let i = 0; i < 4; i++) {
+            const bAngle = (i / 4) * Math.PI * 2;
+            const bGeo = new THREE.BoxGeometry(0.12, 0.3, 0.45);
+            const b = new THREE.Mesh(bGeo, trunkMat);
+            b.position.set(Math.cos(bAngle)*0.18, 0.15, Math.sin(bAngle)*0.18);
+            b.rotation.y = bAngle;
+            group.add(b);
+        }
+        // Multi-layer canopy for fullness
+        const leafPalette = [0x1a6628, 0x236030, 0x2d8a3c, 0x1f7030, 0x308844, 0x15501e];
+        const canopyCount = 5 + Math.floor(rng() * 5);
+        for (let i = 0; i < canopyCount; i++) {
+            const r = 0.55 + rng() * 0.7;
+            const geo = new THREE.SphereGeometry(r, 7, 6);
+            const mat = new THREE.MeshStandardMaterial({ color: leafPalette[Math.floor(rng()*leafPalette.length)], roughness: 0.92, flatShading: true });
+            const leaf = new THREE.Mesh(geo, mat);
+            const theta = rng() * Math.PI * 2;
+            const offset = rng() * 0.55;
+            leaf.position.set(Math.cos(theta)*offset, trunkH + r*0.5 + rng()*0.55, Math.sin(theta)*offset);
+            leaf.castShadow = true;
+            group.add(leaf);
+        }
+        return group;
+    }
+
+    // Map from type string to builder function
+    const DECOR_BUILDERS = {
+        decor_rubble:    buildDecoRubble,
+        decor_shattered: buildDecoShattered,
+        decor_bush:      buildDecoBush,
+        decor_fern:      buildDecoFern,
+        decor_tree:      buildDecoTree,
+    };
+
+    // ── 3-D PREVIEW CANVAS RENDERER ───────────────────────────────────────────
+    // Renders each decoration prop into a small canvas data-URL once on load.
+    const DECOR_PREVIEW_URLS = {};
+    (function generateDecorationPreviews() {
+        try {
+            const SIZE = 128;
+            const pvRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+            pvRenderer.setSize(SIZE, SIZE);
+            pvRenderer.setPixelRatio(1.5);
+            pvRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+            pvRenderer.toneMappingExposure = 1.35;
+            pvRenderer.shadowMap.enabled = false;
+
+            const pvScene = new THREE.Scene();
+            pvScene.background = null;
+
+            // Warm 3-point lighting
+            pvScene.add(new THREE.AmbientLight(0xfff0e8, 0.55));
+            const sun = new THREE.DirectionalLight(0xfff5cc, 1.5);
+            sun.position.set(3, 5, 4);
+            pvScene.add(sun);
+            const rim = new THREE.DirectionalLight(0x88ccff, 0.45);
+            rim.position.set(-2, 1, -3);
+            pvScene.add(rim);
+
+            const pvCamera = new THREE.PerspectiveCamera(48, 1, 0.01, 100);
+
+            const seeds = { decor_rubble: 77, decor_shattered: 42, decor_bush: 55, decor_fern: 33, decor_tree: 99 };
+            Object.entries(DECOR_BUILDERS).forEach(([type, buildFn]) => {
+                const mesh = buildFn(_makeRng(seeds[type] || 50));
+                pvScene.add(mesh);
+
+                // Auto-frame: compute bounding box and position camera
+                const box = new THREE.Box3().setFromObject(mesh);
+                const center = box.getCenter(new THREE.Vector3());
+                const size3 = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size3.x, size3.y, size3.z);
+                const dist = maxDim * 1.6;
+                pvCamera.position.set(center.x + dist * 0.85, center.y + dist * 0.65, center.z + dist * 0.85);
+                pvCamera.lookAt(center);
+                pvCamera.updateProjectionMatrix();
+
+                pvRenderer.render(pvScene, pvCamera);
+                DECOR_PREVIEW_URLS[type] = pvRenderer.domElement.toDataURL('image/png');
+                pvScene.remove(mesh);
+            });
+
+            pvRenderer.dispose();
+        } catch(err) {
+            console.warn('[Decor Previews] Could not generate 3D previews:', err);
+        }
+    })();
+
+    // ── DECORATION SPAWNING (in-game mesh creation) ───────────────────────────
+    const _activeDecorationMeshes = [];
+
+    function spawnCustomDecorations() {
+        // Clean up any previous decoration meshes
+        _activeDecorationMeshes.forEach(m => {
+            scene.remove(m);
+            m.traverse(c => { if (c.isMesh) { c.geometry.dispose(); } });
+        });
+        _activeDecorationMeshes.length = 0;
+
+        customDecorations.forEach(dec => {
+            const buildFn = DECOR_BUILDERS[dec.type];
+            if (!buildFn) return;
+            const rngSeed = Math.round(dec.x * 73 + dec.y * 37 + dec.z * 19) & 0xffffffff;
+            const mesh = buildFn(_makeRng(rngSeed >>> 0));
+            mesh.position.set(dec.x, dec.y, dec.z);
+            mesh.rotation.y = dec.rotY || 0;
+            scene.add(mesh);
+            _activeDecorationMeshes.push(mesh);
+        });
+    }
+
     // ── BUILD HOTBAR (only shows the 10 number-keyed tools: 1–9 + 0) ──
     (function buildHotbar() {
         const hotbar = document.getElementById('editor-hotbar');
@@ -6100,19 +6389,63 @@ import {
     // ── BUILD TOOL SELECTOR GRID ──
     (function buildToolSelector() {
         const grid = document.getElementById('tool-selector-grid');
-        EDITOR_TOOLS_LIST.forEach(({ tool, label, key }) => {
+
+        let lastCategory = null;
+        EDITOR_TOOLS_LIST.forEach(({ tool, label, key, category }) => {
+            const isDecor = category === 'decor';
+
+            // Insert category divider before first decoration item
+            if (isDecor && lastCategory !== 'decor') {
+                const divider = document.createElement('div');
+                divider.className = 'ts-category-divider';
+                divider.style.cssText = `
+                    grid-column: 1 / -1;
+                    display: flex; align-items: center; gap: 10px;
+                    margin: 10px 0 4px; padding: 0 4px;
+                    font-size: 10px; font-weight: 700; letter-spacing: 2px;
+                    color: rgba(180,220,180,0.85);
+                    text-transform: uppercase;
+                    border-top: 1px solid rgba(100,200,120,0.22);
+                    padding-top: 10px;
+                `;
+                divider.innerHTML = `<span style="white-space:nowrap">🌿 DECORATION PROPS</span><span style="flex:1;height:1px;background:rgba(100,200,120,0.18)"></span>`;
+                grid.appendChild(divider);
+            }
+            lastCategory = category || null;
+
             const item = document.createElement('div');
             const isLight = tool === 'light';
             const isBig = tool === 'big_yellow' || tool === 'big_gray';
-            item.className = 'ts-item' + (tool === editorTool ? ' selected' : '') + (isLight ? ' light-tool' : '');
+            item.className = 'ts-item' + (tool === editorTool ? ' selected' : '') + (isLight ? ' light-tool' : '') + (isDecor ? ' ts-decor-item' : '');
             item.dataset.tool = tool;
-            const swatchSize = isBig ? '52px' : isLight ? '36px' : '44px';
-            const br = isLight ? '50%' : isBig ? '8px' : '6px';
-            const swatchExtra = isLight ? `box-shadow:0 0 12px rgba(255,238,68,0.8), 0 3px 12px rgba(0,0,0,0.5);` : '';
-            item.innerHTML = `
-                <div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[tool])};width:${swatchSize};height:${swatchSize};border-radius:${br};${swatchExtra}"></div>
-                <div class="ts-name">${label}</div>
-                <div class="ts-key">${key !== '-' ? '['+key+']' : '(TAB)'}</div>`;
+
+            if (isDecor) {
+                // 3D preview canvas or fallback color swatch
+                const hasPreview = !!DECOR_PREVIEW_URLS[tool];
+                const previewEl = hasPreview
+                    ? `<img src="${DECOR_PREVIEW_URLS[tool]}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;display:block;image-rendering:auto;" />`
+                    : `<div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[tool])};width:64px;height:64px;border-radius:8px;"></div>`;
+
+                // Decor category label icons
+                const icon = { decor_rubble:'🪨', decor_shattered:'💥', decor_bush:'🌿', decor_fern:'🌱', decor_tree:'🌳' }[tool] || '🎨';
+
+                item.innerHTML = `
+                    <div style="position:relative;display:flex;align-items:center;justify-content:center;width:72px;height:72px;">
+                        ${previewEl}
+                        <div style="position:absolute;bottom:2px;right:2px;font-size:14px;line-height:1;filter:drop-shadow(0 1px 2px #000)">${icon}</div>
+                    </div>
+                    <div class="ts-name" style="margin-top:3px;">${label}</div>
+                    <div class="ts-key">(TAB)</div>`;
+            } else {
+                const swatchSize = isBig ? '52px' : isLight ? '36px' : '44px';
+                const br = isLight ? '50%' : isBig ? '8px' : '6px';
+                const swatchExtra = isLight ? `box-shadow:0 0 12px rgba(255,238,68,0.8), 0 3px 12px rgba(0,0,0,0.5);` : '';
+                item.innerHTML = `
+                    <div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[tool])};width:${swatchSize};height:${swatchSize};border-radius:${br};${swatchExtra}"></div>
+                    <div class="ts-name">${label}</div>
+                    <div class="ts-key">${key !== '-' ? '['+key+']' : '(TAB)'}</div>`;
+            }
+
             item.addEventListener('mouseenter', () => {
                 document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('hovered'));
                 item.classList.add('hovered');
@@ -6353,6 +6686,13 @@ import {
                             normal: {x: norm.x, y: norm.y, z: norm.z} 
                         });
                     }
+                    else if (editorTool.startsWith('decor_')) {
+                        // Remove any existing decoration at the same grid position
+                        customDecorations = customDecorations.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
+                        // Random rotation so repeated placements feel varied
+                        const rotY = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.6;
+                        customDecorations.push({ type: editorTool, x: gx, y: gy, z: gz, rotY });
+                    }
                     else {
                         const ent = { type: editorTool, x: gx, y: gy, z: gz };
                         if (editorTool === 'red') ent.startScale = redStartScale;
@@ -6371,6 +6711,7 @@ import {
                     customPlates = customPlates.filter(p => p.x !== gx || p.y !== gy || p.z !== gz);
                     customDoors = customDoors.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
                     customFields = customFields.filter(f => f.x !== gx || f.y !== gy || f.z !== gz);
+                    customDecorations = customDecorations.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
                 }
                 updateEditorVisuals();
             }
@@ -6614,6 +6955,11 @@ import {
         customFields.forEach(f => {
             // We use scale 1.0 for the marker, but you can adjust
             placeInstance(f.x, f.y, f.z, f.type, 1.0);
+        });
+
+        // Decoration prop markers — small translucent colored cubes
+        customDecorations.forEach(d => {
+            placeInstance(d.x, d.y, d.z, d.type, 0.75);
         });
 
         // Draw Spawn and Exit markers
