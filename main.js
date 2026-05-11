@@ -6145,7 +6145,11 @@ import {
         return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
     }
 
-    function _deformGeometry(geometry, rng, intensity) {
+    function _deformGeometry(geometry, rng, intensity, minSize = 0.25) {
+        // Skip deformation on tiny rubble to keep them sharp/readable
+        const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
+        const size = box.getSize(new THREE.Vector3());
+        if (Math.max(size.x, size.y, size.z) < minSize) return;
         geometry.computeVertexNormals();
         const pos = geometry.attributes.position;
         const norm = geometry.attributes.normal;
@@ -6153,6 +6157,7 @@ import {
             const push = (rng() - 0.5) * intensity;
             pos.setXYZ(i, pos.getX(i) + norm.getX(i) * push, pos.getY(i) + norm.getY(i) * push, pos.getZ(i) + norm.getZ(i) * push);
         }
+        pos.needsUpdate = true;
         geometry.computeVertexNormals();
     }
 
@@ -6234,19 +6239,45 @@ import {
 
     function buildDecoBush(rng = _makeRng(55)) {
         const group = new THREE.Group();
-        const leafColors = [0x274e1d, 0x346328, 0x1d3a14, 0x417833];
-        const stemMat = new THREE.MeshStandardMaterial({ color: 0x3d2c20 });
-        for (let i = 0; i < 15; i++) {
-            const r = 0.2 + rng() * 0.4;
+        const leafColors = [0x274e1d, 0x346328, 0x1d3a14, 0x417833, 0x2d5a20, 0x3a6e28];
+        const stemMat = new THREE.MeshStandardMaterial({ color: 0x3d2c20, roughness: 1.0 });
+        // Main stem
+        const stemGeo = new THREE.CylinderGeometry(0.02, 0.04, 0.4, 5);
+        const stem = new THREE.Mesh(stemGeo, stemMat);
+        stem.position.y = -0.3;
+        group.add(stem);
+        // Dense leaf clusters - more of them, more varied sizes
+        const clusterCount = 22 + Math.floor(rng() * 10);
+        for (let i = 0; i < clusterCount; i++) {
+            const r = 0.15 + rng() * 0.35;
             const geo = new THREE.IcosahedronGeometry(r, 1);
-            _deformGeometry(geo, rng, r * 0.3);
-            const mat = new THREE.MeshStandardMaterial({ color: leafColors[Math.floor(rng() * leafColors.length)], roughness: 0.8, flatShading: true });
+            _deformGeometry(geo, rng, r * 0.35, 0.4);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: leafColors[Math.floor(rng() * leafColors.length)], 
+                roughness: 0.9, flatShading: true 
+            });
             const cluster = new THREE.Mesh(geo, mat);
-            const a = rng() * Math.PI * 2, d = rng() * 0.7;
-            cluster.position.set(Math.cos(a)*d, 0.2 + rng()*0.8, Math.sin(a)*d);
-            cluster.scale.set(1, 0.7, 1);
+            const a = rng() * Math.PI * 2;
+            const d = rng() * 0.75;
+            const h = -0.1 + rng() * 1.0;
+            cluster.position.set(Math.cos(a)*d, h, Math.sin(a)*d);
+            cluster.scale.set(1 + rng()*0.4, 0.65 + rng()*0.5, 1 + rng()*0.4);
+            cluster.rotation.set(rng()*0.5, rng()*Math.PI*2, rng()*0.5);
             cluster.castShadow = true;
             group.add(cluster);
+        }
+        // Add some individual flat leaves poking out
+        const flatLeafMat = new THREE.MeshStandardMaterial({ color: 0x3a6b24, roughness: 0.85, side: THREE.DoubleSide });
+        for (let fl = 0; fl < 8; fl++) {
+            const lw = 0.1 + rng() * 0.15;
+            const lh = 0.18 + rng() * 0.2;
+            const lGeo = new THREE.PlaneGeometry(lw, lh);
+            const lMesh = new THREE.Mesh(lGeo, flatLeafMat);
+            const a = rng() * Math.PI * 2, d = 0.4 + rng() * 0.3;
+            lMesh.position.set(Math.cos(a)*d, 0.2 + rng()*0.6, Math.sin(a)*d);
+            lMesh.rotation.set((rng()-0.5)*1.0, rng()*Math.PI*2, (rng()-0.5)*0.8);
+            lMesh.castShadow = true;
+            group.add(lMesh);
         }
         return group;
     }
@@ -6304,40 +6335,111 @@ import {
     function _buildVineBase(rng, points, leafCount, colorBase) {
         const group = new THREE.Group();
         const curve = new THREE.CatmullRomCurve3(points);
-        const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.02, 5, false);
-        const vineMat = new THREE.MeshStandardMaterial({ color: colorBase, roughness: 0.9 });
+        const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.025, 6, false);
+        const vineMat = new THREE.MeshStandardMaterial({ color: colorBase, roughness: 0.95, side: THREE.DoubleSide });
         const vineTube = new THREE.Mesh(tubeGeo, vineMat);
         vineTube.castShadow = true;
         group.add(vineTube);
 
+        // Also add a couple of sub-vines branching off
+        const subVineMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(colorBase).offsetHSL(0, 0, 0.04).getHex(), roughness: 0.95, side: THREE.DoubleSide });
+        for (let sv = 0; sv < 3; sv++) {
+            const tStart = 0.1 + rng() * 0.6;
+            const origin = curve.getPoint(tStart);
+            const subPts = [origin.clone()];
+            let sp = origin.clone();
+            const segCount = 3 + Math.floor(rng() * 3);
+            for (let si = 0; si < segCount; si++) {
+                sp = sp.clone().add(new THREE.Vector3((rng()-0.5)*0.5, -0.3 - rng()*0.3, (rng()-0.5)*0.5));
+                subPts.push(sp.clone());
+            }
+            if (subPts.length >= 2) {
+                const subCurve = new THREE.CatmullRomCurve3(subPts);
+                const subGeo = new THREE.TubeGeometry(subCurve, 10, 0.012, 5, false);
+                const subMesh = new THREE.Mesh(subGeo, subVineMat);
+                group.add(subMesh);
+            }
+        }
+
         const leaves = [];
-        const leafMat = new THREE.MeshStandardMaterial({ color: colorBase, roughness: 0.8, side: THREE.DoubleSide });
+        const darkLeaf = new THREE.Color(colorBase).offsetHSL(0, 0.1, -0.05);
+        const brightLeaf = new THREE.Color(colorBase).offsetHSL(0.03, 0.05, 0.08);
+        const leafColors = [colorBase, darkLeaf.getHex(), brightLeaf.getHex()];
+        
         for (let i = 0; i < leafCount; i++) {
-            const t = rng();
+            const t = i / leafCount;
             const pos = curve.getPoint(t);
             const tangent = curve.getTangent(t);
-            const lSize = 0.05 + rng() * 0.1;
-            const lGeo = new THREE.BoxGeometry(lSize, 0.01, lSize);
+            // Larger, more varied leaves
+            const lSize = 0.08 + rng() * 0.18;
+            const lAspect = 1.2 + rng() * 0.8;
+            // Use a rounded triangular leaf shape via plane
+            const lGeo = new THREE.PlaneGeometry(lSize, lSize * lAspect, 1, 1);
             const lMesh = new THREE.Mesh(lGeo);
-            lMesh.position.copy(pos);
-            lMesh.lookAt(pos.clone().add(tangent));
-            lMesh.rotation.z += rng() * Math.PI;
+            // Offset leaves outward from stem
+            const spread = 0.05 + rng() * 0.12;
+            const sideAngle = rng() * Math.PI * 2;
+            lMesh.position.set(
+                pos.x + Math.cos(sideAngle) * spread,
+                pos.y,
+                pos.z + Math.sin(sideAngle) * spread
+            );
+            lMesh.lookAt(lMesh.position.clone().add(tangent));
+            lMesh.rotateZ(rng() * Math.PI * 2);
+            lMesh.rotateX((rng() - 0.5) * 1.2);
             lMesh.updateMatrix();
             leaves.push(lGeo.clone().applyMatrix4(lMesh.matrix));
         }
+
+        const leafMat = new THREE.MeshStandardMaterial({ 
+            color: colorBase, roughness: 0.85, side: THREE.DoubleSide,
+            alphaTest: 0.1
+        });
         const mergedLeaves = BufferGeometryUtils.mergeGeometries(leaves);
-        group.add(new THREE.Mesh(mergedLeaves, leafMat));
+        const leafMesh = new THREE.Mesh(mergedLeaves, leafMat);
+        leafMesh.castShadow = true;
+        group.add(leafMesh);
         return group;
     }
 
     function buildDecoVineHanging(rng = _makeRng(101)) {
-        const points = [new THREE.Vector3(0, 0.5, 0)];
-        let lastP = points[0].clone();
-        for(let i=0; i<6; i++) {
-            lastP.add(new THREE.Vector3((rng()-0.5)*0.8, -0.4 - rng()*0.4, (rng()-0.5)*0.8));
-            points.push(lastP.clone());
+        const group = new THREE.Group();
+        // Multiple hanging strands from attachment point
+        const strandCount = 3 + Math.floor(rng() * 3);
+        const leafColors = [0x2d5a1a, 0x3d7a22, 0x1e4012, 0x4a8a2a, 0x244e15];
+        
+        for (let s = 0; s < strandCount; s++) {
+            const offsetX = (rng() - 0.5) * 0.5;
+            const offsetZ = (rng() - 0.5) * 0.5;
+            const points = [new THREE.Vector3(offsetX, 0.5, offsetZ)];
+            let lastP = points[0].clone();
+            const segCount = 5 + Math.floor(rng() * 5);
+            const totalDrop = 1.5 + rng() * 2.0;
+            for (let i = 0; i < segCount; i++) {
+                lastP = lastP.clone().add(new THREE.Vector3(
+                    (rng()-0.5) * 0.35,
+                    -(totalDrop / segCount) - rng() * 0.15,
+                    (rng()-0.5) * 0.35
+                ));
+                points.push(lastP.clone());
+            }
+            const baseColor = leafColors[Math.floor(rng() * leafColors.length)];
+            const strand = _buildVineBase(rng, points, 20 + Math.floor(rng() * 20), baseColor);
+            group.add(strand);
         }
-        return _buildVineBase(rng, points, 25, 0x2d451a);
+
+        // Extra loose leaf clusters at base of strands
+        const clusterMat = new THREE.MeshStandardMaterial({ color: 0x2a5018, roughness: 0.9, side: THREE.DoubleSide });
+        for (let c = 0; c < 8; c++) {
+            const lSize = 0.07 + rng() * 0.14;
+            const lGeo = new THREE.PlaneGeometry(lSize, lSize * (1.3 + rng() * 0.7));
+            const lMesh = new THREE.Mesh(lGeo, clusterMat);
+            lMesh.position.set((rng()-0.5)*0.6, -0.8 - rng()*1.2, (rng()-0.5)*0.6);
+            lMesh.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+            lMesh.castShadow = true;
+            group.add(lMesh);
+        }
+        return group;
     }
 
     function buildDecoVineCreeping(rng = _makeRng(202)) {
@@ -6672,9 +6774,9 @@ import {
                 clearCurrentLevel();                  
                 world.addBody(editorPhysicsFloor);    
                 world.addBody(editorStaticBody);    
-                editorSceneGroup.visible = true;      
+                editorSceneGroup.visible = true;
+                ghostMesh.visible = true;
                 document.getElementById('editor-hud').style.display = 'block'; document.getElementById('editor-hotbar').style.display = 'flex';
-
 
                 // Stop momentum and prevent getting trapped under the floor
                 playerBody.velocity.set(0,0,0);
@@ -6801,7 +6903,23 @@ import {
                     customPlates = customPlates.filter(p => p.x !== gx || p.y !== gy || p.z !== gz);
                     customDoors = customDoors.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
                     customFields = customFields.filter(f => f.x !== gx || f.y !== gy || f.z !== gz);
-                    customDecorations = customDecorations.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
+                    // Remove deco props - also clean up live meshes within tolerance
+                    const prevLen = customDecorations.length;
+                    customDecorations = customDecorations.filter(d => {
+                        const match = Math.round(d.x) === gx && Math.round(d.y) === gy && Math.round(d.z) === gz;
+                        return !match;
+                    });
+                    if (customDecorations.length !== prevLen) {
+                        // Remove scene meshes near this position
+                        for (let mi = _activeDecorationMeshes.length - 1; mi >= 0; mi--) {
+                            const dm = _activeDecorationMeshes[mi];
+                            if (Math.round(dm.position.x) === gx && Math.round(dm.position.y) === gy && Math.round(dm.position.z) === gz) {
+                                scene.remove(dm);
+                                dm.traverse(c => { if (c.isMesh && c.geometry) c.geometry.dispose(); });
+                                _activeDecorationMeshes.splice(mi, 1);
+                            }
+                        }
+                    }
                 }
                 updateEditorVisuals();
             }
