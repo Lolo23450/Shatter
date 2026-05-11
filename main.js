@@ -6162,6 +6162,11 @@ import {
     }
 
     // ── PROP BUILDERS ────────────────────────────────────────────────────────────
+    const propTextureLoader = new THREE.TextureLoader();
+    const leavesTex = propTextureLoader.load('./assets/textures/leaves.jpg');
+    leavesTex.colorSpace = THREE.SRGBColorSpace;
+    leavesTex.wrapS = THREE.RepeatWrapping;
+    leavesTex.wrapT = THREE.RepeatWrapping;
 
     function buildDecoRubble(rng = _makeRng(77)) {
         const group = new THREE.Group();
@@ -6253,7 +6258,8 @@ import {
             const geo = new THREE.IcosahedronGeometry(r, 1);
             _deformGeometry(geo, rng, r * 0.35, 0.4);
             const mat = new THREE.MeshStandardMaterial({ 
-                color: leafColors[Math.floor(rng() * leafColors.length)], 
+                color: 0xffffff, 
+                map: leavesTex,
                 roughness: 0.9, flatShading: true 
             });
             const cluster = new THREE.Mesh(geo, mat);
@@ -6267,8 +6273,7 @@ import {
             group.add(cluster);
         }
         // Add some individual flat leaves poking out
-        const flatLeafMat = new THREE.MeshStandardMaterial({ color: 0x3a6b24, roughness: 0.85, side: THREE.DoubleSide });
-        for (let fl = 0; fl < 8; fl++) {
+        const flatLeafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.85, side: THREE.DoubleSide });        for (let fl = 0; fl < 8; fl++) {
             const lw = 0.1 + rng() * 0.15;
             const lh = 0.18 + rng() * 0.2;
             const lGeo = new THREE.PlaneGeometry(lw, lh);
@@ -6287,7 +6292,7 @@ import {
         const group = new THREE.Group();
         const leafColors = [0x2a541c, 0x366b26, 0x224516];
         const frondCount = 8 + Math.floor(rng() * 6);
-        const frondMat = new THREE.MeshStandardMaterial({ color: leafColors[1], roughness: 0.8, side: THREE.DoubleSide });
+        const frondMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.8, side: THREE.DoubleSide });
 
         for (let i = 0; i < frondCount; i++) {
             const angle = (i / frondCount) * Math.PI * 2 + (rng() - 0.5) * 0.4;
@@ -6311,7 +6316,7 @@ import {
                 
                 const leafGeo = new THREE.PlaneGeometry(size, size * 1.5);
                 leafGeo.translate(0, size * 0.5, 0);
-                const lMesh = new THREE.Mesh(leafGeo);
+                const lMesh = new THREE.Mesh(leafGeo, frondMat);
                 lMesh.position.copy(pos);
                 lMesh.lookAt(pos.clone().add(tangent));
                 lMesh.rotateZ(Math.PI / 2);
@@ -6392,7 +6397,7 @@ import {
         }
 
         const leafMat = new THREE.MeshStandardMaterial({ 
-            color: colorBase, roughness: 0.85, side: THREE.DoubleSide,
+            color: 0xffffff, map: leavesTex, roughness: 0.85, side: THREE.DoubleSide,
             alphaTest: 0.1
         });
         const mergedLeaves = BufferGeometryUtils.mergeGeometries(leaves);
@@ -6429,7 +6434,7 @@ import {
         }
 
         // Extra loose leaf clusters at base of strands
-        const clusterMat = new THREE.MeshStandardMaterial({ color: 0x2a5018, roughness: 0.9, side: THREE.DoubleSide });
+        const clusterMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.9, side: THREE.DoubleSide });
         for (let c = 0; c < 8; c++) {
             const lSize = 0.07 + rng() * 0.14;
             const lGeo = new THREE.PlaneGeometry(lSize, lSize * (1.3 + rng() * 0.7));
@@ -6463,7 +6468,7 @@ import {
         group.add(trunk);
         for (let i = 0; i < 15; i++) {
             const r = 0.8 + rng();
-            const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), new THREE.MeshStandardMaterial({ color: 0x1e4215, flatShading: true }));
+            const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, flatShading: true }));            
             leaf.position.set((rng()-0.5)*1.5, trunkH + (rng()-0.5), (rng()-0.5)*1.5);
             leaf.scale.set(1, 0.5, 1);
             leaf.castShadow = true;
