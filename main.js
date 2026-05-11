@@ -6292,7 +6292,7 @@ import {
                 lMesh.updateMatrix();
                 frondLeaves.push(lMesh.geometry.clone().applyMatrix4(lMesh.matrix));
             }
-            const mergedLeaves = THREE.BufferGeometryUtils.mergeGeometries(frondLeaves);
+            const mergedLeaves = BufferGeometryUtils.mergeGeometries(frondLeaves);
             const leafMesh = new THREE.Mesh(mergedLeaves, frondMat);
             leafMesh.castShadow = true;
             group.add(leafMesh);
@@ -6325,7 +6325,7 @@ import {
             lMesh.updateMatrix();
             leaves.push(lGeo.clone().applyMatrix4(lMesh.matrix));
         }
-        const mergedLeaves = THREE.BufferGeometryUtils.mergeGeometries(leaves);
+        const mergedLeaves = BufferGeometryUtils.mergeGeometries(leaves);
         group.add(new THREE.Mesh(mergedLeaves, leafMat));
         return group;
     }
