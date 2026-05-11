@@ -189,7 +189,6 @@ import {
         'decor_vine_creeping': 0x3a5c39,
         'decor_pipes':     0x505c5a,
         'decor_pillar':    0x9ea1a0,
-        'decor_bush':      0x2d8a3c,
         'decor_fern':      0x3acc50,
         'decor_tree':      0x1a6628,
     };
@@ -5840,7 +5839,6 @@ import {
         { tool: 'decor_vine_creeping', label: 'Creeping Vine', key: '-', category: 'decor' },
         { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
         { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
-        { tool: 'decor_bush',      label: 'Bush',           key: '-', category: 'decor' },
         { tool: 'decor_fern',      label: 'Fern',           key: '-', category: 'decor' },
         { tool: 'decor_tree',      label: 'Tree',           key: '-', category: 'decor' },
     ];
@@ -6416,51 +6414,6 @@ import {
         return group;
     }
 
-    function buildDecoBush(rng = _makeRng(55)) {
-        const group = new THREE.Group();
-        const leafColors = [0x274e1d, 0x346328, 0x1d3a14, 0x417833, 0x2d5a20, 0x3a6e28];
-        const stemMat = new THREE.MeshStandardMaterial({ color: 0x3d2c20, roughness: 1.0 });
-        // Main stem
-        const stemGeo = new THREE.CylinderGeometry(0.02, 0.04, 0.4, 5);
-        const stem = new THREE.Mesh(stemGeo, stemMat);
-        stem.position.y = -0.3;
-        group.add(stem);
-        // Dense leaf clusters - more of them, more varied sizes
-        const clusterCount = 22 + Math.floor(rng() * 10);
-        for (let i = 0; i < clusterCount; i++) {
-            const r = 0.15 + rng() * 0.35;
-            const geo = new THREE.IcosahedronGeometry(r, 1);
-            _deformGeometry(geo, rng, r * 0.35, 0.4);
-            const mat = new THREE.MeshStandardMaterial({ 
-                color: 0xffffff, 
-                map: leavesTex,
-                roughness: 0.9, flatShading: true 
-            });
-            const cluster = new THREE.Mesh(geo, mat);
-            const a = rng() * Math.PI * 2;
-            const d = rng() * 0.75;
-            const h = -0.1 + rng() * 1.0;
-            cluster.position.set(Math.cos(a)*d, h, Math.sin(a)*d);
-            cluster.scale.set(1 + rng()*0.4, 0.65 + rng()*0.5, 1 + rng()*0.4);
-            cluster.rotation.set(rng()*0.5, rng()*Math.PI*2, rng()*0.5);
-            cluster.castShadow = true;
-            group.add(cluster);
-        }
-        // Add some individual flat leaves poking out
-        const flatLeafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.85, side: THREE.DoubleSide });        for (let fl = 0; fl < 8; fl++) {
-            const lw = 0.1 + rng() * 0.15;
-            const lh = 0.18 + rng() * 0.2;
-            const lGeo = new THREE.PlaneGeometry(lw, lh);
-            const lMesh = new THREE.Mesh(lGeo, flatLeafMat);
-            const a = rng() * Math.PI * 2, d = 0.4 + rng() * 0.3;
-            lMesh.position.set(Math.cos(a)*d, 0.2 + rng()*0.6, Math.sin(a)*d);
-            lMesh.rotation.set((rng()-0.5)*1.0, rng()*Math.PI*2, (rng()-0.5)*0.8);
-            lMesh.castShadow = true;
-            group.add(lMesh);
-        }
-        return group;
-    }
-
     // ── OPTIMIZED FERN ───────────────────────────────────────────────────────────
     function buildDecoFern(rng = _makeRng(33)) {
         const group = new THREE.Group();
@@ -6664,7 +6617,6 @@ import {
         decor_vine_creeping: buildDecoVineCreeping,
         decor_pipes:     buildDecoPipes,
         decor_pillar:    buildDecoPillar,
-        decor_bush:      buildDecoBush,
         decor_fern:      buildDecoFern,
         decor_tree:      buildDecoTree,
     };
@@ -6699,7 +6651,7 @@ import {
             const seeds = { 
                 decor_debris: 111, decor_wall_1x1_a: 222, decor_wall_1x1_b: 333, 
                 decor_wall_1x1_c: 444, decor_wall_2x2: 555,
-                decor_rubble: 77, decor_shattered: 42, decor_bush: 55, decor_fern: 33, decor_tree: 99 
+                decor_rubble: 77, decor_shattered: 42, decor_fern: 33, decor_tree: 99 
             };
             Object.entries(DECOR_BUILDERS).forEach(([type, buildFn]) => {
                 const mesh = buildFn(_makeRng(seeds[type] || 50));
