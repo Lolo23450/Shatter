@@ -14,6 +14,7 @@ import * as CANNON from 'cannon-es';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { CHAPTER_LEVEL_NAMES, LEVEL_NAMES, CHAPTERS, LevelBuilder } from './level-builder.js';
 import { OptimizedSSRPass } from './OptimizedSSRPass.js';
+import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import {
     HUB_LEVEL_INDEX, HUB_GATES, GATE_BY_ID,
@@ -5825,13 +5826,13 @@ import {
         // DECORATION
         { tool: 'decor_rubble',    label: 'Rubble',         key: '-', category: 'decor' },
         { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
+        { tool: 'decor_vine_hanging', label: 'Hanging Vine', key: '-', category: 'decor' },
+        { tool: 'decor_vine_creeping', label: 'Creeping Vine', key: '-', category: 'decor' },
         { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
         { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
         { tool: 'decor_bush',      label: 'Bush',           key: '-', category: 'decor' },
         { tool: 'decor_fern',      label: 'Fern',           key: '-', category: 'decor' },
         { tool: 'decor_tree',      label: 'Tree',           key: '-', category: 'decor' },
-        { tool: 'decor_vine_hanging', label: 'Hanging Vine', key: '-', category: 'decor' },
-        { tool: 'decor_vine_creeping', label: 'Creeping Vine', key: '-', category: 'decor' },
     ];
 
     function hexToCSS(hex) {
