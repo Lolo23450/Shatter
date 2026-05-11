@@ -187,6 +187,8 @@ import {
         'decor_shattered': 0xb8a898,
         'decor_vine_hanging': 0x4a7c59,
         'decor_vine_creeping': 0x3a5c39,
+        'decor_vine_wall': 0x2d5a35,
+        'decor_vine_pillar': 0x5a7c4a,
         'decor_pipes':     0x505c5a,
         'decor_pillar':    0x9ea1a0,
         'decor_fern':      0x3acc50,
@@ -5837,6 +5839,8 @@ import {
         { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
         { tool: 'decor_vine_hanging', label: 'Hanging Vine', key: '-', category: 'decor' },
         { tool: 'decor_vine_creeping', label: 'Creeping Vine', key: '-', category: 'decor' },
+        { tool: 'decor_vine_wall',    label: 'Wall Ivy',      key: '-', category: 'decor' },
+        { tool: 'decor_vine_pillar',  label: 'Pillar Wrap',   key: '-', category: 'decor' },
         { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
         { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
         { tool: 'decor_fern',      label: 'Fern',           key: '-', category: 'decor' },
@@ -6582,6 +6586,52 @@ import {
         return group;
     }
 
+    function buildDecoVineWall(rng = _makeRng(303)) {
+        const group = new THREE.Group();
+        const branches = 3 + Math.floor(rng() * 3);
+        const leafColors = [0x2d5a1a, 0x1e4012, 0x355e20];
+
+        for (let b = 0; b < branches; b++) {
+            const points = [];
+            let lastP = new THREE.Vector3((rng() - 0.5) * 0.8, -0.5, 0.05);
+            points.push(lastP.clone());
+
+            const segs = 6 + Math.floor(rng() * 4);
+            for (let i = 0; i < segs; i++) {
+                lastP = lastP.clone().add(new THREE.Vector3(
+                    (rng() - 0.5) * 0.7,
+                    (1.5 / segs) + rng() * 0.2,
+                    (rng() - 0.5) * 0.1
+                ));
+                points.push(lastP.clone());
+            }
+            const baseColor = leafColors[Math.floor(rng() * leafColors.length)];
+            group.add(_buildVineBase(rng, points, 25, baseColor));
+        }
+        return group;
+    }
+
+    function buildDecoVinePillar(rng = _makeRng(404)) {
+        const group = new THREE.Group();
+        const points = [];
+        const radius = 0.4 + rng() * 0.2;
+        const height = 2.0 + rng() * 1.5;
+        const loops = 2 + rng() * 2;
+        
+        for (let i = 0; i <= 20; i++) {
+            const t = i / 20;
+            const angle = t * Math.PI * 2 * loops;
+            points.push(new THREE.Vector3(
+                Math.cos(angle) * radius,
+                (t * height) - 0.5,
+                Math.sin(angle) * radius
+            ));
+        }
+        
+        group.add(_buildVineBase(rng, points, 40, 0x4a7c59));
+        return group;
+    }
+
     function buildDecoVineCreeping(rng = _makeRng(202)) {
         const points = [new THREE.Vector3(0, -0.48, 0)];
         let lastP = points[0].clone();
@@ -6686,6 +6736,8 @@ import {
         decor_shattered: buildDecoShattered,
         decor_vine_hanging: buildDecoVineHanging,
         decor_vine_creeping: buildDecoVineCreeping,
+        decor_vine_wall: buildDecoVineWall,
+        decor_vine_pillar: buildDecoVinePillar,
         decor_pipes:     buildDecoPipes,
         decor_pillar:    buildDecoPillar,
         decor_fern:      buildDecoFern,
@@ -6722,7 +6774,8 @@ import {
             const seeds = { 
                 decor_debris: 111, decor_wall_1x1_a: 222, decor_wall_1x1_b: 333, 
                 decor_wall_1x1_c: 444, decor_wall_2x2: 555,
-                decor_rubble: 77, decor_shattered: 42, decor_fern: 33, decor_tree: 99 
+                decor_rubble: 77, decor_shattered: 42, decor_fern: 33, decor_tree: 99,
+                decor_vine_wall: 303, decor_vine_pillar: 404 
             };
             Object.entries(DECOR_BUILDERS).forEach(([type, buildFn]) => {
                 const mesh = buildFn(_makeRng(seeds[type] || 50));
