@@ -6417,9 +6417,8 @@ import {
     // ── OPTIMIZED FERN ───────────────────────────────────────────────────────────
     function buildDecoFern(rng = _makeRng(33)) {
         const group = new THREE.Group();
-        const leafColors = [0x2a541c, 0x366b26, 0x224516];
         const frondCount = 8 + Math.floor(rng() * 6);
-        const frondMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.8, side: THREE.DoubleSide });
+        const frondMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.8, side: THREE.DoubleSide, alphaTest: 0.5 });
 
         for (let i = 0; i < frondCount; i++) {
             const angle = (i / frondCount) * Math.PI * 2 + (rng() - 0.5) * 0.4;
@@ -6449,16 +6448,25 @@ import {
                 lMesh.rotateZ(Math.PI / 2);
                 lMesh.rotateX(0.5);
                 lMesh.updateMatrix();
-                frondLeaves.push(lMesh.geometry.clone().applyMatrix4(lMesh.matrix));
+
+                // Convert to non-indexed to ensure compatibility during merge
+                const g1 = leafGeo.clone().applyMatrix4(lMesh.matrix).toNonIndexed();
+                frondLeaves.push(g1);
                 
                 lMesh.rotateX(-1.0);
                 lMesh.updateMatrix();
-                frondLeaves.push(lMesh.geometry.clone().applyMatrix4(lMesh.matrix));
+                const g2 = leafGeo.clone().applyMatrix4(lMesh.matrix).toNonIndexed();
+                frondLeaves.push(g2);
             }
-            const mergedLeaves = BufferGeometryUtils.mergeGeometries(frondLeaves);
-            const leafMesh = new THREE.Mesh(mergedLeaves, frondMat);
-            leafMesh.castShadow = true;
-            group.add(leafMesh);
+
+            if (frondLeaves.length > 0) {
+                const mergedLeaves = BufferGeometryUtils.mergeGeometries(frondLeaves);
+                if (mergedLeaves) {
+                    const leafMesh = new THREE.Mesh(mergedLeaves, frondMat);
+                    leafMesh.castShadow = true;
+                    group.add(leafMesh);
+                }
+            }
         }
         return group;
     }
@@ -6586,70 +6594,58 @@ import {
 
     function buildDecoTree(rng = _makeRng(99)) {
         const group = new THREE.Group();
-        
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3c2c, roughness: 0.95 });
         const leafMat = new THREE.MeshStandardMaterial({ 
-            color: 0xffffff, map: leavesTex, roughness: 0.9, flatShading: true, side: THREE.DoubleSide
+            color: 0xffffff, map: leavesTex, roughness: 0.9, flatShading: true, side: THREE.DoubleSide, alphaTest: 0.5
         });
 
         const branchGeos = [];
-        const branchPts = []; // Points to spawn leaf canopies
+        const branchPts = []; 
         
-        // 1. Main Trunk (curved/crooked)
         const trunkH = 3.5 + rng() * 3.0;
         const basePt = new THREE.Vector3(0, -0.5, 0);
         const midPt = new THREE.Vector3((rng()-0.5)*1.5, trunkH * 0.4, (rng()-0.5)*1.5);
         const topPt = new THREE.Vector3((rng()-0.5)*2.0, trunkH, (rng()-0.5)*2.0);
         
         const trunkCurve = new THREE.CatmullRomCurve3([basePt, midPt, topPt]);
-        branchGeos.push(new THREE.TubeGeometry(trunkCurve, 10, 0.25, 6, false));
+        branchGeos.push(new THREE.TubeGeometry(trunkCurve, 10, 0.25, 6, false).toNonIndexed());
         branchPts.push(topPt);
         
-        // 2. Roots
         const numRoots = 3 + Math.floor(rng() * 3);
         for(let i=0; i<numRoots; i++) {
             const angle = (i/numRoots) * Math.PI * 2 + rng();
             const rLen = 0.6 + rng() * 0.8;
             const rootEnd = basePt.clone().add(new THREE.Vector3(Math.cos(angle)*rLen, -0.3-rng()*0.4, Math.sin(angle)*rLen));
-            const rootMid = basePt.clone().add(new THREE.Vector3(0, 0.5 + rng()*0.5, 0)); // Starts higher up the trunk
+            const rootMid = basePt.clone().add(new THREE.Vector3(0, 0.5 + rng()*0.5, 0));
             const rootCurve = new THREE.CatmullRomCurve3([rootMid, basePt, rootEnd]);
-            branchGeos.push(new THREE.TubeGeometry(rootCurve, 6, 0.12, 5, false));
+            branchGeos.push(new THREE.TubeGeometry(rootCurve, 6, 0.12, 5, false).toNonIndexed());
         }
 
-        // 3. Branches
         const numBranches = 3 + Math.floor(rng() * 4);
         for(let i=0; i<numBranches; i++) {
-            const t = 0.4 + rng() * 0.5; // Spawn on upper 60% of trunk
+            const t = 0.4 + rng() * 0.5; 
             const start = trunkCurve.getPoint(t);
             const dir = new THREE.Vector3((rng()-0.5)*2.5, 0.2 + rng()*1.5, (rng()-0.5)*2.5).normalize();
             const len = 1.0 + rng() * 2.5;
             const end = start.clone().add(dir.multiplyScalar(len));
-            
-            // Sag or arch the branch
             const sag = (rng() - 0.3) * 1.0;
             const mid = start.clone().lerp(end, 0.5).add(new THREE.Vector3(0, sag, 0));
-            
             const branchCurve = new THREE.CatmullRomCurve3([start, mid, end]);
-            branchGeos.push(new THREE.TubeGeometry(branchCurve, 8, 0.1, 5, false));
+            branchGeos.push(new THREE.TubeGeometry(branchCurve, 8, 0.1, 5, false).toNonIndexed());
             branchPts.push(end);
-            
-            // Optional tiny sub-branch
-            if (rng() > 0.4) {
-                const subStart = branchCurve.getPoint(0.4 + rng()*0.4);
-                const subEnd = subStart.clone().add(new THREE.Vector3((rng()-0.5)*2.0, rng()*1.5, (rng()-0.5)*2.0));
-                const subCurve = new THREE.CatmullRomCurve3([subStart, subEnd]);
-                branchGeos.push(new THREE.TubeGeometry(subCurve, 5, 0.05, 4, false));
-                branchPts.push(subEnd);
+        }
+
+        // Merge Trunk
+        if (branchGeos.length > 0) {
+            const mergedTrunk = BufferGeometryUtils.mergeGeometries(branchGeos);
+            if (mergedTrunk) {
+                const trunkMesh = new THREE.Mesh(mergedTrunk, trunkMat);
+                trunkMesh.castShadow = trunkMesh.receiveShadow = true;
+                group.add(trunkMesh);
             }
         }
 
-        const mergedTrunk = BufferGeometryUtils.mergeGeometries(branchGeos);
-        const trunkMesh = new THREE.Mesh(mergedTrunk, trunkMat);
-        trunkMesh.castShadow = true;
-        trunkMesh.receiveShadow = true;
-        group.add(trunkMesh);
-
-        // 4. Canopy (Leaves)
+        // Merge Leaves
         const leafGeos = [];
         branchPts.forEach(pt => {
             const clusters = 4 + Math.floor(rng() * 5);
@@ -6657,36 +6653,24 @@ import {
                 const r = 0.5 + rng() * 0.8;
                 const geo = new THREE.IcosahedronGeometry(r, 1);
                 _deformGeometry(geo, rng, r * 0.4);
-                
                 const m = new THREE.Matrix4();
                 const pos = pt.clone().add(new THREE.Vector3((rng()-0.5)*1.5, (rng()-0.5)*1.0, (rng()-0.5)*1.5));
                 const rot = new THREE.Euler(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
-                const scl = new THREE.Vector3(1 + rng()*0.3, 0.6 + rng()*0.5, 1 + rng()*0.3); // Flatter canopy clouds
-                
+                const scl = new THREE.Vector3(1 + rng()*0.3, 0.6 + rng()*0.5, 1 + rng()*0.3);
                 m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scl);
                 geo.applyMatrix4(m);
-                leafGeos.push(geo);
+                leafGeos.push(geo.toNonIndexed());
             }
         });
         
-        // Add some loose scattered leaf planes hanging off the branches for organic detail
-        for(let i=0; i<20; i++) {
-            const targetPt = branchPts[Math.floor(rng() * branchPts.length)];
-            const size = 0.3 + rng() * 0.5;
-            const geo = new THREE.PlaneGeometry(size, size);
-            const m = new THREE.Matrix4();
-            const pos = targetPt.clone().add(new THREE.Vector3((rng()-0.5)*2.5, (rng()-0.5)*2.0 - 0.5, (rng()-0.5)*2.5));
-            const rot = new THREE.Euler(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
-            m.compose(pos, new THREE.Quaternion().setFromEuler(rot), new THREE.Vector3(1,1,1));
-            geo.applyMatrix4(m);
-            leafGeos.push(geo);
+        if (leafGeos.length > 0) {
+            const mergedLeaves = BufferGeometryUtils.mergeGeometries(leafGeos);
+            if (mergedLeaves) {
+                const leavesMesh = new THREE.Mesh(mergedLeaves, leafMat);
+                leavesMesh.castShadow = leavesMesh.receiveShadow = true;
+                group.add(leavesMesh);
+            }
         }
-
-        const mergedLeaves = BufferGeometryUtils.mergeGeometries(leafGeos);
-        const leavesMesh = new THREE.Mesh(mergedLeaves, leafMat);
-        leavesMesh.castShadow = true;
-        leavesMesh.receiveShadow = true;
-        group.add(leavesMesh);
 
         return group;
     }
