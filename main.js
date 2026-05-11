@@ -6685,71 +6685,107 @@ function _getNoiseTexture(type = 'concrete') {
         });
     })();
 
-    // ── BUILD TOOL SELECTOR GRID ──
+    // ── REWORKED TABBED TOOL SELECTOR ──
+    let activeCategory = 'build'; // Default tab
+
     (function buildToolSelector() {
+        const hud = document.getElementById('tool-selector-hud');
         const grid = document.getElementById('tool-selector-grid');
-        grid.innerHTML = ''; // Clear existing
         
+        // 1. Create the Tab Bar container if it doesn't exist
+        let tabBar = hud.querySelector('.ts-tab-bar');
+        if (!tabBar) {
+            tabBar = document.createElement('div');
+            tabBar.className = 'ts-tab-bar';
+            tabBar.style.cssText = `
+                display: flex; justify-content: center; gap: 15px; 
+                margin-bottom: 25px; padding-bottom: 15px;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            `;
+            hud.insertBefore(tabBar, grid);
+        }
+
         const categories = {
-            'build': '🏗️ STRUCTURE',
-            'items': '📦 CUBES & OBJECTS',
-            'logic': '⚡ MECHANISMS',
-            'util':  '🛠️ UTILITY',
-            'decor': '🌿 DECORATION'
+            'build': { label: 'STRUCTURE', icon: '🏗️' },
+            'items': { label: 'OBJECTS', icon: '📦' },
+            'logic': { label: 'MECHANISMS', icon: '⚡' },
+            'util':  { label: 'UTILITY', icon: '🛠️' },
+            'decor': { label: 'DECOR', icon: '🌿' }
         };
 
-        Object.entries(categories).forEach(([catKey, catLabel]) => {
-            // Header
-            const header = document.createElement('div');
-            header.className = 'ts-category-header';
-            header.style.cssText = `grid-column: 1/-1; padding: 15px 5px 5px; font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.4); border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px;`;
-            header.textContent = catLabel;
-            grid.appendChild(header);
-
-            // Tools in this category
-            EDITOR_TOOLS_LIST.filter(t => t.category === catKey).forEach((toolObj) => {
-                const item = document.createElement('div');
-                const isDecor = catKey === 'decor';
-                item.className = 'ts-item' + (toolObj.tool === editorTool ? ' selected' : '');
-                item.dataset.tool = toolObj.tool;
-
-                const preview = isDecor && DECOR_PREVIEW_URLS[toolObj.tool]
-                    ? `<img src="${DECOR_PREVIEW_URLS[toolObj.tool]}" style="width:50px;height:50px;object-fit:contain;"/>`
-                    : `<div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[toolObj.tool] || 0xffffff)}; width:30px; height:30px; border-radius:4px;"></div>`;
-
-                item.innerHTML = `
-                    ${preview}
-                    <div class="ts-name" style="font-size:10px; margin-top:5px;">${toolObj.label}</div>
-                    <div class="ts-key" style="font-size:8px; opacity:0.5;">${toolObj.key !== '-' ? '['+toolObj.key+']' : ''}</div>
-                `;
-
-                item.addEventListener('mouseenter', () => {
-                    document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('hovered'));
-                    item.classList.add('hovered');
-                    updateParamsPanel(toolObj.tool, false);
-                });
-                item.addEventListener('click', () => {
-                    document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('selected'));
-                    item.classList.add('selected');
-                    setEditorTool(toolObj.tool);
-                    updateParamsPanel(toolObj.tool, true);
-                });
-                grid.appendChild(item);
+        // 2. Render Tab Buttons
+        tabBar.innerHTML = '';
+        Object.entries(categories).forEach(([key, info]) => {
+            const tabBtn = document.createElement('div');
+            tabBtn.className = `ts-tab-btn ${activeCategory === key ? 'active' : ''}`;
+            tabBtn.style.cssText = `
+                padding: 8px 16px; font-size: 11px; letter-spacing: 2px;
+                color: rgba(255,255,255,${activeCategory === key ? '1' : '0.4'});
+                cursor: pointer; transition: all 0.2s; border-radius: 4px;
+                background: ${activeCategory === key ? 'rgba(255,255,255,0.1)' : 'transparent'};
+            `;
+            tabBtn.innerHTML = `<span style="margin-right:8px">${info.icon}</span> ${info.label}`;
+            
+            tabBtn.addEventListener('click', () => {
+                activeCategory = key;
+                buildToolSelector(); // Re-render everything
             });
+            tabBar.appendChild(tabBtn);
+        });
+
+        // 3. Render Grid Items for Active Category
+        grid.innerHTML = '';
+        EDITOR_TOOLS_LIST.filter(t => t.category === activeCategory).forEach((toolObj) => {
+            const item = document.createElement('div');
+            const isDecor = activeCategory === 'decor';
+            item.className = 'ts-item' + (toolObj.tool === editorTool ? ' selected' : '');
+            item.dataset.tool = toolObj.tool;
+
+            const preview = isDecor && DECOR_PREVIEW_URLS[toolObj.tool]
+                ? `<img src="${DECOR_PREVIEW_URLS[toolObj.tool]}" style="width:60px;height:60px;object-fit:contain; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.3));"/>`
+                : `<div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[toolObj.tool] || 0xffffff)}; width:34px; height:34px; border-radius:6px; box-shadow: inset 0 0 10px rgba(0,0,0,0.2);"></div>`;
+
+            item.innerHTML = `
+                ${preview}
+                <div class="ts-name" style="font-size:10px; margin-top:8px; font-weight:700; letter-spacing:1px;">${toolObj.label.toUpperCase()}</div>
+                <div class="ts-key" style="font-size:9px; opacity:0.4; margin-top:2px;">${toolObj.key !== '-' ? '['+toolObj.key+']' : ''}</div>
+            `;
+
+            item.addEventListener('mouseenter', () => {
+                document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('hovered'));
+                item.classList.add('hovered');
+                updateParamsPanel(toolObj.tool, false);
+            });
+
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+                setEditorTool(toolObj.tool);
+                updateParamsPanel(toolObj.tool, true);
+                
+                // Small visual feedback
+                item.style.transform = 'scale(0.95)';
+                setTimeout(() => item.style.transform = '', 100);
+                closeToolSelector();
+            });
+            
+            grid.appendChild(item);
         });
     })();
 
     function openToolSelector() {
         isTabSelectorOpen = true;
-        // Sync selector to current tool
-        document.querySelectorAll('.ts-item').forEach(el => {
-            el.classList.toggle('selected', el.dataset.tool === editorTool);
-            el.classList.remove('hovered');
-        });
-        // Show params panel for current tool
-        updateParamsPanel(editorTool, true);
+        
+        // Find current tool's category and switch to it
+        const currentToolData = EDITOR_TOOLS_LIST.find(t => t.tool === editorTool);
+        if (currentToolData) activeCategory = currentToolData.category;
+        
+        // Refresh the UI
+        buildToolSelector();
+        
         document.getElementById('tool-selector-hud').classList.add('visible');
-        // Unlock pointer so mouse can interact with selector
+        updateParamsPanel(editorTool, true);
         controls.unlock();
     }
 
@@ -6803,10 +6839,10 @@ function _getNoiseTexture(type = 'concrete') {
         if (e.code === 'KeyR') { isRKeyDown = false; rKeyTimer = 0; document.getElementById('scale-hud').style.opacity = '0'; }
 
         // TAB RELEASE: close tool selector
-        if (e.code === 'Tab' && isTabSelectorOpen) {
-            e.preventDefault();
-            closeToolSelector();
-        }
+        // if (e.code === 'Tab' && isTabSelectorOpen) {
+        //     e.preventDefault();
+        //    closeToolSelector();
+        // }
 
         // KEY P RELEASE LOGIC
         if (e.code === 'KeyP') {
