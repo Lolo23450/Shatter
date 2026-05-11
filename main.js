@@ -6760,6 +6760,7 @@ function _getNoiseTexture(type = 'concrete') {
                 setEditorTool(toolObj.tool);
                 buildToolSelector(); // Refresh selection visual
                 updateParamsPanel(toolObj.tool, true);
+                closeToolSelector();
             };
 
             grid.appendChild(item);
