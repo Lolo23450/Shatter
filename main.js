@@ -6112,135 +6112,208 @@ import {
         }
     }
 
-    // ── DECORATION PROP GEOMETRY BUILDERS ────────────────────────────────────────
+    // ── DECORATION PROP GEOMETRY BUILDERS (UPGRADED REALISM) ─────────────────────
+
     function _makeRng(seed) {
         let s = seed;
         return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
     }
 
+    // Utility: Adds procedural noise/irregularity to vertices to make shapes organic/broken
+    function _deformGeometry(geometry, rng, intensity) {
+        const pos = geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i) + (rng() - 0.5) * intensity;
+            const y = pos.getY(i) + (rng() - 0.5) * intensity;
+            const z = pos.getZ(i) + (rng() - 0.5) * intensity;
+            pos.setXYZ(i, x, y, z);
+        }
+        geometry.computeVertexNormals();
+    }
+
     function buildDecoRubble(rng = _makeRng(77)) {
         const group = new THREE.Group();
-        const darkConcrete = new THREE.MeshStandardMaterial({ color: 0x7a6a5a, roughness: 0.98, metalness: 0.0 });
-        const lightConcrete = new THREE.MeshStandardMaterial({ color: 0x9a8a7a, roughness: 0.95, metalness: 0.0 });
-        const count = 6 + Math.floor(rng() * 6);
+        // Uses your global materials if they exist, otherwise ultra-realistic fallbacks
+        const mat1 = typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ color: 0x7a7065, roughness: 1.0, flatShading: true });
+        const mat2 = typeof brokenMaterial !== 'undefined' ? brokenMaterial : new THREE.MeshStandardMaterial({ color: 0x66605a, roughness: 0.95, flatShading: true });
+
+        const count = 12 + Math.floor(rng() * 8); // denser debris fields
         for (let i = 0; i < count; i++) {
-            const w = 0.12 + rng() * 0.52, h = 0.06 + rng() * 0.22, d = 0.1 + rng() * 0.44;
-            const geo = new THREE.BoxGeometry(w, h, d);
-            const mesh = new THREE.Mesh(geo, rng() > 0.5 ? darkConcrete : lightConcrete);
-            mesh.position.set((rng() - 0.5) * 1.3, h * 0.5 + rng() * 0.05, (rng() - 0.5) * 1.3);
-            mesh.rotation.y = rng() * Math.PI * 2;
-            mesh.rotation.x = (rng() - 0.5) * 0.5;
-            mesh.rotation.z = (rng() - 0.5) * 0.3;
-            mesh.castShadow = true; mesh.receiveShadow = true;
+            const radius = 0.08 + rng() * 0.35;
+            // Dodecahedron creates excellent, jagged rock formations
+            const geo = new THREE.DodecahedronGeometry(radius, 0);
+            _deformGeometry(geo, rng, radius * 0.4); 
+            
+            const mesh = new THREE.Mesh(geo, rng() > 0.4 ? mat1 : mat2);
+            
+            // Irregular scaling for realistic chunks
+            mesh.scale.set(1 + rng() * 0.6, 0.4 + rng() * 0.6, 1 + rng() * 0.6);
+            
+            const dist = rng() * 1.6;
+            const angle = rng() * Math.PI * 2;
+            mesh.position.set(Math.cos(angle) * dist, radius * mesh.scale.y * 0.5 + rng() * 0.05, Math.sin(angle) * dist);
+            
+            mesh.rotation.set(rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2);
+            mesh.castShadow = true; 
+            mesh.receiveShadow = true;
             group.add(mesh);
         }
-        // Dust particle (flat disc)
-        const discGeo = new THREE.CircleGeometry(0.7, 8);
-        const discMat = new THREE.MeshStandardMaterial({ color: 0x887060, roughness: 1.0, transparent: true, opacity: 0.45, depthWrite: false });
-        const disc = new THREE.Mesh(discGeo, discMat);
-        disc.rotation.x = -Math.PI / 2; disc.position.y = 0.01;
-        group.add(disc);
         return group;
     }
 
     function buildDecoShattered(rng = _makeRng(42)) {
         const group = new THREE.Group();
-        const concreteMat = new THREE.MeshStandardMaterial({ color: 0xb0a090, roughness: 0.93, metalness: 0.0 });
-        const darkMat     = new THREE.MeshStandardMaterial({ color: 0x888070, roughness: 0.98, metalness: 0.0 });
-        // Main tilted slab
-        const slabGeo = new THREE.BoxGeometry(1.1 + rng()*0.3, 1.6 + rng()*0.5, 0.22);
-        const slab = new THREE.Mesh(slabGeo, concreteMat);
-        slab.rotation.z = (rng() - 0.5) * 0.7; slab.rotation.y = (rng() - 0.5) * 0.4;
-        slab.position.y = 0.95; slab.castShadow = true; slab.receiveShadow = true;
+        const matWall = typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ color: 0x8a847c, roughness: 0.95 });
+        const matBroken = typeof brokenMaterial !== 'undefined' ? brokenMaterial : new THREE.MeshStandardMaterial({ color: 0x736d66, roughness: 1.0 });
+        
+        const w = 1.2 + rng() * 0.4, h = 1.8 + rng() * 0.6, d = 0.25;
+        
+        // Segmented Box so we can deform the edges, creating a damaged slab
+        const slabGeo = new THREE.BoxGeometry(w, h, d, 5, 5, 2);
+        _deformGeometry(slabGeo, rng, 0.06);
+        const slab = new THREE.Mesh(slabGeo, matWall);
+        
+        slab.rotation.set((rng() - 0.5) * 0.3, (rng() - 0.5) * 0.4, (rng() - 0.5) * 0.6);
+        slab.position.set(0, h * 0.45, 0);
+        slab.castShadow = true; 
+        slab.receiveShadow = true;
         group.add(slab);
-        // Rebar streaks (thin cylinders)
-        for (let i = 0; i < 3; i++) {
-            const rbarGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.6 + rng()*0.8, 4);
-            const rbar = new THREE.Mesh(rbarGeo, new THREE.MeshStandardMaterial({ color: 0x554444, roughness: 0.8, metalness: 0.4 }));
-            rbar.position.set((rng()-0.5)*0.6, 0.4 + rng()*0.6, (rng()-0.5)*0.15);
-            rbar.rotation.z = (rng()-0.5)*1.2; rbar.rotation.x = (rng()-0.5)*0.4;
-            group.add(rbar);
+
+        // Rebar: twisted, bent, and rusted
+        const rebarMat = new THREE.MeshStandardMaterial({ color: 0x3d2820, roughness: 0.8, metalness: 0.6 });
+        const rebarCount = 4 + Math.floor(rng() * 4);
+        for (let i = 0; i < rebarCount; i++) {
+            // Bend rebar realistically using a bezier curve
+            const start = new THREE.Vector3((rng() - 0.5) * w * 0.8, (rng() - 0.5) * h * 0.8, (rng() - 0.5) * d);
+            const control = new THREE.Vector3(start.x + (rng() - 0.5) * 0.6, start.y + 0.3 + rng() * 0.5, start.z + (rng() - 0.5) * 0.6);
+            const end = new THREE.Vector3(control.x + (rng() - 0.5) * 0.5, control.y + 0.2 + rng() * 0.4, control.z + (rng() - 0.5) * 0.5);
+            
+            const curve = new THREE.QuadraticBezierCurve3(start, control, end);
+            const rebarGeo = new THREE.TubeGeometry(curve, 6, 0.012, 4, false);
+            const rebar = new THREE.Mesh(rebarGeo, rebarMat);
+            rebar.castShadow = true;
+            slab.add(rebar); // Parented to slab so it matches tilt
         }
-        // Scattered broken pieces around base
-        for (let i = 0; i < 5; i++) {
-            const pw = 0.18 + rng()*0.5, ph = 0.12 + rng()*0.3;
-            const pGeo = new THREE.BoxGeometry(pw, ph, 0.18);
-            const piece = new THREE.Mesh(pGeo, i % 2 === 0 ? concreteMat : darkMat);
-            piece.position.set((rng()-0.5)*1.2, ph*0.5, (rng()-0.5)*0.8);
-            piece.rotation.set((rng()-0.5)*0.6, rng()*Math.PI*2, (rng()-0.5)*0.4);
-            piece.castShadow = true;
-            group.add(piece);
-        }
+
+        // Scatter debris
+        const debrisGroup = buildDecoRubble(rng);
+        debrisGroup.position.set(0, 0, 0);
+        group.add(debrisGroup);
+
         return group;
     }
 
     function buildDecoBush(rng = _makeRng(55)) {
         const group = new THREE.Group();
-        const leafPalette = [0x267a30, 0x2d9438, 0x1f6826, 0x3db84e, 0x224e1e, 0x4acc5e];
-        // Stem cluster
-        for (let s = 0; s < 4; s++) {
-            const sh = 0.2 + rng()*0.35;
-            const sGeo = new THREE.CylinderGeometry(0.02, 0.05, sh, 4);
-            const sMesh = new THREE.Mesh(sGeo, new THREE.MeshStandardMaterial({ color: 0x3a2818, roughness: 1.0 }));
-            sMesh.position.set((rng()-0.5)*0.25, sh*0.5, (rng()-0.5)*0.25);
-            sMesh.rotation.z = (rng()-0.5)*0.3;
+        // Complex natural leaf tones
+        const leafColors = [0x274e1d, 0x346328, 0x1d3a14, 0x417833, 0x214518];
+        
+        // Stems (Crinkled)
+        const stemMat = new THREE.MeshStandardMaterial({ color: 0x3d2c20, roughness: 0.95 });
+        for (let s = 0; s < 5; s++) {
+            const sh = 0.3 + rng() * 0.5;
+            const sGeo = new THREE.CylinderGeometry(0.015, 0.035, sh, 5, 4);
+            _deformGeometry(sGeo, rng, 0.008);
+            const sMesh = new THREE.Mesh(sGeo, stemMat);
+            sMesh.position.set((rng() - 0.5) * 0.2, sh * 0.5, (rng() - 0.5) * 0.2);
+            sMesh.rotation.set((rng() - 0.5) * 0.6, rng() * Math.PI, (rng() - 0.5) * 0.6);
+            sMesh.castShadow = true;
             group.add(sMesh);
         }
-        // Dense leaf spheres
-        for (let i = 0; i < 11; i++) {
-            const r = 0.18 + rng() * 0.38;
-            const geo = new THREE.SphereGeometry(r, 6, 5);
-            const mat = new THREE.MeshStandardMaterial({ color: leafPalette[Math.floor(rng()*leafPalette.length)], roughness: 0.88, flatShading: true });
-            const sphere = new THREE.Mesh(geo, mat);
+        
+        // Foliage Clusters
+        const clusterCount = 12 + Math.floor(rng() * 8);
+        for (let i = 0; i < clusterCount; i++) {
+            const r = 0.2 + rng() * 0.35;
+            // Icosahedron with Detail=1 mimics a beautiful dense low-poly leaf cluster when deformed
+            const geo = new THREE.IcosahedronGeometry(r, 1);
+            _deformGeometry(geo, rng, r * 0.25);
+            
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: leafColors[Math.floor(rng() * leafColors.length)], 
+                roughness: 0.7, 
+                flatShading: true // Creates great specular highlights across the deformations
+            });
+            
+            const cluster = new THREE.Mesh(geo, mat);
             const angle = rng() * Math.PI * 2;
-            const rad = rng() * 0.55;
-            sphere.position.set(Math.cos(angle)*rad, 0.35 + rng()*0.7, Math.sin(angle)*rad);
-            sphere.castShadow = true;
-            group.add(sphere);
+            const rad = rng() * 0.6;
+            const h = 0.25 + rng() * 0.7;
+            cluster.position.set(Math.cos(angle) * rad, h, Math.sin(angle) * rad);
+            
+            cluster.scale.set(1 + rng() * 0.2, 0.6 + rng() * 0.3, 1 + rng() * 0.2); // Flattened tops
+            cluster.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+            cluster.castShadow = true; 
+            cluster.receiveShadow = true;
+            group.add(cluster);
         }
         return group;
     }
 
     function buildDecoFern(rng = _makeRng(33)) {
         const group = new THREE.Group();
-        const stemColors = [0x2a4c1c, 0x1e3a14];
-        const leafColors  = [0x2e9440, 0x3db858, 0x247832, 0x4acc66, 0x1e6028];
-        const leafCount = 9 + Math.floor(rng() * 6);
-        // Center stub
-        const centerGeo = new THREE.CylinderGeometry(0.03, 0.06, 0.18, 5);
-        const centerMesh = new THREE.Mesh(centerGeo, new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 1.0 }));
-        centerMesh.position.y = 0.09;
-        group.add(centerMesh);
+        const leafColors = [0x2a541c, 0x366b26, 0x224516, 0x40802c];
+        const frondCount = 7 + Math.floor(rng() * 6);
+        
+        // Central Root Crown
+        const baseGeo = new THREE.DodecahedronGeometry(0.08, 0);
+        _deformGeometry(baseGeo, rng, 0.03);
+        const baseMesh = new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({ color: 0x382618, roughness: 1.0 }));
+        baseMesh.position.y = 0.04;
+        group.add(baseMesh);
 
-        for (let i = 0; i < leafCount; i++) {
-            const angle = (i / leafCount) * Math.PI * 2 + rng() * 0.4;
-            const stemLen = 0.45 + rng() * 0.9;
-            const tilt = 0.35 + rng() * 0.5; // how much frond droops outward
-
-            // Stem
-            const sGeo = new THREE.CylinderGeometry(0.012, 0.022, stemLen, 3);
-            const sMat = new THREE.MeshStandardMaterial({ color: stemColors[Math.floor(rng()*stemColors.length)], roughness: 1.0 });
-            const stemMesh = new THREE.Mesh(sGeo, sMat);
-            stemMesh.position.set(Math.cos(angle)*stemLen*0.42, stemLen*0.42, Math.sin(angle)*stemLen*0.42);
-            stemMesh.rotation.z = Math.cos(angle) * tilt;
-            stemMesh.rotation.x = -Math.sin(angle) * tilt;
-            group.add(stemMesh);
-
-            // Pinnate leaf blade using a row of small ellipses
-            const pinnaeCount = 4 + Math.floor(rng() * 4);
-            for (let p = 0; p < pinnaeCount; p++) {
-                const t = (p + 1) / (pinnaeCount + 1);
-                const pw = 0.08 + rng()*0.10, ph = 0.18 + rng()*0.14;
-                const pGeo = new THREE.PlaneGeometry(pw, ph);
-                const pMat = new THREE.MeshStandardMaterial({ color: leafColors[Math.floor(rng()*leafColors.length)], roughness: 0.85, side: THREE.DoubleSide });
-                const pMesh = new THREE.Mesh(pGeo, pMat);
-                const lx = Math.cos(angle)*stemLen*t*0.85;
-                const lz = Math.sin(angle)*stemLen*t*0.85;
-                pMesh.position.set(lx, stemLen*t*0.8, lz);
-                pMesh.rotation.y = angle + Math.PI * 0.5;
-                pMesh.rotation.x = -tilt * t * 0.8;
-                pMesh.castShadow = false;
-                group.add(pMesh);
+        for (let i = 0; i < frondCount; i++) {
+            const angle = (i / frondCount) * Math.PI * 2 + (rng() - 0.5) * 0.4;
+            const length = 0.6 + rng() * 0.6;
+            
+            // Procedural sweeping curve for the frond stem
+            const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(0, 0.05, 0),
+                new THREE.Vector3(Math.cos(angle) * length * 0.4, length * 0.9, Math.sin(angle) * length * 0.4),
+                new THREE.Vector3(Math.cos(angle) * length, length * 0.2 - rng() * 0.15, Math.sin(angle) * length)
+            );
+            
+            const stemGeo = new THREE.TubeGeometry(curve, 10, 0.012, 4, false);
+            const color = leafColors[Math.floor(rng() * leafColors.length)];
+            const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.65, side: THREE.DoubleSide });
+            
+            const stem = new THREE.Mesh(stemGeo, mat);
+            stem.castShadow = true;
+            group.add(stem);
+            
+            // Leaflets (Pinnae) traveling up the curve
+            const pinnaeCount = 12 + Math.floor(rng() * 6);
+            for (let p = 1; p < pinnaeCount; p++) {
+                const t = p / pinnaeCount;
+                const pos = curve.getPoint(t);
+                const tangent = curve.getTangent(t);
+                
+                // Leaves are smaller at bottom and tip, widest in middle
+                const taper = Math.sin(t * Math.PI); 
+                const pw = 0.04 + rng() * 0.02 * taper;
+                const ph = 0.16 + rng() * 0.08 * taper;
+                
+                // Create single shaped plane leaflet
+                const lGeo = new THREE.PlaneGeometry(pw, ph, 1, 2);
+                _deformGeometry(lGeo, rng, 0.006); // Slight crinkles
+                
+                // Left leaflet
+                const leafL = new THREE.Mesh(lGeo, mat);
+                leafL.position.copy(pos);
+                leafL.lookAt(pos.clone().add(tangent)); // Align to stem
+                leafL.rotateZ(Math.PI / 2); // Flatten horizontally
+                leafL.rotateX(0.3 + rng() * 0.2); // Angle outward and up
+                leafL.castShadow = true;
+                group.add(leafL);
+                
+                // Right leaflet
+                const leafR = new THREE.Mesh(lGeo, mat);
+                leafR.position.copy(pos);
+                leafR.lookAt(pos.clone().add(tangent));
+                leafR.rotateZ(Math.PI / 2);
+                leafR.rotateX(-0.3 - rng() * 0.2); // Angle opposite
+                leafR.castShadow = true;
+                group.add(leafR);
             }
         }
         return group;
@@ -6248,35 +6321,87 @@ import {
 
     function buildDecoTree(rng = _makeRng(99)) {
         const group = new THREE.Group();
-        const trunkH = 2.0 + rng() * 1.4;
-        // Trunk with subtle taper and facets
-        const trunkGeo = new THREE.CylinderGeometry(0.10, 0.24, trunkH, 8);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 1.0, flatShading: true });
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x423224, roughness: 0.95 });
+        const trunkH = 2.5 + rng() * 2.0;
+        const trunkR = 0.15 + rng() * 0.15;
+        
+        // Trunk: Tapered, heavily subdivided for bark texturing and root flares
+        const trunkGeo = new THREE.CylinderGeometry(trunkR * 0.5, trunkR, trunkH, 8, 8);
+        const pos = trunkGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+            const y = pos.getY(i);
+            const x = pos.getX(i);
+            const z = pos.getZ(i);
+            
+            // Base bark noise
+            const noiseX = (rng() - 0.5) * 0.05;
+            const noiseZ = (rng() - 0.5) * 0.05;
+            
+            // Root flare at bottom of the trunk (-trunkH / 2)
+            let flare = 1.0;
+            const bottomY = -trunkH / 2;
+            if (y < bottomY + 0.6) {
+                flare = 1.0 + ((bottomY + 0.6) - y) * 1.8;
+            }
+            
+            pos.setXYZ(i, (x * flare) + noiseX, y, (z * flare) + noiseZ);
+        }
+        trunkGeo.computeVertexNormals();
+        
         const trunk = new THREE.Mesh(trunkGeo, trunkMat);
         trunk.position.y = trunkH * 0.5;
-        trunk.castShadow = true; trunk.receiveShadow = true;
+        trunk.castShadow = true; 
+        trunk.receiveShadow = true;
         group.add(trunk);
-        // Root buttresses
-        for (let i = 0; i < 4; i++) {
-            const bAngle = (i / 4) * Math.PI * 2;
-            const bGeo = new THREE.BoxGeometry(0.12, 0.3, 0.45);
-            const b = new THREE.Mesh(bGeo, trunkMat);
-            b.position.set(Math.cos(bAngle)*0.18, 0.15, Math.sin(bAngle)*0.18);
-            b.rotation.y = bAngle;
-            group.add(b);
+        
+        // Branches
+        const branchCount = 2 + Math.floor(rng() * 3);
+        for(let i = 0; i < branchCount; i++) {
+            const bLength = 0.6 + rng() * 1.0;
+            const bGeo = new THREE.CylinderGeometry(0.02, trunkR * 0.5, bLength, 5, 3);
+            _deformGeometry(bGeo, rng, 0.015);
+            const branch = new THREE.Mesh(bGeo, trunkMat);
+            
+            const bY = trunkH * (0.5 + rng() * 0.3); // Mid to upper trunk
+            const bAngle = rng() * Math.PI * 2;
+            
+            branch.position.set(0, bY, 0);
+            branch.rotation.set(0, bAngle, 0.4 + rng() * 0.5); // Angled up/out
+            branch.translateY(bLength / 2); // Shift along rotation
+            branch.castShadow = true;
+            group.add(branch);
         }
-        // Multi-layer canopy for fullness
-        const leafPalette = [0x1a6628, 0x236030, 0x2d8a3c, 0x1f7030, 0x308844, 0x15501e];
-        const canopyCount = 5 + Math.floor(rng() * 5);
+
+        // Lush organic canopy
+        const leafColors = [0x1e4215, 0x26541a, 0x183310, 0x316922, 0x1b3813];
+        const canopyCount = 14 + Math.floor(rng() * 10);
+        
         for (let i = 0; i < canopyCount; i++) {
-            const r = 0.55 + rng() * 0.7;
-            const geo = new THREE.SphereGeometry(r, 7, 6);
-            const mat = new THREE.MeshStandardMaterial({ color: leafPalette[Math.floor(rng()*leafPalette.length)], roughness: 0.92, flatShading: true });
+            const r = 0.6 + rng() * 0.9;
+            const geo = new THREE.IcosahedronGeometry(r, 1);
+            _deformGeometry(geo, rng, r * 0.3); // Highly fluffy/crinkled leaves
+            
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: leafColors[Math.floor(rng() * leafColors.length)], 
+                roughness: 0.85, 
+                flatShading: true 
+            });
+            
             const leaf = new THREE.Mesh(geo, mat);
+            
             const theta = rng() * Math.PI * 2;
-            const offset = rng() * 0.55;
-            leaf.position.set(Math.cos(theta)*offset, trunkH + r*0.5 + rng()*0.55, Math.sin(theta)*offset);
-            leaf.castShadow = true;
+            const phi = (rng() - 0.5) * Math.PI * 0.6;
+            const offset = rng() * (trunkR + 1.0);
+            
+            const lx = Math.cos(theta) * Math.cos(phi) * offset;
+            const ly = trunkH + Math.sin(phi) * offset * 0.5 + rng() * 0.8;
+            const lz = Math.sin(theta) * Math.cos(phi) * offset;
+            
+            leaf.position.set(lx, ly, lz);
+            leaf.scale.set(1 + rng() * 0.3, 0.5 + rng() * 0.3, 1 + rng() * 0.3); // Flatten to simulate horizontal leaf growth
+            leaf.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+            leaf.castShadow = true; 
+            leaf.receiveShadow = true;
             group.add(leaf);
         }
         return group;
