@@ -178,6 +178,11 @@ import {
         'light': 0xffee44, 'plate': 0xc27a3e, 'door': 0x66ccff, 'room': 0xffffff,
         'water': 0x0055ff, 'logic': 0x9966ff, 'aero': 0x00ffff, 'oneway': 0xffaa00,
         // DECORATION PROPS
+        'decor_debris':    0x7a7a7a,
+        'decor_wall_1x1_a':0x6a6a6a,
+        'decor_wall_1x1_b':0x6a6a6a,
+        'decor_wall_1x1_c':0x6a6a6a,
+        'decor_wall_2x2':  0x5a5a5a,
         'decor_rubble':    0x8a7266,
         'decor_shattered': 0xb8a898,
         'decor_vine_hanging': 0x4a7c59,
@@ -5824,6 +5829,11 @@ import {
         { tool: 'exit',       label: 'Exit',      key: '8', category: 'util' },
         { tool: 'light',      label: 'Light',     key: '-', category: 'util' },
         // DECORATION
+        { tool: 'decor_debris',    label: 'Scattered Debris', key: '-', category: 'decor' },
+        { tool: 'decor_wall_1x1_a',label: 'Wall Rubble A',  key: '-', category: 'decor' },
+        { tool: 'decor_wall_1x1_b',label: 'Wall Rubble B',  key: '-', category: 'decor' },
+        { tool: 'decor_wall_1x1_c',label: 'Wall Rubble C',  key: '-', category: 'decor' },
+        { tool: 'decor_wall_2x2',  label: 'Wall Rubble 2x2',key: '-', category: 'decor' },
         { tool: 'decor_rubble',    label: 'Rubble',         key: '-', category: 'decor' },
         { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
         { tool: 'decor_vine_hanging', label: 'Hanging Vine', key: '-', category: 'decor' },
@@ -6145,16 +6155,22 @@ import {
         return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
     }
 
-    function _deformGeometry(geometry, rng, intensity, minSize = 0.25) {
+    function _deformGeometry(geometry, rng, intensity, minSize = 0.3) {
         // Skip deformation on tiny rubble to keep them sharp/readable
         const box = new THREE.Box3().setFromBufferAttribute(geometry.attributes.position);
         const size = box.getSize(new THREE.Vector3());
-        if (Math.max(size.x, size.y, size.z) < minSize) return;
+        const maxDim = Math.max(size.x, size.y, size.z);
+        if (maxDim < minSize) return;
+
+        // Scale intensity so medium objects don't get turned inside out
+        const scaleDist = Math.min(1.0, maxDim / 2.0); 
+        const effectiveIntensity = intensity * scaleDist;
+
         geometry.computeVertexNormals();
         const pos = geometry.attributes.position;
         const norm = geometry.attributes.normal;
         for (let i = 0; i < pos.count; i++) {
-            const push = (rng() - 0.5) * intensity;
+            const push = (rng() - 0.5) * effectiveIntensity;
             pos.setXYZ(i, pos.getX(i) + norm.getX(i) * push, pos.getY(i) + norm.getY(i) * push, pos.getZ(i) + norm.getZ(i) * push);
         }
         pos.needsUpdate = true;
@@ -6162,6 +6178,164 @@ import {
     }
 
     // ── PROP BUILDERS ────────────────────────────────────────────────────────────
+    
+    // A much darker, high-contrast concrete material for the destroyed pieces
+    const heavyRubbleMat = new THREE.MeshStandardMaterial({ 
+        map: concreteTexs.albedo,
+        normalMap: concreteTexs.normal,
+        color: 0x605c58,
+        roughness: 0.95,
+        metalness: 0.2,
+        normalScale: new THREE.Vector2(3.0, 3.0)
+    });
+
+    function buildDecoDebris(rng = _makeRng(111)) {
+        const group = new THREE.Group();
+        const count = 15 + Math.floor(rng() * 15);
+        for(let i=0; i<count; i++) {
+            const type = rng();
+            let mesh;
+            if(type < 0.4) {
+                const r = 0.05 + rng() * 0.15;
+                const geo = new THREE.DodecahedronGeometry(r, 0);
+                _deformGeometry(geo, rng, r*0.5);
+                mesh = new THREE.Mesh(geo, heavyRubbleMat);
+            } else if(type < 0.7) {
+                const len = 0.2 + rng() * 0.5;
+                const geo = new THREE.CylinderGeometry(0.01, 0.01, len, 4);
+                mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color: 0x3a1f18, metalness: 0.8}));
+                mesh.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+            } else {
+                const geo = new THREE.BoxGeometry(0.1 + rng()*0.2, 0.02, 0.1 + rng()*0.2);
+                mesh = new THREE.Mesh(geo, heavyRubbleMat);
+                mesh.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+            }
+            mesh.position.set((rng()-0.5)*1.5, -0.45 + rng()*0.1, (rng()-0.5)*1.5);
+            mesh.castShadow = true;
+            group.add(mesh);
+        }
+        return group;
+    }
+
+    function buildDecoWallRubble1x1_A(rng = _makeRng(222)) {
+        const group = new THREE.Group();
+        const baseGeo = new THREE.BoxGeometry(1, 0.4, 1, 3, 2, 3);
+        _deformGeometry(baseGeo, rng, 0.1);
+        const base = new THREE.Mesh(baseGeo, heavyRubbleMat);
+        base.position.y = -0.3;
+        base.castShadow = true; base.receiveShadow = true;
+        group.add(base);
+
+        const slantGeo = new THREE.BoxGeometry(0.8, 0.4, 0.8, 2, 2, 2);
+        _deformGeometry(slantGeo, rng, 0.08);
+        const slant = new THREE.Mesh(slantGeo, heavyRubbleMat);
+        slant.position.set((rng()-0.5)*0.2, 0.1, (rng()-0.5)*0.2);
+        slant.rotation.set((rng()-0.5)*0.5, rng()*Math.PI, (rng()-0.5)*0.5);
+        slant.castShadow = true; slant.receiveShadow = true;
+        group.add(slant);
+
+        const rebarMat = new THREE.MeshStandardMaterial({ color: 0x3a1f18, metalness: 0.8, roughness: 0.6 });
+        for(let i=0; i<4; i++) {
+            const geo = new THREE.CylinderGeometry(0.015, 0.015, 0.6 + rng()*0.4, 4);
+            const rebar = new THREE.Mesh(geo, rebarMat);
+            rebar.position.set((rng()-0.5)*0.6, 0.2 + rng()*0.2, (rng()-0.5)*0.6);
+            rebar.rotation.set((rng()-0.5)*0.4, 0, (rng()-0.5)*0.4);
+            rebar.castShadow = true;
+            group.add(rebar);
+        }
+        return group;
+    }
+
+    function buildDecoWallRubble1x1_B(rng = _makeRng(333)) {
+        const group = new THREE.Group();
+        const p1Geo = new THREE.BoxGeometry(0.3, 1, 1, 2, 4, 2);
+        _deformGeometry(p1Geo, rng, 0.06);
+        const p1 = new THREE.Mesh(p1Geo, heavyRubbleMat);
+        p1.position.set(-0.35, 0, 0); p1.castShadow = true; p1.receiveShadow = true;
+        
+        const p2Geo = new THREE.BoxGeometry(0.3, 1, 1, 2, 4, 2);
+        _deformGeometry(p2Geo, rng, 0.06);
+        const p2 = new THREE.Mesh(p2Geo, heavyRubbleMat);
+        p2.position.set(0.35, 0, 0); p2.castShadow = true; p2.receiveShadow = true;
+        group.add(p1, p2);
+
+        const rebarMat = new THREE.MeshStandardMaterial({ color: 0x3a1f18, metalness: 0.8, roughness: 0.6 });
+        for(let i=0; i<5; i++) {
+            const geo = new THREE.CylinderGeometry(0.015, 0.015, 0.8, 4);
+            geo.rotateZ(Math.PI/2);
+            const rebar = new THREE.Mesh(geo, rebarMat);
+            rebar.position.set(0, (rng()-0.5)*0.8, (rng()-0.5)*0.8);
+            rebar.rotation.set((rng()-0.5)*0.3, (rng()-0.5)*0.3, 0);
+            rebar.castShadow = true;
+            group.add(rebar);
+        }
+        return group;
+    }
+
+    function buildDecoWallRubble1x1_C(rng = _makeRng(444)) {
+        const group = new THREE.Group();
+        const bGeo = new THREE.BoxGeometry(1, 0.5, 1, 3, 2, 3);
+        _deformGeometry(bGeo, rng, 0.08);
+        const b = new THREE.Mesh(bGeo, heavyRubbleMat);
+        b.position.y = -0.25; b.castShadow = true; b.receiveShadow = true;
+        group.add(b);
+
+        for(let i=0; i<3; i++) {
+            const sGeo = new THREE.BoxGeometry(0.4, 0.4, 0.4, 2, 2, 2);
+            _deformGeometry(sGeo, rng, 0.08);
+            const s = new THREE.Mesh(sGeo, heavyRubbleMat);
+            s.position.set((rng()-0.5)*0.4, 0.1+rng()*0.1, (rng()-0.5)*0.4);
+            s.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+            s.castShadow = true; s.receiveShadow = true;
+            group.add(s);
+        }
+        return group;
+    }
+
+    function buildDecoWallRubble2x2(rng = _makeRng(555)) {
+        const group = new THREE.Group();
+        const bGeo = new THREE.BoxGeometry(2, 0.6, 2, 4, 3, 4);
+        _deformGeometry(bGeo, rng, 0.15);
+        const b = new THREE.Mesh(bGeo, heavyRubbleMat);
+        b.position.y = -0.7; b.castShadow = true; b.receiveShadow = true;
+        group.add(b);
+
+        for(let i=0; i<3; i++) {
+            const sGeo = new THREE.BoxGeometry(1.0, 0.4, 1.2, 3, 2, 3);
+            _deformGeometry(sGeo, rng, 0.1);
+            const s = new THREE.Mesh(sGeo, heavyRubbleMat);
+            s.position.set((rng()-0.5)*0.6, -0.1 + rng()*0.3, (rng()-0.5)*0.6);
+            s.rotation.set((rng()-0.5)*0.6, rng()*Math.PI, (rng()-0.5)*0.6);
+            s.castShadow = true; s.receiveShadow = true;
+            group.add(s);
+        }
+
+        const rebarMat = new THREE.MeshStandardMaterial({ color: 0x3a1f18, metalness: 0.8, roughness: 0.6 });
+        for (let i = 0; i < 8; i++) {
+            const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3((rng()-0.5)*1.5, -0.5, (rng()-0.5)*1.5),
+                new THREE.Vector3((rng()-0.5)*1.8, rng()*1.5, (rng()-0.5)*1.8),
+                new THREE.Vector3((rng()-0.5)*1.2, 0.5 + rng()*1.5, (rng()-0.5)*1.2)
+            );
+            const rebar = new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.025, 5), rebarMat);
+            rebar.castShadow = true;
+            group.add(rebar);
+        }
+        
+        for(let i=0; i<10; i++) {
+            const r = 0.15 + rng() * 0.25;
+            const geo = new THREE.DodecahedronGeometry(r, 1);
+            _deformGeometry(geo, rng, r * 0.4); 
+            const mesh = new THREE.Mesh(geo, heavyRubbleMat);
+            mesh.position.set((rng()-0.5)*1.8, -0.8 + r, (rng()-0.5)*1.8);
+            mesh.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+            mesh.castShadow = true;
+            group.add(mesh);
+        }
+
+        return group;
+    }
+
     const propTextureLoader = new THREE.TextureLoader();
     const leavesTex = propTextureLoader.load('./assets/textures/leaves.jpg');
     leavesTex.colorSpace = THREE.SRGBColorSpace;
@@ -6479,6 +6653,11 @@ import {
 
     // Map from type string to builder function
     const DECOR_BUILDERS = {
+        decor_debris:    buildDecoDebris,
+        decor_wall_1x1_a: buildDecoWallRubble1x1_A,
+        decor_wall_1x1_b: buildDecoWallRubble1x1_B,
+        decor_wall_1x1_c: buildDecoWallRubble1x1_C,
+        decor_wall_2x2:  buildDecoWallRubble2x2,
         decor_rubble:    buildDecoRubble,
         decor_shattered: buildDecoShattered,
         decor_vine_hanging: buildDecoVineHanging,
@@ -6517,7 +6696,11 @@ import {
 
             const pvCamera = new THREE.PerspectiveCamera(48, 1, 0.01, 100);
 
-            const seeds = { decor_rubble: 77, decor_shattered: 42, decor_bush: 55, decor_fern: 33, decor_tree: 99 };
+            const seeds = { 
+                decor_debris: 111, decor_wall_1x1_a: 222, decor_wall_1x1_b: 333, 
+                decor_wall_1x1_c: 444, decor_wall_2x2: 555,
+                decor_rubble: 77, decor_shattered: 42, decor_bush: 55, decor_fern: 33, decor_tree: 99 
+            };
             Object.entries(DECOR_BUILDERS).forEach(([type, buildFn]) => {
                 const mesh = buildFn(_makeRng(seeds[type] || 50));
                 pvScene.add(mesh);
