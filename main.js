@@ -171,28 +171,17 @@ import {
     ];
 
     const TOOL_COLORS = {
-        'wall': 0x454545, 
-        'blue': 0x3388ff, 
-        'red': 0xff3344, 
-        'green': 0x33ff99, 
-        'bomb': 0xffaa00,
-        'spawn': 0xffffff, 
-        'exit': 0xffff00, 
-        'gray': 0xaaaaaa,
-        'yellow': 0xffdd33,
-        'big_yellow': 0xffaa33,
-        'big_gray': 0x888888,
-        'light': 0xffee44,
-        'plate': 0xc27a3e, 
-        'door': 0x66ccff,
-        'room': 0xffffff,
-        'water': 0x0055ff,
-        'logic': 0x9966ff, // <--- ADD THIS
-        'aero': 0x00ffff,   // <--- ADD THIS
-        'oneway': 0xffaa00,  // <--- ADD THIS
-        // ── DECORATION PROPS ──
+        'wall': 0x454545, 'blue': 0x3388ff, 'red': 0xff3344, 'green': 0x33ff99, 
+        'bomb': 0xffaa00, 'spawn': 0xffffff, 'exit': 0xffff00, 'gray': 0xaaaaaa,
+        'yellow': 0xffdd33, 'big_yellow': 0xffaa33, 'big_gray': 0x888888,
+        'light': 0xffee44, 'plate': 0xc27a3e, 'door': 0x66ccff, 'room': 0xffffff,
+        'water': 0x0055ff, 'logic': 0x9966ff, 'aero': 0x00ffff, 'oneway': 0xffaa00,
+        // DECORATION PROPS
         'decor_rubble':    0x8a7266,
         'decor_shattered': 0xb8a898,
+        'decor_log':       0x5c4a38,
+        'decor_pipes':     0x505c5a,
+        'decor_pillar':    0x9ea1a0,
         'decor_bush':      0x2d8a3c,
         'decor_fern':      0x3acc50,
         'decor_tree':      0x1a6628,
@@ -5813,28 +5802,31 @@ import {
     }
 
     const EDITOR_TOOLS_LIST = [
-        { tool: 'wall',       label: 'Wall',      key: '1' },
-        { tool: 'blue',       label: 'Blue',      key: '2' },
-        { tool: 'red',        label: 'Red',       key: '3' },
-        { tool: 'green',      label: 'Green',     key: '4' },
-        { tool: 'yellow',     label: 'Yellow',    key: '5' },
-        { tool: 'big_gray',   label: 'Lg Gray',   key: '-'  },
-        { tool: 'bomb',       label: 'Bomb',      key: '6' },
-        { tool: 'spawn',      label: 'Spawn',     key: '7' },
-        { tool: 'exit',       label: 'Exit',      key: '8' },
-        { tool: 'big_yellow', label: 'Lg Yellow', key: '9'  },
-        { tool: 'gray',       label: 'Gray',      key: '0' },
-        { tool: 'light',      label: 'Light',     key: '-'  },
-        { tool: 'plate',      label: 'Plate',     key: '-'  }, 
-        { tool: 'door',       label: 'Door',      key: '-'  }, 
-        { tool: 'room',       label: 'Room',      key: '-'  }, 
-        { tool: 'water',      label: 'Water',     key: '-'  }, 
-        { tool: 'logic',      label: 'LOGIC',     key: 'L'  },
-        { tool: 'aero',       label: 'Aero Filter',      key: '-'  },
-        { tool: 'oneway',      label: 'One Way Field',      key: '-'  },
-        // ── DECORATION PROPS ──
+        { tool: 'wall',       label: 'Wall',      key: '1', category: 'build' },
+        { tool: 'room',       label: 'Hollow Room', key: '-', category: 'build' },
+        { tool: 'water',      label: 'Water',     key: '-', category: 'build' },
+        { tool: 'blue',       label: 'Blue (Bounce)', key: '2', category: 'items' },
+        { tool: 'red',        label: 'Red (Scale)',  key: '3', category: 'items' },
+        { tool: 'green',      label: 'Green (Goal)', key: '4', category: 'items' },
+        { tool: 'yellow',     label: 'Yellow (Phys)', key: '5', category: 'items' },
+        { tool: 'gray',       label: 'Gray (Block)', key: '0', category: 'items' },
+        { tool: 'big_gray',   label: 'Lg Gray',   key: '-', category: 'items' },
+        { tool: 'big_yellow', label: 'Lg Yellow', key: '9', category: 'items' },
+        { tool: 'bomb',       label: 'Destruction', key: '6', category: 'logic' },
+        { tool: 'plate',      label: 'Plate',     key: '-', category: 'logic' },
+        { tool: 'door',       label: 'Door',      key: '-', category: 'logic' },
+        { tool: 'logic',      label: 'Logic Gate', key: 'L', category: 'logic' },
+        { tool: 'aero',       label: 'Aero Filter', key: '-', category: 'logic' },
+        { tool: 'oneway',     label: 'One-Way',    key: '-', category: 'logic' },
+        { tool: 'spawn',      label: 'Spawn',     key: '7', category: 'util' },
+        { tool: 'exit',       label: 'Exit',      key: '8', category: 'util' },
+        { tool: 'light',      label: 'Light',     key: '-', category: 'util' },
+        // DECORATION
         { tool: 'decor_rubble',    label: 'Rubble',         key: '-', category: 'decor' },
-        { tool: 'decor_shattered', label: 'Shattered Wall', key: '-', category: 'decor' },
+        { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
+        { tool: 'decor_log',       label: 'Fallen Log',     key: '-', category: 'decor' },
+        { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
+        { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
         { tool: 'decor_bush',      label: 'Bush',           key: '-', category: 'decor' },
         { tool: 'decor_fern',      label: 'Fern',           key: '-', category: 'decor' },
         { tool: 'decor_tree',      label: 'Tree',           key: '-', category: 'decor' },
@@ -6696,87 +6688,54 @@ function _getNoiseTexture(type = 'concrete') {
     // ── BUILD TOOL SELECTOR GRID ──
     (function buildToolSelector() {
         const grid = document.getElementById('tool-selector-grid');
+        grid.innerHTML = ''; // Clear existing
+        
+        const categories = {
+            'build': '🏗️ STRUCTURE',
+            'items': '📦 CUBES & OBJECTS',
+            'logic': '⚡ MECHANISMS',
+            'util':  '🛠️ UTILITY',
+            'decor': '🌿 DECORATION'
+        };
 
-        let lastCategory = null;
-        EDITOR_TOOLS_LIST.forEach(({ tool, label, key, category }) => {
-            const isDecor = category === 'decor';
+        Object.entries(categories).forEach(([catKey, catLabel]) => {
+            // Header
+            const header = document.createElement('div');
+            header.className = 'ts-category-header';
+            header.style.cssText = `grid-column: 1/-1; padding: 15px 5px 5px; font-size: 11px; letter-spacing: 3px; color: rgba(255,255,255,0.4); border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px;`;
+            header.textContent = catLabel;
+            grid.appendChild(header);
 
-            // Insert category divider before first decoration item
-            if (isDecor && lastCategory !== 'decor') {
-                const divider = document.createElement('div');
-                divider.className = 'ts-category-divider';
-                divider.style.cssText = `
-                    grid-column: 1 / -1;
-                    display: flex; align-items: center; gap: 10px;
-                    margin: 10px 0 4px; padding: 0 4px;
-                    font-size: 10px; font-weight: 700; letter-spacing: 2px;
-                    color: rgba(180,220,180,0.85);
-                    text-transform: uppercase;
-                    border-top: 1px solid rgba(100,200,120,0.22);
-                    padding-top: 10px;
+            // Tools in this category
+            EDITOR_TOOLS_LIST.filter(t => t.category === catKey).forEach((toolObj) => {
+                const item = document.createElement('div');
+                const isDecor = catKey === 'decor';
+                item.className = 'ts-item' + (toolObj.tool === editorTool ? ' selected' : '');
+                item.dataset.tool = toolObj.tool;
+
+                const preview = isDecor && DECOR_PREVIEW_URLS[toolObj.tool]
+                    ? `<img src="${DECOR_PREVIEW_URLS[toolObj.tool]}" style="width:50px;height:50px;object-fit:contain;"/>`
+                    : `<div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[toolObj.tool] || 0xffffff)}; width:30px; height:30px; border-radius:4px;"></div>`;
+
+                item.innerHTML = `
+                    ${preview}
+                    <div class="ts-name" style="font-size:10px; margin-top:5px;">${toolObj.label}</div>
+                    <div class="ts-key" style="font-size:8px; opacity:0.5;">${toolObj.key !== '-' ? '['+toolObj.key+']' : ''}</div>
                 `;
-                divider.innerHTML = `<span style="white-space:nowrap">🌿 DECORATION PROPS</span><span style="flex:1;height:1px;background:rgba(100,200,120,0.18)"></span>`;
-                grid.appendChild(divider);
-            }
-            lastCategory = category || null;
 
-            const item = document.createElement('div');
-            const isLight = tool === 'light';
-            const isBig = tool === 'big_yellow' || tool === 'big_gray';
-            item.className = 'ts-item' + (tool === editorTool ? ' selected' : '') + (isLight ? ' light-tool' : '') + (isDecor ? ' ts-decor-item' : '');
-            item.dataset.tool = tool;
-
-            if (isDecor) {
-                // 3D preview canvas or fallback color swatch
-                const hasPreview = !!DECOR_PREVIEW_URLS[tool];
-                const previewEl = hasPreview
-                    ? `<img src="${DECOR_PREVIEW_URLS[tool]}" style="width:72px;height:72px;border-radius:8px;object-fit:cover;display:block;image-rendering:auto;" />`
-                    : `<div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[tool])};width:64px;height:64px;border-radius:8px;"></div>`;
-
-                // Decor category label icons
-                const icon = { decor_rubble:'🪨', decor_shattered:'💥', decor_bush:'🌿', decor_fern:'🌱', decor_tree:'🌳' }[tool] || '🎨';
-
-                item.innerHTML = `
-                    <div style="position:relative;display:flex;align-items:center;justify-content:center;width:72px;height:72px;">
-                        ${previewEl}
-                        <div style="position:absolute;bottom:2px;right:2px;font-size:14px;line-height:1;filter:drop-shadow(0 1px 2px #000)">${icon}</div>
-                    </div>
-                    <div class="ts-name" style="margin-top:3px;">${label}</div>
-                    <div class="ts-key">(TAB)</div>`;
-            } else {
-                const swatchSize = isBig ? '52px' : isLight ? '36px' : '44px';
-                const br = isLight ? '50%' : isBig ? '8px' : '6px';
-                const swatchExtra = isLight ? `box-shadow:0 0 12px rgba(255,238,68,0.8), 0 3px 12px rgba(0,0,0,0.5);` : '';
-                item.innerHTML = `
-                    <div class="ts-swatch" style="background:${hexToCSS(TOOL_COLORS[tool])};width:${swatchSize};height:${swatchSize};border-radius:${br};${swatchExtra}"></div>
-                    <div class="ts-name">${label}</div>
-                    <div class="ts-key">${key !== '-' ? '['+key+']' : '(TAB)'}</div>`;
-            }
-
-            item.addEventListener('mouseenter', () => {
-                document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('hovered'));
-                item.classList.add('hovered');
-                // Preview the hotbar highlight without committing
-                document.querySelectorAll('.hotbar-slot').forEach(el => {
-                    el.classList.toggle('active', el.dataset.tool === tool);
+                item.addEventListener('mouseenter', () => {
+                    document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('hovered'));
+                    item.classList.add('hovered');
+                    updateParamsPanel(toolObj.tool, false);
                 });
-                // Show params for this tool (preview only, don't commit)
-                updateParamsPanel(tool, false);
-            });
-            item.addEventListener('click', () => {
-                // ONLY select in hotbar — do not switch the active placement tool yet
-                document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('selected', 'hovered'));
-                item.classList.add('selected');
-                // Update hotbar highlight to reflect selection
-                document.querySelectorAll('.hotbar-slot').forEach(el => {
-                    el.classList.toggle('active', el.dataset.tool === tool);
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('.ts-item').forEach(el => el.classList.remove('selected'));
+                    item.classList.add('selected');
+                    setEditorTool(toolObj.tool);
+                    updateParamsPanel(toolObj.tool, true);
                 });
-                // Show params for this tool (committed)
-                updateParamsPanel(tool, true);
-                // Mark on the item so TAB-release can pick it up
-                item.dataset.pendingSelect = 'true';
+                grid.appendChild(item);
             });
-            grid.appendChild(item);
         });
     })();
 
@@ -7207,11 +7166,10 @@ function _getNoiseTexture(type = 'concrete') {
         return light;
     }
 
-    function updateEditorVisuals() {
-        // Reset counts
+    function updateEditorVisuals(forcePhysicsRebuild = false) {
+        // 1. Reset Visual Instance Counts
         for (const key in editorInstancedMeshes) editorInstancedMeshes[key].count = 0;
 
-        // Helper to place matrix
         const placeInstance = (x, y, z, tool, scale = 1) => {
             const im = editorInstancedMeshes[tool];
             if (im && im.count < MAX_EDITOR_BLOCKS) {
@@ -7223,110 +7181,42 @@ function _getNoiseTexture(type = 'concrete') {
             }
         };
 
-        // Build Walls
-        customSolidBlocks.forEach(key => {
-            const [x, y, z] = key.split(',').map(Number);
-            placeInstance(x, y, z, 'wall');
-        });
-
-        // Build Entities & Bombs
+        // Batch render components
+        customSolidBlocks.forEach(k => { const [x,y,z] = k.split(',').map(Number); placeInstance(x,y,z,'wall'); });
         customEntities.forEach(ent => placeInstance(ent.x, ent.y, ent.z, ent.type));
-        customDestruction.forEach(bomb => placeInstance(bomb.cx, bomb.cy, bomb.cz, 'bomb'));
-
-        // Build Light markers — small box per light, per-instance color via setColorAt
-        const _editorLightColor = new THREE.Color();
-        customLights.forEach(light => {
-            const im = editorInstancedMeshes['light'];
-            if (im && im.count < MAX_EDITOR_BLOCKS) {
-                dummy.position.set(light.x, light.y, light.z);
-                dummy.rotation.set(0, 0, 0);
-                dummy.scale.setScalar(0.45);
-                dummy.updateMatrix();
-                const idx = im.count;
-                im.setMatrixAt(idx, dummy.matrix);
-                _editorLightColor.setHex(light.color);
-                im.setColorAt(idx, _editorLightColor);
-                im.count++;
-            }
-        });
-        if (editorInstancedMeshes['light'] && editorInstancedMeshes['light'].instanceColor) {
-            editorInstancedMeshes['light'].instanceColor.needsUpdate = true;
-        }
-
+        customDestruction.forEach(b => placeInstance(b.cx, b.cy, b.cz, 'bomb'));
         customPlates.forEach(p => placeInstance(p.x, p.y, p.z, 'plate', 0.8));
-        customDoors.forEach(d => {
-            // Doors are 3x3 in game, let's draw them taller in editor
-            placeInstance(d.x, d.y, d.z, 'door', 1.0);
-        });
-
-        customFields.forEach(f => {
-            // We use scale 1.0 for the marker, but you can adjust
-            placeInstance(f.x, f.y, f.z, f.type, 1.0);
-        });
-
-        // Decoration prop markers — small translucent colored cubes
-        customDecorations.forEach(d => {
-            placeInstance(d.x, d.y, d.z, d.type, 0.75);
-        });
-
-        // Draw Spawn and Exit markers
+        customDoors.forEach(d => placeInstance(d.x, d.y, d.z, 'door', 1.0));
+        customFields.forEach(f => placeInstance(f.x, f.y, f.z, f.type, 1.0));
+        customDecorations.forEach(d => placeInstance(d.x, d.y, d.z, d.type, 0.75));
         placeInstance(customSpawn.x, customSpawn.y, customSpawn.z, 'spawn');
         placeInstance(customExit.x, customExit.y, customExit.z, 'exit');
 
-        if (customWaterY !== undefined) {
-            editorWaterPlane.position.y = customWaterY;
-            editorWaterPlane.visible = true;
-        } else {
-            editorWaterPlane.visible = false;
-        }
-
-        // Tell Three.js to update the GPU buffers
+        // Update GPU Buffers
         for (const key in editorInstancedMeshes) {
             editorInstancedMeshes[key].instanceMatrix.needsUpdate = true;
-            editorInstancedMeshes[key].computeBoundingSphere(); // Important for raycasting
         }
 
-        // --- PHYSICS SYNC ---
-        // Skip the expensive CANNON body rebuild mid-drag; schedule for next mouseup
-        if (isMouseDown) {
-            _editorPhysicsDirty = true;
+        // 2. Optimized Physics Sync (Deferred)
+        if (isMouseDown && !forcePhysicsRebuild) {
+            _editorPhysicsDirty = true; // Handle rebuild on mouseUp
         } else {
-        // Remove from world to edit safely
-        world.removeBody(editorStaticBody);
-
-        // Wipe old hitboxes
-        editorStaticBody.shapes.length = 0;
-        editorStaticBody.shapeOffsets.length = 0;
-        editorStaticBody.shapeOrientations.length = 0;
-
-        const standardBox = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-
-        // Add a hitbox for every wall block
-        customSolidBlocks.forEach(key => {
-            const [x, y, z] = key.split(',').map(Number);
-            editorStaticBody.addShape(standardBox, new CANNON.Vec3(x, y, z));
-        });
-
-        // Add a hitbox for every entity (Red, Blue, Green, etc.)
-        customEntities.forEach(ent => {
-            let extents = new CANNON.Vec3(0.5, 0.5, 0.5);
-            // Size it perfectly based on the entity type
-            if (blockConfigs[ent.type] && blockConfigs[ent.type].extents) {
-                extents = blockConfigs[ent.type].extents;
-            }
-            editorStaticBody.addShape(new CANNON.Box(extents), new CANNON.Vec3(ent.x, ent.y, ent.z));
-        });
-
-        // Recalculate collision bounds
-        editorStaticBody.updateBoundingRadius();
-
-        // Re-add to the world if we are currently building
-        if (isEditorMode) {
-            world.addBody(editorStaticBody);
+            _editorPhysicsDirty = false;
+            world.removeBody(editorStaticBody);
+            editorStaticBody.shapes.length = 0;
+            editorStaticBody.shapeOffsets.length = 0;
+            editorStaticBody.shapeOrientations.length = 0;
+            const standardBox = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+            customSolidBlocks.forEach(key => {
+                const [x, y, z] = key.split(',').map(Number);
+                editorStaticBody.addShape(standardBox, new CANNON.Vec3(x, y, z));
+            });
+            customEntities.forEach(ent => {
+                let ext = blockConfigs[ent.type]?.extents || new CANNON.Vec3(0.5, 0.5, 0.5);
+                editorStaticBody.addShape(new CANNON.Box(ext), new CANNON.Vec3(ent.x, ent.y, ent.z));
+            });
+            if (isEditorMode) world.addBody(editorStaticBody);
         }
-        } // end of !isMouseDown physics rebuild
-
-        // Refresh logic wire visualizer
         updateLogicVisualizer();
     }
 
