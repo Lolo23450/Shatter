@@ -6586,21 +6586,108 @@ import {
 
     function buildDecoTree(rng = _makeRng(99)) {
         const group = new THREE.Group();
-        const trunkH = 3 + rng()*2, trunkR = 0.2;
-        const trunkGeo = new THREE.CylinderGeometry(trunkR*0.5, trunkR, trunkH, 8, 4);
-        _deformGeometry(trunkGeo, rng, 0.05);
-        const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x423224 }));
-        trunk.position.y = trunkH/2 - 0.5;
-        trunk.castShadow = true;
-        group.add(trunk);
-        for (let i = 0; i < 15; i++) {
-            const r = 0.8 + rng();
-            const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, flatShading: true }));            
-            leaf.position.set((rng()-0.5)*1.5, trunkH + (rng()-0.5), (rng()-0.5)*1.5);
-            leaf.scale.set(1, 0.5, 1);
-            leaf.castShadow = true;
-            group.add(leaf);
+        
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3c2c, roughness: 0.95 });
+        const leafMat = new THREE.MeshStandardMaterial({ 
+            color: 0xffffff, map: leavesTex, roughness: 0.9, flatShading: true, side: THREE.DoubleSide
+        });
+
+        const branchGeos = [];
+        const branchPts = []; // Points to spawn leaf canopies
+        
+        // 1. Main Trunk (curved/crooked)
+        const trunkH = 3.5 + rng() * 3.0;
+        const basePt = new THREE.Vector3(0, -0.5, 0);
+        const midPt = new THREE.Vector3((rng()-0.5)*1.5, trunkH * 0.4, (rng()-0.5)*1.5);
+        const topPt = new THREE.Vector3((rng()-0.5)*2.0, trunkH, (rng()-0.5)*2.0);
+        
+        const trunkCurve = new THREE.CatmullRomCurve3([basePt, midPt, topPt]);
+        branchGeos.push(new THREE.TubeGeometry(trunkCurve, 10, 0.25, 6, false));
+        branchPts.push(topPt);
+        
+        // 2. Roots
+        const numRoots = 3 + Math.floor(rng() * 3);
+        for(let i=0; i<numRoots; i++) {
+            const angle = (i/numRoots) * Math.PI * 2 + rng();
+            const rLen = 0.6 + rng() * 0.8;
+            const rootEnd = basePt.clone().add(new THREE.Vector3(Math.cos(angle)*rLen, -0.3-rng()*0.4, Math.sin(angle)*rLen));
+            const rootMid = basePt.clone().add(new THREE.Vector3(0, 0.5 + rng()*0.5, 0)); // Starts higher up the trunk
+            const rootCurve = new THREE.CatmullRomCurve3([rootMid, basePt, rootEnd]);
+            branchGeos.push(new THREE.TubeGeometry(rootCurve, 6, 0.12, 5, false));
         }
+
+        // 3. Branches
+        const numBranches = 3 + Math.floor(rng() * 4);
+        for(let i=0; i<numBranches; i++) {
+            const t = 0.4 + rng() * 0.5; // Spawn on upper 60% of trunk
+            const start = trunkCurve.getPoint(t);
+            const dir = new THREE.Vector3((rng()-0.5)*2.5, 0.2 + rng()*1.5, (rng()-0.5)*2.5).normalize();
+            const len = 1.0 + rng() * 2.5;
+            const end = start.clone().add(dir.multiplyScalar(len));
+            
+            // Sag or arch the branch
+            const sag = (rng() - 0.3) * 1.0;
+            const mid = start.clone().lerp(end, 0.5).add(new THREE.Vector3(0, sag, 0));
+            
+            const branchCurve = new THREE.CatmullRomCurve3([start, mid, end]);
+            branchGeos.push(new THREE.TubeGeometry(branchCurve, 8, 0.1, 5, false));
+            branchPts.push(end);
+            
+            // Optional tiny sub-branch
+            if (rng() > 0.4) {
+                const subStart = branchCurve.getPoint(0.4 + rng()*0.4);
+                const subEnd = subStart.clone().add(new THREE.Vector3((rng()-0.5)*2.0, rng()*1.5, (rng()-0.5)*2.0));
+                const subCurve = new THREE.CatmullRomCurve3([subStart, subEnd]);
+                branchGeos.push(new THREE.TubeGeometry(subCurve, 5, 0.05, 4, false));
+                branchPts.push(subEnd);
+            }
+        }
+
+        const mergedTrunk = BufferGeometryUtils.mergeGeometries(branchGeos);
+        const trunkMesh = new THREE.Mesh(mergedTrunk, trunkMat);
+        trunkMesh.castShadow = true;
+        trunkMesh.receiveShadow = true;
+        group.add(trunkMesh);
+
+        // 4. Canopy (Leaves)
+        const leafGeos = [];
+        branchPts.forEach(pt => {
+            const clusters = 4 + Math.floor(rng() * 5);
+            for(let j=0; j<clusters; j++) {
+                const r = 0.5 + rng() * 0.8;
+                const geo = new THREE.IcosahedronGeometry(r, 1);
+                _deformGeometry(geo, rng, r * 0.4);
+                
+                const m = new THREE.Matrix4();
+                const pos = pt.clone().add(new THREE.Vector3((rng()-0.5)*1.5, (rng()-0.5)*1.0, (rng()-0.5)*1.5));
+                const rot = new THREE.Euler(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+                const scl = new THREE.Vector3(1 + rng()*0.3, 0.6 + rng()*0.5, 1 + rng()*0.3); // Flatter canopy clouds
+                
+                m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scl);
+                geo.applyMatrix4(m);
+                leafGeos.push(geo);
+            }
+        });
+        
+        // Add some loose scattered leaf planes hanging off the branches for organic detail
+        for(let i=0; i<20; i++) {
+            const targetPt = branchPts[Math.floor(rng() * branchPts.length)];
+            const size = 0.3 + rng() * 0.5;
+            const geo = new THREE.PlaneGeometry(size, size);
+            const m = new THREE.Matrix4();
+            const pos = targetPt.clone().add(new THREE.Vector3((rng()-0.5)*2.5, (rng()-0.5)*2.0 - 0.5, (rng()-0.5)*2.5));
+            const rot = new THREE.Euler(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
+            m.compose(pos, new THREE.Quaternion().setFromEuler(rot), new THREE.Vector3(1,1,1));
+            geo.applyMatrix4(m);
+            leafGeos.push(geo);
+        }
+
+        const mergedLeaves = BufferGeometryUtils.mergeGeometries(leafGeos);
+        const leavesMesh = new THREE.Mesh(mergedLeaves, leafMat);
+        leavesMesh.castShadow = true;
+        leavesMesh.receiveShadow = true;
+        group.add(leavesMesh);
+
         return group;
     }
 
