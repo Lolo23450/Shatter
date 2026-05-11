@@ -179,7 +179,8 @@ import {
         // DECORATION PROPS
         'decor_rubble':    0x8a7266,
         'decor_shattered': 0xb8a898,
-        'decor_log':       0x5c4a38,
+        'decor_vine_hanging': 0x4a7c59,
+        'decor_vine_creeping': 0x3a5c39,
         'decor_pipes':     0x505c5a,
         'decor_pillar':    0x9ea1a0,
         'decor_bush':      0x2d8a3c,
@@ -5824,12 +5825,13 @@ import {
         // DECORATION
         { tool: 'decor_rubble',    label: 'Rubble',         key: '-', category: 'decor' },
         { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
-        { tool: 'decor_log',       label: 'Fallen Log',     key: '-', category: 'decor' },
         { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
         { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
         { tool: 'decor_bush',      label: 'Bush',           key: '-', category: 'decor' },
         { tool: 'decor_fern',      label: 'Fern',           key: '-', category: 'decor' },
         { tool: 'decor_tree',      label: 'Tree',           key: '-', category: 'decor' },
+        { tool: 'decor_vine_hanging', label: 'Hanging Vine', key: '-', category: 'decor' },
+        { tool: 'decor_vine_creeping', label: 'Creeping Vine', key: '-', category: 'decor' },
     ];
 
     function hexToCSS(hex) {
@@ -6106,45 +6108,35 @@ import {
         }
     }
 
-// ── PROCEDURAL TEXTURE GENERATOR ─────────────────────────────────────────────
-const _procTextures = {}; // Cache to avoid regenerating identical textures
+    // ── PROCEDURAL TEXTURE GENERATOR ─────────────────────────────────────────────
+    const _procTextures = {}; 
 
-function _getNoiseTexture(type = 'concrete') {
-    if (_procTextures[type]) return _procTextures[type];
-    
-    const size = 256;
-    const canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.createImageData(size, size);
-    
-    for (let i = 0; i < imgData.data.length; i += 4) {
-        let val;
-        if (type === 'wood') {
-            // Directional noise for wood grain
-            const x = (i / 4) % size;
-            const y = Math.floor((i / 4) / size);
-            val = (Math.random() * 50 + Math.sin(y * 0.1 + Math.random()) * 100 + 105) | 0;
-        } else if (type === 'rust') {
-            // High contrast patchy noise
-            val = Math.random() > 0.6 ? 255 : (Math.random() * 100 | 0);
-        } else {
-            // Fine cellular/static noise for concrete pores
-            val = (Math.random() * 255) | 0;
+    function _getNoiseTexture(type = 'concrete') {
+        if (_procTextures[type]) return _procTextures[type];
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(size, size);
+        for (let i = 0; i < imgData.data.length; i += 4) {
+            let val;
+            if (type === 'wood') {
+                const y = Math.floor((i / 4) / size);
+                val = (Math.random() * 50 + Math.sin(y * 0.1 + Math.random()) * 100 + 105) | 0;
+            } else if (type === 'rust') {
+                val = Math.random() > 0.6 ? 255 : (Math.random() * 100 | 0);
+            } else {
+                val = (Math.random() * 255) | 0;
+            }
+            imgData.data[i] = imgData.data[i+1] = imgData.data[i+2] = val;
+            imgData.data[i+3] = 255;
         }
-        imgData.data[i] = val;
-        imgData.data[i+1] = val;
-        imgData.data[i+2] = val;
-        imgData.data[i+3] = 255;
+        ctx.putImageData(imgData, 0, 0);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        _procTextures[type] = tex;
+        return tex;
     }
-    ctx.putImageData(imgData, 0, 0);
-    
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    _procTextures[type] = tex;
-    return tex;
-}
 
     // ── UTILITIES ────────────────────────────────────────────────────────────────
     function _makeRng(seed) {
@@ -6152,57 +6144,35 @@ function _getNoiseTexture(type = 'concrete') {
         return () => { s = (s * 1664525 + 1013904223) & 0xffffffff; return (s >>> 0) / 0xffffffff; };
     }
 
-    // Fixed: Now pushes vertices along their normals to prevent inverted/broken faces
     function _deformGeometry(geometry, rng, intensity) {
-        geometry.computeVertexNormals(); // Get base normals first
+        geometry.computeVertexNormals();
         const pos = geometry.attributes.position;
         const norm = geometry.attributes.normal;
         for (let i = 0; i < pos.count; i++) {
             const push = (rng() - 0.5) * intensity;
-            const x = pos.getX(i) + norm.getX(i) * push;
-            const y = pos.getY(i) + norm.getY(i) * push;
-            const z = pos.getZ(i) + norm.getZ(i) * push;
-            pos.setXYZ(i, x, y, z);
+            pos.setXYZ(i, pos.getX(i) + norm.getX(i) * push, pos.getY(i) + norm.getY(i) * push, pos.getZ(i) + norm.getZ(i) * push);
         }
-        geometry.computeVertexNormals(); // Recompute for proper lighting
+        geometry.computeVertexNormals();
     }
 
     // ── PROP BUILDERS ────────────────────────────────────────────────────────────
 
     function buildDecoRubble(rng = _makeRng(77)) {
         const group = new THREE.Group();
-        const noiseTex = _getNoiseTexture('concrete');
-        
-        const mat1 = typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ 
-            color: 0x7a7065, roughness: 1.0, bumpMap: noiseTex, bumpScale: 0.02 
-        });
-        const mat2 = typeof brokenMaterial !== 'undefined' ? brokenMaterial : new THREE.MeshStandardMaterial({ 
-            color: 0x66605a, roughness: 1.0, bumpMap: noiseTex, bumpScale: 0.03 
-        });
-
+        const mat1 = typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ color: 0x7a7065, roughness: 1.0 });
+        const mat2 = typeof brokenMaterial !== 'undefined' ? brokenMaterial : new THREE.MeshStandardMaterial({ color: 0x66605a, roughness: 1.0 });
         const count = 12 + Math.floor(rng() * 8); 
         for (let i = 0; i < count; i++) {
             const radius = 0.08 + rng() * 0.35;
-            // Detail 1 prevents breaking when deformed
             const geo = new THREE.DodecahedronGeometry(radius, 1);
             _deformGeometry(geo, rng, radius * 0.3); 
-            
             const mesh = new THREE.Mesh(geo, rng() > 0.4 ? mat1 : mat2);
             mesh.scale.set(1 + rng() * 0.6, 0.4 + rng() * 0.6, 1 + rng() * 0.6);
-            
             const dist = rng() * 1.6;
             const angle = rng() * Math.PI * 2;
-            
-            // Spawned 0.5 units lower in Y, plus half scale to rest on ground
-            const lowerY = -0.5; 
-            mesh.position.set(
-                Math.cos(angle) * dist, 
-                lowerY + (radius * mesh.scale.y * 0.5) + rng() * 0.05, 
-                Math.sin(angle) * dist
-            );
-            
-            mesh.rotation.set(rng() * Math.PI * 2, rng() * Math.PI * 2, rng() * Math.PI * 2);
-            mesh.castShadow = true; mesh.receiveShadow = true;
+            mesh.position.set(Math.cos(angle) * dist, -0.5 + (radius * mesh.scale.y * 0.5), Math.sin(angle) * dist);
+            mesh.rotation.set(rng() * 6, rng() * 6, rng() * 6);
+            mesh.castShadow = mesh.receiveShadow = true;
             group.add(mesh);
         }
         return group;
@@ -6210,369 +6180,190 @@ function _getNoiseTexture(type = 'concrete') {
 
     function buildDecoShattered(rng = _makeRng(42)) {
         const group = new THREE.Group();
-        const noiseTex = _getNoiseTexture('concrete');
-        const matWall = typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ 
-            color: 0x8a847c, roughness: 0.95, bumpMap: noiseTex, bumpScale: 0.02 
-        });
-        
-        const w = 1.2 + rng() * 0.4, h = 1.8 + rng() * 0.6, d = 0.25;
-        const slabGeo = new THREE.BoxGeometry(w, h, d, 4, 4, 2);
-        _deformGeometry(slabGeo, rng, 0.08); // More dramatic chipping
-        
+        const matWall = typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ color: 0x8a847c, roughness: 0.95 });
+        const w = 1.2 + rng() * 0.4, h = 1.8 + rng() * 0.6;
+        const slabGeo = new THREE.BoxGeometry(w, h, 0.25, 4, 4, 2);
+        _deformGeometry(slabGeo, rng, 0.08);
         const slab = new THREE.Mesh(slabGeo, matWall);
-        slab.rotation.set((rng() - 0.5) * 0.3, (rng() - 0.5) * 0.4, (rng() - 0.5) * 0.6);
-        slab.position.set(0, h * 0.45 - 0.5, 0); // Lowered by 0.5
-        slab.castShadow = true; slab.receiveShadow = true;
+        slab.position.set(0, h * 0.45 - 0.5, 0);
+        slab.rotation.set((rng()-0.5)*0.3, (rng()-0.5)*0.4, (rng()-0.5)*0.6);
+        slab.castShadow = slab.receiveShadow = true;
         group.add(slab);
-
-        const rebarMat = new THREE.MeshStandardMaterial({ 
-            color: 0x4a2a20, roughness: 0.9, metalness: 0.8, bumpMap: _getNoiseTexture('rust'), bumpScale: 0.05 
-        });
-        
-        const rebarCount = 4 + Math.floor(rng() * 4);
-        for (let i = 0; i < rebarCount; i++) {
-            const start = new THREE.Vector3((rng() - 0.5) * w * 0.8, (rng() - 0.5) * h * 0.8, (rng() - 0.5) * d);
-            const control = new THREE.Vector3(start.x + (rng() - 0.5) * 0.6, start.y + 0.3 + rng() * 0.5, start.z + (rng() - 0.5) * 0.6);
-            const end = new THREE.Vector3(control.x + (rng() - 0.5) * 0.5, control.y + 0.2 + rng() * 0.4, control.z + (rng() - 0.5) * 0.5);
-            
-            const curve = new THREE.QuadraticBezierCurve3(start, control, end);
-            const rebarGeo = new THREE.TubeGeometry(curve, 6, 0.012, 4, false);
-            const rebar = new THREE.Mesh(rebarGeo, rebarMat);
-            rebar.castShadow = true;
-            slab.add(rebar); 
-        }
-
-        const debrisGroup = buildDecoRubble(rng);
-        group.add(debrisGroup);
-
-        return group;
-    }
-
-    // ── NEW ASSET: PROCEDURAL FALLEN LOG ─────────────────────────────────────────
-    function buildDecoLog(rng = _makeRng(12)) {
-        const group = new THREE.Group();
-        const woodTex = _getNoiseTexture('wood');
-        const barkMat = new THREE.MeshStandardMaterial({ 
-            color: 0x3d3024, roughness: 1.0, bumpMap: woodTex, bumpScale: 0.05 
-        });
-        const insideMat = new THREE.MeshStandardMaterial({ color: 0x6e5c47, roughness: 0.9 });
-
-        const length = 2.0 + rng() * 1.5;
-        const radius = 0.25 + rng() * 0.1;
-        
-        // Create the hollow/broken cylinder
-        const logGeo = new THREE.CylinderGeometry(radius*0.8, radius, length, 7, 5, true);
-        _deformGeometry(logGeo, rng, 0.06);
-        
-        const log = new THREE.Mesh(logGeo, barkMat);
-        log.rotation.z = Math.PI / 2 + (rng() - 0.5) * 0.2;
-        log.rotation.y = rng() * Math.PI;
-        log.position.y = (radius * 0.8) - 0.5; // Rest on ground, lowered
-        log.castShadow = true; log.receiveShadow = true;
-        group.add(log);
-
-        // Inner wood cap (jagged)
-        const capGeo = new THREE.CylinderGeometry(radius*0.75, radius*0.95, length - 0.1, 7, 3);
-        _deformGeometry(capGeo, rng, 0.08);
-        const cap = new THREE.Mesh(capGeo, insideMat);
-        cap.rotation.copy(log.rotation);
-        cap.position.copy(log.position);
-        cap.castShadow = true;
-        group.add(cap);
-
-        // Small fungus/moss clusters
-        const fungusMat = new THREE.MeshStandardMaterial({ color: 0x8f9c76, roughness: 0.8 });
-        for(let i=0; i < 5; i++) {
-            const fGeo = new THREE.SphereGeometry(0.06, 5, 4);
-            _deformGeometry(fGeo, rng, 0.03);
-            const fungus = new THREE.Mesh(fGeo, fungusMat);
-            const lOffset = (rng() - 0.5) * length * 0.8;
-            const angle = rng() * Math.PI;
-            fungus.position.set(
-                Math.cos(angle) * radius, 
-                radius + rng() * 0.1, 
-                lOffset
+        const rebarMat = new THREE.MeshStandardMaterial({ color: 0x4a2a20, metalness: 0.8 });
+        for (let i = 0; i < 5; i++) {
+            const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3((rng()-0.5)*w, (rng()-0.5)*h, 0),
+                new THREE.Vector3((rng()-0.5)*w, rng()*h, 0.2),
+                new THREE.Vector3((rng()-0.5)*w, h, 0.5)
             );
-            fungus.scale.set(1, 0.3, 1);
-            log.add(fungus); // parent to log
+            const rebar = new THREE.Mesh(new THREE.TubeGeometry(curve, 6, 0.012, 4), rebarMat);
+            slab.add(rebar);
         }
+        group.add(buildDecoRubble(rng));
         return group;
     }
 
-    // ── NEW ASSET: RUSTED INDUSTRIAL PIPES ───────────────────────────────────────
     function buildDecoPipes(rng = _makeRng(88)) {
         const group = new THREE.Group();
-        const rustTex = _getNoiseTexture('rust');
-        const pipeMat = new THREE.MeshStandardMaterial({ 
-            color: 0x3d4745, roughness: 0.7, metalness: 0.6, 
-            bumpMap: rustTex, bumpScale: 0.04 
-        });
-
-        const count = 2 + Math.floor(rng() * 3);
-        for (let i = 0; i < count; i++) {
-            const r = 0.04 + rng() * 0.05;
-            const h = 0.8 + rng() * 1.2;
-            
-            // Procedural pipe bends
-            const start = new THREE.Vector3((rng()-0.5)*0.8, -0.5, (rng()-0.5)*0.8);
-            const mid = new THREE.Vector3(start.x, start.y + h*0.6, start.z);
-            const end = new THREE.Vector3(start.x + (rng()-0.5)*0.8, start.y + h, start.z + (rng()-0.5)*0.8);
-            
-            const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-            const pipeGeo = new THREE.TubeGeometry(curve, 12, r, 8, false);
-            const pipe = new THREE.Mesh(pipeGeo, pipeMat);
-            pipe.castShadow = true; pipe.receiveShadow = true;
+        const pipeMat = new THREE.MeshStandardMaterial({ color: 0x3d4745, roughness: 0.7, metalness: 0.6 });
+        for (let i = 0; i < 3; i++) {
+            const r = 0.05 + rng() * 0.04;
+            const h = 0.8 + rng() * 1.5;
+            const start = new THREE.Vector3((rng()-0.5), -0.5, (rng()-0.5));
+            const curve = new THREE.QuadraticBezierCurve3(start, new THREE.Vector3(start.x, h*0.5, start.z), new THREE.Vector3(start.x + rng(), h, start.z + rng()));
+            const pipe = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, r, 8), pipeMat);
+            pipe.castShadow = true;
             group.add(pipe);
-
-            // Pipe Joint/Flange
-            const jointGeo = new THREE.TorusGeometry(r * 1.3, r * 0.4, 6, 12);
-            const joint = new THREE.Mesh(jointGeo, pipeMat);
-            joint.position.copy(curve.getPoint(0.6));
-            joint.lookAt(curve.getPoint(0.65));
-            joint.castShadow = true;
-            group.add(joint);
         }
         return group;
     }
 
-    // ── NEW ASSET: BROKEN PILLAR ─────────────────────────────────────────────────
     function buildDecoPillar(rng = _makeRng(19)) {
         const group = new THREE.Group();
-        const noiseTex = _getNoiseTexture('concrete');
-        const concreteMat = new THREE.MeshStandardMaterial({ 
-            color: 0x93908a, roughness: 0.98, bumpMap: noiseTex, bumpScale: 0.03 
-        });
-
-        const r = 0.25 + rng() * 0.1;
-        const h = 1.0 + rng() * 1.5;
-        
-        // Main column
+        const r = 0.25 + rng() * 0.1, h = 1.0 + rng() * 2.0;
         const colGeo = new THREE.CylinderGeometry(r*0.8, r, h, 8, 5);
         _deformGeometry(colGeo, rng, 0.05);
-        const col = new THREE.Mesh(colGeo, concreteMat);
-        col.position.y = (h / 2) - 0.5; // lower to ground
-        col.castShadow = true; col.receiveShadow = true;
+        const col = new THREE.Mesh(colGeo, typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ color: 0x93908a }));
+        col.position.y = (h / 2) - 0.5;
+        col.castShadow = col.receiveShadow = true;
         group.add(col);
-
-        // Rebar core sticking out of top
-        const rebarMat = new THREE.MeshStandardMaterial({ color: 0x54362a, metalness: 0.7, roughness: 0.8 });
-        for(let i=0; i<4; i++) {
-            const rbH = 0.4 + rng() * 0.6;
-            const rbGeo = new THREE.CylinderGeometry(0.01, 0.01, rbH, 4);
-            const rebar = new THREE.Mesh(rbGeo, rebarMat);
-            const a = (i/4) * Math.PI*2;
-            rebar.position.set(Math.cos(a)*r*0.5, h - 0.5 + (rbH/2) - 0.1, Math.sin(a)*r*0.5);
-            rebar.rotation.x = (rng() - 0.5) * 0.5;
-            rebar.rotation.z = (rng() - 0.5) * 0.5;
-            rebar.castShadow = true;
-            group.add(rebar);
-        }
-
-        // Add base rubble
-        const rubble = buildDecoRubble(rng);
-        group.add(rubble);
+        group.add(buildDecoRubble(rng));
         return group;
     }
 
     function buildDecoBush(rng = _makeRng(55)) {
         const group = new THREE.Group();
-        // Complex natural leaf tones
-        const leafColors = [0x274e1d, 0x346328, 0x1d3a14, 0x417833, 0x214518];
-        
-        // Stems (Crinkled)
-        const stemMat = new THREE.MeshStandardMaterial({ color: 0x3d2c20, roughness: 0.95 });
-        for (let s = 0; s < 5; s++) {
-            const sh = 0.3 + rng() * 0.5;
-            const sGeo = new THREE.CylinderGeometry(0.015, 0.035, sh, 5, 4);
-            _deformGeometry(sGeo, rng, 0.008);
-            const sMesh = new THREE.Mesh(sGeo, stemMat);
-            sMesh.position.set((rng() - 0.5) * 0.2, sh * 0.5, (rng() - 0.5) * 0.2);
-            sMesh.rotation.set((rng() - 0.5) * 0.6, rng() * Math.PI, (rng() - 0.5) * 0.6);
-            sMesh.castShadow = true;
-            group.add(sMesh);
-        }
-        
-        // Foliage Clusters
-        const clusterCount = 12 + Math.floor(rng() * 8);
-        for (let i = 0; i < clusterCount; i++) {
-            const r = 0.2 + rng() * 0.35;
-            // Icosahedron with Detail=1 mimics a beautiful dense low-poly leaf cluster when deformed
+        const leafColors = [0x274e1d, 0x346328, 0x1d3a14, 0x417833];
+        const stemMat = new THREE.MeshStandardMaterial({ color: 0x3d2c20 });
+        for (let i = 0; i < 15; i++) {
+            const r = 0.2 + rng() * 0.4;
             const geo = new THREE.IcosahedronGeometry(r, 1);
-            _deformGeometry(geo, rng, r * 0.25);
-            
-            const mat = new THREE.MeshStandardMaterial({ 
-                color: leafColors[Math.floor(rng() * leafColors.length)], 
-                roughness: 0.7, 
-                flatShading: true // Creates great specular highlights across the deformations
-            });
-            
+            _deformGeometry(geo, rng, r * 0.3);
+            const mat = new THREE.MeshStandardMaterial({ color: leafColors[Math.floor(rng() * leafColors.length)], roughness: 0.8, flatShading: true });
             const cluster = new THREE.Mesh(geo, mat);
-            const angle = rng() * Math.PI * 2;
-            const rad = rng() * 0.6;
-            const h = 0.25 + rng() * 0.7;
-            cluster.position.set(Math.cos(angle) * rad, h, Math.sin(angle) * rad);
-            
-            cluster.scale.set(1 + rng() * 0.2, 0.6 + rng() * 0.3, 1 + rng() * 0.2); // Flattened tops
-            cluster.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
-            cluster.castShadow = true; 
-            cluster.receiveShadow = true;
+            const a = rng() * Math.PI * 2, d = rng() * 0.7;
+            cluster.position.set(Math.cos(a)*d, 0.2 + rng()*0.8, Math.sin(a)*d);
+            cluster.scale.set(1, 0.7, 1);
+            cluster.castShadow = true;
             group.add(cluster);
         }
         return group;
     }
 
+    // ── OPTIMIZED FERN ───────────────────────────────────────────────────────────
     function buildDecoFern(rng = _makeRng(33)) {
         const group = new THREE.Group();
-        const leafColors = [0x2a541c, 0x366b26, 0x224516, 0x40802c];
-        const frondCount = 7 + Math.floor(rng() * 6);
-        
-        // Central Root Crown
-        const baseGeo = new THREE.DodecahedronGeometry(0.08, 0);
-        _deformGeometry(baseGeo, rng, 0.03);
-        const baseMesh = new THREE.Mesh(baseGeo, new THREE.MeshStandardMaterial({ color: 0x382618, roughness: 1.0 }));
-        baseMesh.position.y = 0.04;
-        group.add(baseMesh);
+        const leafColors = [0x2a541c, 0x366b26, 0x224516];
+        const frondCount = 8 + Math.floor(rng() * 6);
+        const frondMat = new THREE.MeshStandardMaterial({ color: leafColors[1], roughness: 0.8, side: THREE.DoubleSide });
 
         for (let i = 0; i < frondCount; i++) {
             const angle = (i / frondCount) * Math.PI * 2 + (rng() - 0.5) * 0.4;
-            const length = 0.6 + rng() * 0.6;
-            
-            // Procedural sweeping curve for the frond stem
+            const length = 0.8 + rng() * 0.7;
             const curve = new THREE.QuadraticBezierCurve3(
-                new THREE.Vector3(0, 0.05, 0),
-                new THREE.Vector3(Math.cos(angle) * length * 0.4, length * 0.9, Math.sin(angle) * length * 0.4),
-                new THREE.Vector3(Math.cos(angle) * length, length * 0.2 - rng() * 0.15, Math.sin(angle) * length)
+                new THREE.Vector3(0, -0.45, 0),
+                new THREE.Vector3(Math.cos(angle) * length * 0.2, length * 0.8, Math.sin(angle) * length * 0.2),
+                new THREE.Vector3(Math.cos(angle) * length, length * 0.1, Math.sin(angle) * length)
             );
-            
-            const stemGeo = new THREE.TubeGeometry(curve, 10, 0.012, 4, false);
-            const color = leafColors[Math.floor(rng() * leafColors.length)];
-            const mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.65, side: THREE.DoubleSide });
-            
-            const stem = new THREE.Mesh(stemGeo, mat);
-            stem.castShadow = true;
-            group.add(stem);
-            
-            // Leaflets (Pinnae) traveling up the curve
-            const pinnaeCount = 12 + Math.floor(rng() * 6);
-            for (let p = 1; p < pinnaeCount; p++) {
-                const t = p / pinnaeCount;
+
+            const stemGeo = new THREE.TubeGeometry(curve, 12, 0.015, 5, false);
+            group.add(new THREE.Mesh(stemGeo, frondMat));
+
+            const leavesPerFrond = 10 + Math.floor(rng() * 5);
+            const frondLeaves = [];
+            for (let j = 1; j < leavesPerFrond; j++) {
+                const t = j / leavesPerFrond;
                 const pos = curve.getPoint(t);
                 const tangent = curve.getTangent(t);
+                const size = (1.0 - t) * 0.25;
                 
-                // Leaves are smaller at bottom and tip, widest in middle
-                const taper = Math.sin(t * Math.PI); 
-                const pw = 0.04 + rng() * 0.02 * taper;
-                const ph = 0.16 + rng() * 0.08 * taper;
+                const leafGeo = new THREE.PlaneGeometry(size, size * 1.5);
+                leafGeo.translate(0, size * 0.5, 0);
+                const lMesh = new THREE.Mesh(leafGeo);
+                lMesh.position.copy(pos);
+                lMesh.lookAt(pos.clone().add(tangent));
+                lMesh.rotateZ(Math.PI / 2);
+                lMesh.rotateX(0.5);
+                lMesh.updateMatrix();
+                frondLeaves.push(lMesh.geometry.clone().applyMatrix4(lMesh.matrix));
                 
-                // Create single shaped plane leaflet
-                const lGeo = new THREE.PlaneGeometry(pw, ph, 1, 2);
-                _deformGeometry(lGeo, rng, 0.006); // Slight crinkles
-                
-                // Left leaflet
-                const leafL = new THREE.Mesh(lGeo, mat);
-                leafL.position.copy(pos);
-                leafL.lookAt(pos.clone().add(tangent)); // Align to stem
-                leafL.rotateZ(Math.PI / 2); // Flatten horizontally
-                leafL.rotateX(0.3 + rng() * 0.2); // Angle outward and up
-                leafL.castShadow = true;
-                group.add(leafL);
-                
-                // Right leaflet
-                const leafR = new THREE.Mesh(lGeo, mat);
-                leafR.position.copy(pos);
-                leafR.lookAt(pos.clone().add(tangent));
-                leafR.rotateZ(Math.PI / 2);
-                leafR.rotateX(-0.3 - rng() * 0.2); // Angle opposite
-                leafR.castShadow = true;
-                group.add(leafR);
+                lMesh.rotateX(-1.0);
+                lMesh.updateMatrix();
+                frondLeaves.push(lMesh.geometry.clone().applyMatrix4(lMesh.matrix));
             }
+            const mergedLeaves = THREE.BufferGeometryUtils.mergeGeometries(frondLeaves);
+            const leafMesh = new THREE.Mesh(mergedLeaves, frondMat);
+            leafMesh.castShadow = true;
+            group.add(leafMesh);
         }
         return group;
     }
 
+    // ── VINE VARIANTS ────────────────────────────────────────────────────────────
+    function _buildVineBase(rng, points, leafCount, colorBase) {
+        const group = new THREE.Group();
+        const curve = new THREE.CatmullRomCurve3(points);
+        const tubeGeo = new THREE.TubeGeometry(curve, 24, 0.02, 5, false);
+        const vineMat = new THREE.MeshStandardMaterial({ color: colorBase, roughness: 0.9 });
+        const vineTube = new THREE.Mesh(tubeGeo, vineMat);
+        vineTube.castShadow = true;
+        group.add(vineTube);
+
+        const leaves = [];
+        const leafMat = new THREE.MeshStandardMaterial({ color: colorBase, roughness: 0.8, side: THREE.DoubleSide });
+        for (let i = 0; i < leafCount; i++) {
+            const t = rng();
+            const pos = curve.getPoint(t);
+            const tangent = curve.getTangent(t);
+            const lSize = 0.05 + rng() * 0.1;
+            const lGeo = new THREE.BoxGeometry(lSize, 0.01, lSize);
+            const lMesh = new THREE.Mesh(lGeo);
+            lMesh.position.copy(pos);
+            lMesh.lookAt(pos.clone().add(tangent));
+            lMesh.rotation.z += rng() * Math.PI;
+            lMesh.updateMatrix();
+            leaves.push(lGeo.clone().applyMatrix4(lMesh.matrix));
+        }
+        const mergedLeaves = THREE.BufferGeometryUtils.mergeGeometries(leaves);
+        group.add(new THREE.Mesh(mergedLeaves, leafMat));
+        return group;
+    }
+
+    function buildDecoVineHanging(rng = _makeRng(101)) {
+        const points = [new THREE.Vector3(0, 0.5, 0)];
+        let lastP = points[0].clone();
+        for(let i=0; i<6; i++) {
+            lastP.add(new THREE.Vector3((rng()-0.5)*0.8, -0.4 - rng()*0.4, (rng()-0.5)*0.8));
+            points.push(lastP.clone());
+        }
+        return _buildVineBase(rng, points, 25, 0x2d451a);
+    }
+
+    function buildDecoVineCreeping(rng = _makeRng(202)) {
+        const points = [new THREE.Vector3(0, -0.48, 0)];
+        let lastP = points[0].clone();
+        for(let i=0; i<6; i++) {
+            lastP.add(new THREE.Vector3((rng()-0.5)*1.5, (rng()-0.5)*0.1, (rng()-0.5)*1.5));
+            points.push(lastP.clone());
+        }
+        return _buildVineBase(rng, points, 30, 0x38541c);
+    }
+
     function buildDecoTree(rng = _makeRng(99)) {
         const group = new THREE.Group();
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x423224, roughness: 0.95 });
-        const trunkH = 2.5 + rng() * 2.0;
-        const trunkR = 0.15 + rng() * 0.15;
-        
-        // Trunk: Tapered, heavily subdivided for bark texturing and root flares
-        const trunkGeo = new THREE.CylinderGeometry(trunkR * 0.5, trunkR, trunkH, 8, 8);
-        const pos = trunkGeo.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-            const y = pos.getY(i);
-            const x = pos.getX(i);
-            const z = pos.getZ(i);
-            
-            // Base bark noise
-            const noiseX = (rng() - 0.5) * 0.05;
-            const noiseZ = (rng() - 0.5) * 0.05;
-            
-            // Root flare at bottom of the trunk (-trunkH / 2)
-            let flare = 1.0;
-            const bottomY = -trunkH / 2;
-            if (y < bottomY + 0.6) {
-                flare = 1.0 + ((bottomY + 0.6) - y) * 1.8;
-            }
-            
-            pos.setXYZ(i, (x * flare) + noiseX, y, (z * flare) + noiseZ);
-        }
-        trunkGeo.computeVertexNormals();
-        
-        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-        trunk.position.y = trunkH * 0.5;
-        trunk.castShadow = true; 
-        trunk.receiveShadow = true;
+        const trunkH = 3 + rng()*2, trunkR = 0.2;
+        const trunkGeo = new THREE.CylinderGeometry(trunkR*0.5, trunkR, trunkH, 8, 4);
+        _deformGeometry(trunkGeo, rng, 0.05);
+        const trunk = new THREE.Mesh(trunkGeo, new THREE.MeshStandardMaterial({ color: 0x423224 }));
+        trunk.position.y = trunkH/2 - 0.5;
+        trunk.castShadow = true;
         group.add(trunk);
-        
-        // Branches
-        const branchCount = 2 + Math.floor(rng() * 3);
-        for(let i = 0; i < branchCount; i++) {
-            const bLength = 0.6 + rng() * 1.0;
-            const bGeo = new THREE.CylinderGeometry(0.02, trunkR * 0.5, bLength, 5, 3);
-            _deformGeometry(bGeo, rng, 0.015);
-            const branch = new THREE.Mesh(bGeo, trunkMat);
-            
-            const bY = trunkH * (0.5 + rng() * 0.3); // Mid to upper trunk
-            const bAngle = rng() * Math.PI * 2;
-            
-            branch.position.set(0, bY, 0);
-            branch.rotation.set(0, bAngle, 0.4 + rng() * 0.5); // Angled up/out
-            branch.translateY(bLength / 2); // Shift along rotation
-            branch.castShadow = true;
-            group.add(branch);
-        }
-
-        // Lush organic canopy
-        const leafColors = [0x1e4215, 0x26541a, 0x183310, 0x316922, 0x1b3813];
-        const canopyCount = 14 + Math.floor(rng() * 10);
-        
-        for (let i = 0; i < canopyCount; i++) {
-            const r = 0.6 + rng() * 0.9;
-            const geo = new THREE.IcosahedronGeometry(r, 1);
-            _deformGeometry(geo, rng, r * 0.3); // Highly fluffy/crinkled leaves
-            
-            const mat = new THREE.MeshStandardMaterial({ 
-                color: leafColors[Math.floor(rng() * leafColors.length)], 
-                roughness: 0.85, 
-                flatShading: true 
-            });
-            
-            const leaf = new THREE.Mesh(geo, mat);
-            
-            const theta = rng() * Math.PI * 2;
-            const phi = (rng() - 0.5) * Math.PI * 0.6;
-            const offset = rng() * (trunkR + 1.0);
-            
-            const lx = Math.cos(theta) * Math.cos(phi) * offset;
-            const ly = trunkH + Math.sin(phi) * offset * 0.5 + rng() * 0.8;
-            const lz = Math.sin(theta) * Math.cos(phi) * offset;
-            
-            leaf.position.set(lx, ly, lz);
-            leaf.scale.set(1 + rng() * 0.3, 0.5 + rng() * 0.3, 1 + rng() * 0.3); // Flatten to simulate horizontal leaf growth
-            leaf.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
-            leaf.castShadow = true; 
-            leaf.receiveShadow = true;
+        for (let i = 0; i < 15; i++) {
+            const r = 0.8 + rng();
+            const leaf = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), new THREE.MeshStandardMaterial({ color: 0x1e4215, flatShading: true }));
+            leaf.position.set((rng()-0.5)*1.5, trunkH + (rng()-0.5), (rng()-0.5)*1.5);
+            leaf.scale.set(1, 0.5, 1);
+            leaf.castShadow = true;
             group.add(leaf);
         }
         return group;
@@ -6582,7 +6373,8 @@ function _getNoiseTexture(type = 'concrete') {
     const DECOR_BUILDERS = {
         decor_rubble:    buildDecoRubble,
         decor_shattered: buildDecoShattered,
-        decor_log:       buildDecoLog,
+        decor_vine_hanging: buildDecoVineHanging,
+        decor_vine_creeping: buildDecoVineCreeping,
         decor_pipes:     buildDecoPipes,
         decor_pillar:    buildDecoPillar,
         decor_bush:      buildDecoBush,
