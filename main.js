@@ -14,7 +14,7 @@ import * as CANNON from 'cannon-es';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { CHAPTER_LEVEL_NAMES, LEVEL_NAMES, CHAPTERS, LevelBuilder } from './level-builder.js';
 import { OptimizedSSRPass } from './OptimizedSSRPass.js';
-import { BufferGeometryUtils } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 import {
     HUB_LEVEL_INDEX, HUB_GATES, GATE_BY_ID,
