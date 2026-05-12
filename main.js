@@ -194,12 +194,14 @@ import {
         'decor_shattered': 0xb8a898,
         'decor_pipes':     0x505c5a,
         'decor_pillar':    0x9ea1a0,
-        // DECORATION PROPS (Clean Architecture)
-        'decor_conduit':   0x2a2a2a, // Dark plastic/cabling
-        'decor_led_strip': 0x00aaff, // Bright glowing blue
-        'decor_vent':      0x3b3b3b, // Gunmetal louver
-        'decor_panel':     0x555555, // Clean gray acoustic padding
-        'decor_powerbox':  0xcc5522, // Industrial safety orange
+        // MODULAR CLEAN ARCHITECTURE
+        'decor_frame_open':   0x888888, // Light structural grey
+        'decor_frame_solid':  0x555555, // Heavy dark grey
+        'decor_frame_braced': 0x777777, // Structural grey
+        'decor_panel_blank':  0x444444, // Flat panel grey
+        'decor_panel_vent':   0x333333, // Dark vent
+        'decor_panel_core':   0x00aaff, // Emissive blue core
+        'decor_panel_pipes':  0xcc5511, // Hazard pipe orange
     };
 
     function applyPOM(material, heightMap, scale = 0.05) {
@@ -5860,12 +5862,14 @@ import {
         { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
         { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
         { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
-        // NEW CLEAN PROPS:
-        { tool: 'decor_conduit',   label: 'Data Conduits',  key: '-', category: 'decor' },
-        { tool: 'decor_led_strip', label: 'LED Wall Strip', key: '-', category: 'decor' },
-        { tool: 'decor_vent',      label: 'Vent Grate',     key: '-', category: 'decor' },
-        { tool: 'decor_panel',     label: 'Acoustic Panel', key: '-', category: 'decor' },
-        { tool: 'decor_powerbox',  label: 'Utility Box',    key: '-', category: 'decor' },
+        // NEW MODULAR PROPS:
+        { tool: 'decor_frame_open',   label: 'Frame (Open)',   key: '-', category: 'decor' },
+        { tool: 'decor_frame_solid',  label: 'Frame (Armor)',  key: '-', category: 'decor' },
+        { tool: 'decor_frame_braced', label: 'Frame (Braced)', key: '-', category: 'decor' },
+        { tool: 'decor_panel_blank',  label: 'Panel (Blank)',  key: '-', category: 'decor' },
+        { tool: 'decor_panel_vent',   label: 'Panel (Vent)',   key: '-', category: 'decor' },
+        { tool: 'decor_panel_core',   label: 'Panel (Core)',   key: '-', category: 'decor' },
+        { tool: 'decor_panel_pipes',  label: 'Panel (Pipes)',  key: '-', category: 'decor' },
     ];
 
     function hexToCSS(hex) {
@@ -6539,162 +6543,141 @@ import {
         return group;
     }
 
-// ── CLEAN ARCHITECTURAL DECOR BUILDERS ───────────────────────────────────────
+    // ── MODULAR CLEAN ARCHITECTURE BUILDERS ──────────────────────────────────────
 
-    const cleanMetalMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4, metalness: 0.8 });
-    const darkPlasticMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7, metalness: 0.2 });
-    const panelMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.1 });
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a4d52, roughness: 0.5, metalness: 0.7 });
+    const darkPanelMat = new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.7, metalness: 0.4 });
+    const ledMat = new THREE.MeshStandardMaterial({ color: 0xccffff, emissive: 0x00aaff, emissiveIntensity: 2.0, toneMapped: false });
+    const warnMat = new THREE.MeshStandardMaterial({ color: 0xcc5511, roughness: 0.6, metalness: 0.3 });
 
-    // 1. Parallel Data Conduits (Organized cables with mounting brackets)
-    function buildDecoConduitRun(rng = _makeRng(101)) {
+    // --- OUTER FRAMEWORKS (1x1x1 Grid Structures) ---
+
+    // 1. Open Scaffolding Frame (Edges only)
+    function buildDecoFrameOpen(rng = _makeRng(101)) {
         const group = new THREE.Group();
-        const length = 2.0;
-        
-        // 3 parallel pipes
-        const pipeGeo = new THREE.CylinderGeometry(0.02, 0.02, length, 8);
-        for(let i=0; i<3; i++) {
-            const pipe = new THREE.Mesh(pipeGeo, darkPlasticMat);
-            pipe.position.set((i - 1) * 0.08, 0, 0.03);
-            pipe.castShadow = true;
-            group.add(pipe);
-        }
+        const t = 0.12; // thickness of struts
+        const gX = new THREE.BoxGeometry(1, t, t);
+        const gY = new THREE.BoxGeometry(t, 1, t);
+        const gZ = new THREE.BoxGeometry(t, t, 1);
+        const h = 0.5 - t/2;
 
-        // Mounting brackets
-        const bracketGeo = new THREE.BoxGeometry(0.3, 0.05, 0.08);
-        for(let i=-1; i<=1; i++) {
-            const bracket = new THREE.Mesh(bracketGeo, cleanMetalMat);
-            bracket.position.set(0, i * 0.8, 0.04);
-            bracket.castShadow = true;
-            group.add(bracket);
-        }
-        return group;
-    }
+        const edges = [
+            [gX, 0, h, h], [gX, 0, -h, h], [gX, 0, h, -h], [gX, 0, -h, -h],
+            [gY, h, 0, h], [gY, -h, 0, h], [gY, h, 0, -h], [gY, -h, 0, -h],
+            [gZ, h, h, 0], [gZ, -h, h, 0], [gZ, h, -h, 0], [gZ, -h, -h, 0]
+        ];
 
-    // 2. Recessed LED Light Strip
-    function buildDecoLightStrip(rng = _makeRng(202)) {
-        const group = new THREE.Group();
-        const length = 1.5;
-        
-        // Casing
-        const caseGeo = new THREE.BoxGeometry(0.15, length, 0.05);
-        const casing = new THREE.Mesh(caseGeo, cleanMetalMat);
-        casing.position.set(0, 0, 0.025);
-        group.add(casing);
-
-        // Glowing Core
-        const coreGeo = new THREE.BoxGeometry(0.08, length - 0.1, 0.06);
-        const coreMat = new THREE.MeshStandardMaterial({ 
-            color: 0xccffff, emissive: 0x00aaff, emissiveIntensity: 2.5, toneMapped: false 
+        edges.forEach(([geo, x, y, z]) => {
+            const mesh = new THREE.Mesh(geo, frameMat);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            group.add(mesh);
         });
-        const core = new THREE.Mesh(coreGeo, coreMat);
-        core.position.set(0, 0, 0.03);
-        group.add(core);
+        return group;
+    }
+
+    // 2. Solid Armor Frame (Thick block with 0.85 cutouts)
+    function buildDecoFrameSolid(rng = _makeRng(102)) {
+        const group = new THREE.Group();
+        // A solid 1x1 block
+        const main = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), frameMat);
+        main.castShadow = true;
+        group.add(main);
+
+        // Dark recesses to make it look like a sci-fi casing
+        const recessGeoX = new THREE.BoxGeometry(1.02, 0.85, 0.85);
+        const recessGeoY = new THREE.BoxGeometry(0.85, 1.02, 0.85);
+        const recessGeoZ = new THREE.BoxGeometry(0.85, 0.85, 1.02);
+        
+        [recessGeoX, recessGeoY, recessGeoZ].forEach(geo => {
+            const mesh = new THREE.Mesh(geo, darkPanelMat);
+            group.add(mesh);
+        });
 
         return group;
     }
 
-    // 3. Industrial Vent Grate
-    function buildDecoVentGrate(rng = _makeRng(303)) {
-        const group = new THREE.Group();
+    // 3. X-Brace Strut Frame
+    function buildDecoFrameBraced(rng = _makeRng(103)) {
+        const group = buildDecoFrameOpen(rng); // Start with open frame
         
-        // Outer Frame
-        const frameGeo = new THREE.BoxGeometry(1.0, 1.0, 0.1);
-        const frame = new THREE.Mesh(frameGeo, cleanMetalMat);
-        frame.position.set(0, 0, 0.05);
-        group.add(frame);
+        // Add internal X cross-bracing
+        const braceGeo = new THREE.BoxGeometry(0.08, 1.414, 0.08); // Diagonal length
+        const brace1 = new THREE.Mesh(braceGeo, frameMat);
+        brace1.rotation.z = Math.PI / 4;
+        const brace2 = new THREE.Mesh(braceGeo, frameMat);
+        brace2.rotation.z = -Math.PI / 4;
 
-        // Dark Interior
-        const voidGeo = new THREE.PlaneGeometry(0.8, 0.8);
-        const voidMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        const voidMesh = new THREE.Mesh(voidGeo, voidMat);
-        voidMesh.position.set(0, 0, 0.101);
-        group.add(voidMesh);
+        group.add(brace1, brace2);
+        return group;
+    }
 
-        // Louvers (Slanted slats)
-        const slatGeo = new THREE.BoxGeometry(0.85, 0.05, 0.08);
-        for(let y = -0.35; y <= 0.35; y += 0.15) {
-            const slat = new THREE.Mesh(slatGeo, cleanMetalMat);
-            slat.position.set(0, y, 0.12);
-            slat.rotation.x = Math.PI / 6; // Slant them down
+    // --- INNER PANELS (0.85 x 0.85 centered modules) ---
+    // These are scaled to sit perfectly inside the frames above
+
+    // 4. Blank Acoustic Backpanel
+    function buildDecoPanelBlank(rng = _makeRng(201)) {
+        const group = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.25), darkPanelMat);
+        base.castShadow = true;
+        group.add(base);
+
+        // Simple armor plating details
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.28), frameMat);
+        group.add(pad);
+        return group;
+    }
+
+    // 5. Louvered Vent Panel
+    function buildDecoPanelVent(rng = _makeRng(202)) {
+        const group = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.25), darkPanelMat);
+        group.add(base);
+
+        const slatGeo = new THREE.BoxGeometry(0.75, 0.06, 0.06);
+        for(let y = -0.3; y <= 0.3; y += 0.12) {
+            const slat = new THREE.Mesh(slatGeo, frameMat);
+            slat.position.set(0, y, 0.14);
+            slat.rotation.x = Math.PI / 6; // Angled down
             slat.castShadow = true;
             group.add(slat);
         }
         return group;
     }
 
-    // 4. Acoustic / Architectural Wall Panel
-    function buildDecoWallPanel(rng = _makeRng(404)) {
+    // 6. Glowing Data/Energy Core Panel
+    function buildDecoPanelCore(rng = _makeRng(203)) {
         const group = new THREE.Group();
-        
-        // Base plate
-        const baseGeo = new THREE.BoxGeometry(1.8, 1.8, 0.05);
-        const base = new THREE.Mesh(baseGeo, panelMat);
-        base.position.set(0, 0, 0.025);
-        base.castShadow = true;
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.25), darkPanelMat);
         group.add(base);
 
-        // Raised inner padding with slight color variation
-        const innerGeo = new THREE.BoxGeometry(1.6, 1.6, 0.04);
-        const innerMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.9, metalness: 0.0 });
-        const inner = new THREE.Mesh(innerGeo, innerMat);
-        inner.position.set(0, 0, 0.06);
-        inner.castShadow = true;
-        group.add(inner);
+        // Bright LED strip running down the middle
+        const led = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.75, 0.28), ledMat);
+        group.add(led);
 
-        // 4 industrial bolts in the corners
-        const boltGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8);
-        boltGeo.rotateX(Math.PI / 2);
-        const offsets = [-0.75, 0.75];
-        offsets.forEach(x => {
-            offsets.forEach(y => {
-                const bolt = new THREE.Mesh(boltGeo, cleanMetalMat);
-                bolt.position.set(x, y, 0.05);
-                group.add(bolt);
-            });
-        });
+        // Data banks on sides
+        const bankGeo = new THREE.BoxGeometry(0.2, 0.6, 0.26);
+        const bankL = new THREE.Mesh(bankGeo, frameMat); bankL.position.x = -0.25;
+        const bankR = new THREE.Mesh(bankGeo, frameMat); bankR.position.x = 0.25;
+        group.add(bankL, bankR);
 
         return group;
     }
 
-    // 5. Electrical Utility Box
-    function buildDecoPowerBox(rng = _makeRng(505)) {
+    // 7. Internal Pipes/Conduit Panel
+    function buildDecoPanelPipes(rng = _makeRng(204)) {
         const group = new THREE.Group();
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.15), darkPanelMat);
+        group.add(base);
+
+        const pipeGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.85, 8);
+        const pipe1 = new THREE.Mesh(pipeGeo, warnMat); // Orange hazard pipe
+        pipe1.position.set(-0.2, 0, 0.12);
         
-        // Main Box
-        const boxGeo = new THREE.BoxGeometry(0.6, 0.9, 0.25);
-        const boxMat = new THREE.MeshStandardMaterial({ color: 0x883322, roughness: 0.6, metalness: 0.5 }); // Industrial Orange/Rust
-        const box = new THREE.Mesh(boxGeo, boxMat);
-        box.position.set(0, 0, 0.125);
-        box.castShadow = true;
-        group.add(box);
+        const pipe2 = new THREE.Mesh(pipeGeo, frameMat); // Standard metal pipe
+        pipe2.position.set(0.15, 0, 0.12);
 
-        // Warning Label (Yellow/Black stripe illusion)
-        const labelGeo = new THREE.PlaneGeometry(0.4, 0.1);
-        const labelMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
-        const label = new THREE.Mesh(labelGeo, labelMat);
-        label.position.set(0, 0.3, 0.251);
-        group.add(label);
-
-        // Power Status Light
-        const lightGeo = new THREE.SphereGeometry(0.04, 8, 8);
-        const isOn = rng() > 0.3; // 70% chance to be powered on
-        const lightMat = new THREE.MeshStandardMaterial({ 
-            color: isOn ? 0x00ff00 : 0x222222, 
-            emissive: isOn ? 0x00ff00 : 0x000000,
-            emissiveIntensity: 2.0
-        });
-        const light = new THREE.Mesh(lightGeo, lightMat);
-        light.position.set(0.15, 0.1, 0.25);
-        group.add(light);
-
-        // Cables routing up into the ceiling
-        const cableGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.0, 8);
-        const cable1 = new THREE.Mesh(cableGeo, darkPlasticMat);
-        cable1.position.set(-0.15, 0.95, 0.1);
-        const cable2 = new THREE.Mesh(cableGeo, darkPlasticMat);
-        cable2.position.set(0.15, 0.95, 0.1);
-        group.add(cable1, cable2);
-
+        group.add(pipe1, pipe2);
         return group;
     }
 
@@ -6709,12 +6692,14 @@ import {
         decor_shattered: buildDecoShattered,
         decor_pipes:     buildDecoPipes,
         decor_pillar:    buildDecoPillar,
-        // NEW CLEAN PROPS:
-        decor_conduit:   buildDecoConduitRun,
-        decor_led_strip: buildDecoLightStrip,
-        decor_vent:      buildDecoVentGrate,
-        decor_panel:     buildDecoWallPanel,
-        decor_powerbox:  buildDecoPowerBox,
+        // NEW MODULAR PROPS:
+        decor_frame_open:   buildDecoFrameOpen,
+        decor_frame_solid:  buildDecoFrameSolid,
+        decor_frame_braced: buildDecoFrameBraced,
+        decor_panel_blank:  buildDecoPanelBlank,
+        decor_panel_vent:   buildDecoPanelVent,
+        decor_panel_core:   buildDecoPanelCore,
+        decor_panel_pipes:  buildDecoPanelPipes,
     };
 
     // ── 3-D PREVIEW CANVAS RENDERER ───────────────────────────────────────────
@@ -6749,7 +6734,8 @@ import {
                 decor_wall_1x1_c: 444, decor_wall_2x2: 555,
                 decor_rubble: 77, decor_shattered: 42, decor_pillar: 19, decor_pipes: 88,
                 // NEW:
-                decor_conduit: 101, decor_led_strip: 202, decor_vent: 303, decor_panel: 404, decor_powerbox: 505
+                decor_frame_open: 101, decor_frame_solid: 102, decor_frame_braced: 103,
+                decor_panel_blank: 201, decor_panel_vent: 202, decor_panel_core: 203, decor_panel_pipes: 204
             };
             Object.entries(DECOR_BUILDERS).forEach(([type, buildFn]) => {
                 const mesh = buildFn(_makeRng(seeds[type] || 50));
@@ -7178,8 +7164,21 @@ import {
                     else if (editorTool.startsWith('decor_')) {
                         // Remove any existing decoration at the same grid position
                         customDecorations = customDecorations.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
-                        // Random rotation so repeated placements feel varied
-                        const rotY = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.6;
+                        
+                        let rotY = 0;
+                        
+                        // Clean architectural assets snap cleanly to face the wall you click
+                        if (editorTool.startsWith('decor_frame_') || editorTool.startsWith('decor_panel_')) {
+                            if (norm.x > 0.5) rotY = Math.PI / 2;         // Facing +X
+                            else if (norm.x < -0.5) rotY = -Math.PI / 2;  // Facing -X
+                            else if (norm.z < -0.5) rotY = Math.PI;       // Facing -Z
+                            else rotY = 0;                                // Facing +Z (or floor/ceiling)
+                        } 
+                        // Organic rubble and debris keep the random messy rotation
+                        else {
+                            rotY = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.6;
+                        }
+
                         customDecorations.push({ type: editorTool, x: gx, y: gy, z: gz, rotY });
                     }
                     else {
