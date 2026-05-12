@@ -6987,14 +6987,6 @@ import {
         clamp.castShadow = true;
         group.add(clamp);
 
-        // 6. Glowing Capillary Tubes (Adds gorgeous lighting/bloom)
-        const tubeGeo = new THREE.CylinderGeometry(0.015, 0.015, s, 8);
-        const t1 = new THREE.Mesh(tubeGeo, ledMat); 
-        t1.position.set(0.36, 0, 0); // Right edge
-        const t2 = new THREE.Mesh(tubeGeo, ledMat); 
-        t2.position.set(-0.36, 0, 0); // Left edge
-        group.add(t1, t2);
-
         return group;
     }
 
