@@ -6543,7 +6543,7 @@ import {
         return group;
     }
 
-    // ── MODULAR CLEAN ARCHITECTURE BUILDERS ──────────────────────────────────────
+// ── MODULAR CLEAN ARCHITECTURE BUILDERS ──────────────────────────────────────
 
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a4d52, roughness: 0.5, metalness: 0.7 });
     const darkPanelMat = new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.7, metalness: 0.4 });
@@ -6579,162 +6579,212 @@ import {
     // 2. Solid Armor Frame (Thick block with 0.85 cutouts)
     function buildDecoFrameSolid(rng = _makeRng(102)) {
         const group = new THREE.Group();
-        // A solid 1x1 block
         const main = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), frameMat);
         main.castShadow = true;
         group.add(main);
 
-        // Dark recesses to make it look like a sci-fi casing
         const recessGeoX = new THREE.BoxGeometry(1.02, 0.85, 0.85);
         const recessGeoY = new THREE.BoxGeometry(0.85, 1.02, 0.85);
         const recessGeoZ = new THREE.BoxGeometry(0.85, 0.85, 1.02);
         
         [recessGeoX, recessGeoY, recessGeoZ].forEach(geo => {
-            const mesh = new THREE.Mesh(geo, darkPanelMat);
-            group.add(mesh);
+            group.add(new THREE.Mesh(geo, darkPanelMat));
         });
 
         return group;
     }
-    
-    // 3. Heavy X-Brace Strut Frame
+
+    // 3. Heavy Truss Cage (X-Bracing on all 6 sides)
     function buildDecoFrameBraced(rng = _makeRng(103)) {
-        const group = buildDecoFrameOpen(rng); // Start with open outer frame
-        
-        const zOffset = -0.38; // Push the bracing to the back to leave room for panels
+        const group = buildDecoFrameOpen(rng); 
 
-        // --- 1. Central Mechanical Hub ---
-        const hubGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 8);
-        hubGeo.rotateX(Math.PI / 2);
-        const hub = new THREE.Mesh(hubGeo, frameMat);
-        hub.position.set(0, 0, zOffset);
-        hub.castShadow = true;
-        group.add(hub);
+        // Helper to build a single braced face
+        function createBraceFace() {
+            const faceGroup = new THREE.Group();
+            
+            // Hub
+            const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.04, 8), frameMat);
+            hub.rotation.x = Math.PI / 2;
+            const innerHub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 8), darkPanelMat);
+            innerHub.rotation.x = Math.PI / 2;
+            faceGroup.add(hub, innerHub);
+            
+            // Diagonal Struts
+            const strutGeo = new THREE.BoxGeometry(0.04, 0.8, 0.04);
+            const strut1 = new THREE.Mesh(strutGeo, frameMat); strut1.rotation.z = Math.PI/4;
+            const strut2 = new THREE.Mesh(strutGeo, frameMat); strut2.rotation.z = -Math.PI/4;
+            faceGroup.add(strut1, strut2);
+            
+            // Corner Reinforcements
+            const gussetGeo = new THREE.BoxGeometry(0.25, 0.02, 0.04);
+            [ 
+                [0.3, 0.3, -Math.PI/4], [-0.3, -0.3, -Math.PI/4], 
+                [-0.3, 0.3, Math.PI/4], [0.3, -0.3, Math.PI/4] 
+            ].forEach(p => {
+                const g = new THREE.Mesh(gussetGeo, darkPanelMat);
+                g.position.set(p[0], p[1], 0); g.rotation.z = p[2];
+                faceGroup.add(g);
+            });
+            return faceGroup;
+        }
 
-        // Dark recessed inner core of the hub
-        const innerHubGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 8);
-        innerHubGeo.rotateX(Math.PI / 2);
-        const innerHub = new THREE.Mesh(innerHubGeo, darkPanelMat);
-        innerHub.position.set(0, 0, zOffset);
-        group.add(innerHub);
-
-        // --- 2. Heavy Diagonal Struts ---
-        const strutLength = 0.6; // Fits perfectly between corners and hub
-        const strutGeo = new THREE.BoxGeometry(0.06, strutLength, 0.06);
-        
-        const positions = [
-            { x: 0.22, y: 0.22, rot: -Math.PI / 4 }, // Top Right
-            { x: -0.22, y: -0.22, rot: -Math.PI / 4 }, // Bottom Left
-            { x: -0.22, y: 0.22, rot: Math.PI / 4 }, // Top Left
-            { x: 0.22, y: -0.22, rot: Math.PI / 4 }, // Bottom Right
+        const zOffset = 0.42; // Sits just inside the outer 0.5 bounds
+        const transforms = [
+            [0, 0, zOffset, 0, 0, 0],              // Front
+            [0, 0, -zOffset, 0, Math.PI, 0],       // Back
+            [zOffset, 0, 0, 0, Math.PI/2, 0],      // Right
+            [-zOffset, 0, 0, 0, -Math.PI/2, 0],    // Left
+            [0, zOffset, 0, -Math.PI/2, 0, 0],     // Top
+            [0, -zOffset, 0, Math.PI/2, 0, 0]      // Bottom
         ];
 
-        positions.forEach(p => {
-            const strut = new THREE.Mesh(strutGeo, frameMat);
-            strut.position.set(p.x, p.y, zOffset);
-            strut.rotation.z = p.rot;
-            strut.castShadow = true;
-            group.add(strut);
-        });
-
-        // --- 3. Corner Gusset Plates (Reinforcements) ---
-        const gussetGeo = new THREE.BoxGeometry(0.35, 0.04, 0.06);
-        const gussetPos = [
-            { x: 0.38, y: 0.38, rotZ: -Math.PI / 4 },
-            { x: -0.38, y: -0.38, rotZ: -Math.PI / 4 },
-            { x: -0.38, y: 0.38, rotZ: Math.PI / 4 },
-            { x: 0.38, y: -0.38, rotZ: Math.PI / 4 },
-        ];
-
-        gussetPos.forEach(p => {
-            const gusset = new THREE.Mesh(gussetGeo, darkPanelMat);
-            gusset.position.set(p.x, p.y, zOffset);
-            gusset.rotation.z = p.rotZ;
-            gusset.castShadow = true;
-            group.add(gusset);
-        });
-
-        // --- 4. Hub Bolts ---
-        const boltGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.14, 6);
-        boltGeo.rotateX(Math.PI / 2);
-        const boltDist = 0.1;
-        
-        const boltAngles = [0, Math.PI/2, Math.PI, Math.PI*1.5];
-        boltAngles.forEach(ang => {
-            const bolt = new THREE.Mesh(boltGeo, frameMat);
-            bolt.position.set(Math.cos(ang) * boltDist, Math.sin(ang) * boltDist, zOffset);
-            group.add(bolt);
+        transforms.forEach(t => {
+            const face = createBraceFace();
+            face.position.set(t[0], t[1], t[2]);
+            face.rotation.set(t[3], t[4], t[5]);
+            group.add(face);
         });
 
         return group;
     }
 
-    // --- INNER PANELS (0.85 x 0.85 centered modules) ---
-    // These are scaled to sit perfectly inside the frames above
+    // --- INNER PANELS (0.84 x 0.84 x 0.84 Cubes) ---
 
-    // 4. Blank Acoustic Backpanel
+    // 4. Heavy Armor Cube (Interlocking geometry)
     function buildDecoPanelBlank(rng = _makeRng(201)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.25), darkPanelMat);
+        const s = 0.84;
+        
+        // Dark core
+        const base = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), darkPanelMat);
         base.castShadow = true;
         group.add(base);
 
-        // Simple armor plating details
-        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 0.28), frameMat);
-        group.add(pad);
+        // Armor plating protruding slightly on all axes, leaving dark recessed edges
+        const plateS = 0.68;
+        const plateT = s + 0.02; 
+        
+        const plates = [
+            new THREE.BoxGeometry(plateT, plateS, plateS),
+            new THREE.BoxGeometry(plateS, plateT, plateS),
+            new THREE.BoxGeometry(plateS, plateS, plateT)
+        ];
+
+        plates.forEach(geo => {
+            const plate = new THREE.Mesh(geo, frameMat);
+            plate.castShadow = true;
+            group.add(plate);
+        });
+        
         return group;
     }
 
-    // 5. Louvered Vent Panel
+    // 5. Heavy HVAC Vent Cube
     function buildDecoPanelVent(rng = _makeRng(202)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.25), darkPanelMat);
+        const s = 0.84;
+        
+        const base = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), darkPanelMat);
+        base.castShadow = true;
         group.add(base);
 
-        const slatGeo = new THREE.BoxGeometry(0.75, 0.06, 0.06);
-        for(let y = -0.3; y <= 0.3; y += 0.12) {
+        // Central black void so you can't see the dark wall behind the louvers
+        const voidBox = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, s + 0.01), new THREE.MeshBasicMaterial({color:0x000000}));
+        group.add(voidBox);
+
+        // Slanted Louvers passing entirely through the cube (Z-axis)
+        const slatGeo = new THREE.BoxGeometry(0.65, 0.06, s + 0.02);
+        for(let y = -0.28; y <= 0.28; y += 0.14) {
             const slat = new THREE.Mesh(slatGeo, frameMat);
-            slat.position.set(0, y, 0.14);
-            slat.rotation.x = Math.PI / 6; // Angled down
+            slat.position.set(0, y, 0);
+            slat.rotation.x = Math.PI / 5;
             slat.castShadow = true;
             group.add(slat);
         }
         return group;
     }
 
-    // 6. Glowing Data/Energy Core Panel
+    // 6. Quantum Server Core Cube
     function buildDecoPanelCore(rng = _makeRng(203)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.25), darkPanelMat);
+        const s = 0.84;
+        
+        const base = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), darkPanelMat);
         group.add(base);
 
-        // Bright LED strip running down the middle
-        const led = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.75, 0.28), ledMat);
-        group.add(led);
+        // 3D Cross of glowing energy penetrating all 6 faces
+        const glowT = 0.35;
+        const glowL = s + 0.02;
+        const glows = [
+            new THREE.BoxGeometry(glowL, glowT, glowT),
+            new THREE.BoxGeometry(glowT, glowL, glowT),
+            new THREE.BoxGeometry(glowT, glowT, glowL)
+        ];
 
-        // Data banks on sides
-        const bankGeo = new THREE.BoxGeometry(0.2, 0.6, 0.26);
-        const bankL = new THREE.Mesh(bankGeo, frameMat); bankL.position.x = -0.25;
-        const bankR = new THREE.Mesh(bankGeo, frameMat); bankR.position.x = 0.25;
-        group.add(bankL, bankR);
+        glows.forEach(geo => {
+            group.add(new THREE.Mesh(geo, ledMat));
+        });
+
+        // Add a protective edge-cage around the glowing core
+        const t = 0.08;
+        const eX = new THREE.BoxGeometry(s+0.04, t, t);
+        const eY = new THREE.BoxGeometry(t, s+0.04, t);
+        const eZ = new THREE.BoxGeometry(t, t, s+0.04);
+        const h = s/2;
+        
+        const edges = [
+            [eX, 0, h, h], [eX, 0, -h, h], [eX, 0, h, -h], [eX, 0, -h, -h],
+            [eY, h, 0, h], [eY, -h, 0, h], [eY, h, 0, -h], [eY, -h, 0, -h],
+            [eZ, h, h, 0], [eZ, -h, h, 0], [eZ, h, -h, 0], [eZ, -h, -h, 0]
+        ];
+        edges.forEach(([geo, x, y, z]) => {
+            const m = new THREE.Mesh(geo, frameMat);
+            m.position.set(x, y, z);
+            m.castShadow = true;
+            group.add(m);
+        });
 
         return group;
     }
 
-    // 7. Internal Pipes/Conduit Panel
+    // 7. Fluid Routing Manifold Cube
     function buildDecoPanelPipes(rng = _makeRng(204)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.15), darkPanelMat);
+        const s = 0.84;
+        
+        // Smaller dark core so pipes protrude heavily
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), darkPanelMat);
         group.add(base);
 
-        const pipeGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.84, 8);
-        const pipe1 = new THREE.Mesh(pipeGeo, warnMat); // Orange hazard pipe
-        pipe1.position.set(-0.2, 0, 0.12);
-        
-        const pipe2 = new THREE.Mesh(pipeGeo, frameMat); // Standard metal pipe
-        pipe2.position.set(0.15, 0, 0.12);
+        // Massive Orange Vertical Hazard Pipe
+        const pipeYGeo = new THREE.CylinderGeometry(0.18, 0.18, s, 12);
+        const pipeY = new THREE.Mesh(pipeYGeo, warnMat); 
+        pipeY.position.set(-0.15, 0, 0.15);
+        pipeY.castShadow = true;
+        group.add(pipeY);
 
-        group.add(pipe1, pipe2);
+        // Flanges (Connectors at top/bottom of orange pipe)
+        const flangeGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.05, 12);
+        const f1 = new THREE.Mesh(flangeGeo, frameMat); f1.position.set(-0.15, s/2 - 0.025, 0.15);
+        const f2 = new THREE.Mesh(flangeGeo, frameMat); f2.position.set(-0.15, -s/2 + 0.025, 0.15);
+        group.add(f1, f2);
+
+        // Thick Horizontal Steel Pipe
+        const pipeXGeo = new THREE.CylinderGeometry(0.12, 0.12, s, 12);
+        pipeXGeo.rotateZ(Math.PI / 2);
+        const pipeX = new THREE.Mesh(pipeXGeo, frameMat);
+        pipeX.position.set(0, -0.15, -0.15);
+        pipeX.castShadow = true;
+        group.add(pipeX);
+
+        // Smaller depth Steel Pipe
+        const pipeZGeo = new THREE.CylinderGeometry(0.08, 0.08, s, 8);
+        pipeZGeo.rotateX(Math.PI / 2);
+        const pipeZ = new THREE.Mesh(pipeZGeo, frameMat);
+        pipeZ.position.set(0.2, 0.2, 0);
+        pipeZ.castShadow = true;
+        group.add(pipeZ);
+
         return group;
     }
 
