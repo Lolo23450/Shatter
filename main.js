@@ -6546,6 +6546,7 @@ import {
 // ── MODULAR CLEAN ARCHITECTURE BUILDERS ──────────────────────────────────────
 
     const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a4d52, roughness: 0.5, metalness: 0.7 });
+    const cleanMetalMat = new THREE.MeshStandardMaterial({ color: 0x6c7a89, roughness: 0.3, metalness: 0.9 });
     const darkPanelMat = new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.7, metalness: 0.4 });
     const ledMat = new THREE.MeshStandardMaterial({ color: 0xccffff, emissive: 0x00aaff, emissiveIntensity: 2.0, toneMapped: false });
     const warnMat = new THREE.MeshStandardMaterial({ color: 0xcc5511, roughness: 0.6, metalness: 0.3 });
