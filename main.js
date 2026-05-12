@@ -6836,44 +6836,104 @@ import {
         return group;
     }
 
-    // 6. Quantum Server Core Cube
+    // 6. Quantum Server Core Cube (Deep-Recessed Mainframe)
     function buildDecoPanelCore(rng = _makeRng(203)) {
         const group = new THREE.Group();
         const s = 0.84;
         
-        const base = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), darkPanelMat);
-        group.add(base);
+        // 1. Dark Inner Containment Chassis
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.68, 0.68), darkPanelMat);
+        chassis.castShadow = true;
+        group.add(chassis);
 
-        // 3D Cross of glowing energy penetrating all 6 faces
-        const glowT = 0.35;
-        const glowL = s + 0.02;
-        const glows = [
-            new THREE.BoxGeometry(glowL, glowT, glowT),
-            new THREE.BoxGeometry(glowT, glowL, glowT),
-            new THREE.BoxGeometry(glowT, glowT, glowL)
+        // 2. Heavy Corner Nodes (Defines the 0.84 bounds)
+        const cornerSize = 0.12;
+        const cornerGeo = new THREE.BoxGeometry(cornerSize, cornerSize, cornerSize);
+        const cPos = s / 2 - cornerSize / 2;
+        const corners = [
+            [1,1,1], [1,1,-1], [1,-1,1], [1,-1,-1],
+            [-1,1,1], [-1,1,-1], [-1,-1,1], [-1,-1,-1]
         ];
-
-        glows.forEach(geo => {
-            group.add(new THREE.Mesh(geo, ledMat));
+        
+        corners.forEach(c => {
+            const node = new THREE.Mesh(cornerGeo, frameMat);
+            node.position.set(c[0] * cPos, c[1] * cPos, c[2] * cPos);
+            node.castShadow = true;
+            group.add(node);
         });
 
-        // Add a protective edge-cage around the glowing core
-        const t = 0.08;
-        const eX = new THREE.BoxGeometry(s+0.04, t, t);
-        const eY = new THREE.BoxGeometry(t, s+0.04, t);
-        const eZ = new THREE.BoxGeometry(t, t, s+0.04);
-        const h = s/2;
-        
-        const edges = [
-            [eX, 0, h, h], [eX, 0, -h, h], [eX, 0, h, -h], [eX, 0, -h, -h],
-            [eY, h, 0, h], [eY, -h, 0, h], [eY, h, 0, -h], [eY, -h, 0, -h],
-            [eZ, h, h, 0], [eZ, -h, h, 0], [eZ, h, -h, 0], [eZ, -h, -h, 0]
+        // 3. Helper to build a highly detailed Server Face
+        function createServerFace() {
+            const faceGroup = new THREE.Group();
+            
+            // Central Aperture Ring
+            const ringGeo = new THREE.CylinderGeometry(0.20, 0.20, 0.04, 16);
+            ringGeo.rotateX(Math.PI / 2); // Face Z-axis
+            const ring = new THREE.Mesh(ringGeo, frameMat);
+            faceGroup.add(ring);
+
+            // Glowing Quantum Lens
+            const lensGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.05, 16);
+            lensGeo.rotateX(Math.PI / 2);
+            const lens = new THREE.Mesh(lensGeo, ledMat);
+            faceGroup.add(lens);
+
+            // Protective X-Grille over the lens
+            const grilleGeo = new THREE.BoxGeometry(0.42, 0.02, 0.06);
+            const grille1 = new THREE.Mesh(grilleGeo, darkPanelMat);
+            grille1.rotation.z = Math.PI / 4;
+            grille1.position.z = 0.02;
+            const grille2 = new THREE.Mesh(grilleGeo, darkPanelMat);
+            grille2.rotation.z = -Math.PI / 4;
+            grille2.position.z = 0.02;
+            faceGroup.add(grille1, grille2);
+
+            // Server Data Banks (Flanking the lens)
+            const bankGeo = new THREE.BoxGeometry(0.12, 0.55, 0.05);
+            const bankL = new THREE.Mesh(bankGeo, frameMat); bankL.position.x = -0.28;
+            const bankR = new THREE.Mesh(bankGeo, frameMat); bankR.position.x = 0.28;
+            faceGroup.add(bankL, bankR);
+
+            // Tiny LED Status Lights on the Data Banks
+            const ledBoxGeo = new THREE.BoxGeometry(0.04, 0.02, 0.06);
+            const ledColors = [ledMat, warnMat]; // Mix of cyan and orange lights
+            
+            [-0.28, 0.28].forEach(xOffset => {
+                for (let y = -0.2; y <= 0.2; y += 0.1) {
+                    if (rng() > 0.4) { // 60% chance for a light to be populated
+                        const lightMat = ledColors[Math.floor(rng() * ledColors.length)];
+                        const light = new THREE.Mesh(ledBoxGeo, lightMat);
+                        light.position.set(xOffset, y, 0.01);
+                        faceGroup.add(light);
+                    }
+                }
+            });
+
+            // Recessed horizontal structural bars connecting the data banks
+            const barGeo = new THREE.BoxGeometry(0.68, 0.02, 0.02);
+            const barTop = new THREE.Mesh(barGeo, darkPanelMat); barTop.position.set(0, 0.32, -0.02);
+            const barBot = new THREE.Mesh(barGeo, darkPanelMat); barBot.position.set(0, -0.32, -0.02);
+            faceGroup.add(barTop, barBot);
+
+            return faceGroup;
+        }
+
+        // 4. Attach the Server Faces to all 6 sides
+        const offset = 0.34; // Pushes the face out to sit flush with the 0.68 chassis
+        const transforms = [
+            [0, 0, offset, 0, 0, 0],               // Front (+Z)
+            [0, 0, -offset, 0, Math.PI, 0],        // Back (-Z)
+            [offset, 0, 0, 0, Math.PI/2, 0],       // Right (+X)
+            [-offset, 0, 0, 0, -Math.PI/2, 0],     // Left (-X)
+            [0, offset, 0, -Math.PI/2, 0, 0],      // Top (+Y)
+            [0, -offset, 0, Math.PI/2, 0, 0]       // Bottom (-Y)
         ];
-        edges.forEach(([geo, x, y, z]) => {
-            const m = new THREE.Mesh(geo, frameMat);
-            m.position.set(x, y, z);
-            m.castShadow = true;
-            group.add(m);
+
+        transforms.forEach(t => {
+            const face = createServerFace();
+            face.position.set(t[0], t[1], t[2]);
+            face.rotation.set(t[3], t[4], t[5]);
+            group.add(face);
         });
 
         return group;
