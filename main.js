@@ -179,7 +179,7 @@ import {
     ];
 
     const TOOL_COLORS = {
-        'wall': 0x454545, 'blue': 0x3388ff, 'red': 0xff3344, 'green': 0x33ff99, 
+        'wall': 0x454545, 'fill': 0x00ff88, 'blue': 0x3388ff, 'red': 0xff3344, 'green': 0x33ff99, 
         'bomb': 0xffaa00, 'spawn': 0xffffff, 'exit': 0xffff00, 'gray': 0xaaaaaa,
         'yellow': 0xffdd33, 'big_yellow': 0xffaa33, 'big_gray': 0x888888,
         'light': 0xffee44, 'plate': 0xc27a3e, 'door': 0x66ccff, 'room': 0xffffff,
