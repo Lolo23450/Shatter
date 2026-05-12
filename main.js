@@ -8184,107 +8184,106 @@ import {
                     
                     _v1.set(playerBody.position.x, playerBody.position.y + playerHalfH * 0.85, playerBody.position.z);
                     activeCamera.position.lerp(_v1, 0.4);
-                    return; // Skip standard impulse physics below
-                }
-
-                // --- STANDARD WALKING MOVEMENT ---
-                if(!isCutscene) {
-                    if (keys.w) targetVel.add(fwd); if (keys.s) targetVel.sub(fwd);
-                    if (keys.d) targetVel.add(rgt); if (keys.a) targetVel.sub(rgt);
-                }
-                const isSprinting = keys.shift && currentlyGrounded && !isCutscene && targetVel.lengthSq() > 0;
-                if (targetVel.lengthSq() > 0) targetVel.normalize().multiplyScalar(isSprinting ? 10 : 6.5);
-
-                for (let i = 0; i < world.contacts.length; i++) {
-                    const c = world.contacts[i]; let nx = 0, ny = 0, nz = 0; let contactRelY = 0;
-                    if (c.bi === playerBody) { nx = -c.ni.x; ny = -c.ni.y; nz = -c.ni.z; contactRelY = c.ri.y; } else if (c.bj === playerBody) { nx = c.ni.x; ny = c.ni.y; nz = c.ni.z; contactRelY = c.rj.y; } else continue;
-                    if (Math.abs(ny) > 0.5) continue; if (contactRelY < -0.3) continue;
-
-                    let l = Math.sqrt(nx * nx + nz * nz); if (l > 0.0001) { nx /= l; nz /= l; } else continue;
-                    const dot = targetVel.x * nx + targetVel.z * nz; if (dot < 0) { targetVel.x -= dot * nx; targetVel.z -= dot * nz; }
-                }
-
-                let diffX = targetVel.x - playerBody.velocity.x;
-                let diffZ = targetVel.z - playerBody.velocity.z;
-
-                let accel = currentlyGrounded ? 18.0 : 4.0;
-
-                playerBody.applyImpulse(_cannonImpulse.set(
-                    diffX * playerBody.mass * accel * delta,
-                    0,
-                    diffZ * playerBody.mass * accel * delta
-                ), playerBody.position);
-
-                let speedSq = playerBody.velocity.x * playerBody.velocity.x + playerBody.velocity.z * playerBody.velocity.z;
-
-                if (keys.space && coyoteTimer > 0) { 
-                    let jumpTarget = 11;
-                    let requiredImpulse = jumpTarget - playerBody.velocity.y;
-                    if (requiredImpulse > 0) {
-                        playerBody.applyImpulse(_cannonImpulse2.set(0, requiredImpulse * playerBody.mass, 0), playerBody.position);
+                } else {
+                    // --- STANDARD WALKING MOVEMENT ---
+                    if(!isCutscene) {
+                        if (keys.w) targetVel.add(fwd); if (keys.s) targetVel.sub(fwd);
+                        if (keys.d) targetVel.add(rgt); if (keys.a) targetVel.sub(rgt);
                     }
-                    coyoteTimer = 0; 
-                }
+                    const isSprinting = keys.shift && currentlyGrounded && !isCutscene && targetVel.lengthSq() > 0;
+                    if (targetVel.lengthSq() > 0) targetVel.normalize().multiplyScalar(isSprinting ? 10 : 6.5);
 
-                if (waterMesh && currentParams && currentParams.waterY !== undefined) {
-                    const waterSurface = currentParams.waterY;
-                    const playerY = playerBody.position.y;
-                    const submerged = playerY < waterSurface;   // feet below water
-                    const headUnder = playerY + playerHalfH * 0.85 < waterSurface; // head under
+                    for (let i = 0; i < world.contacts.length; i++) {
+                        const c = world.contacts[i]; let nx = 0, ny = 0, nz = 0; let contactRelY = 0;
+                        if (c.bi === playerBody) { nx = -c.ni.x; ny = -c.ni.y; nz = -c.ni.z; contactRelY = c.ri.y; } else if (c.bj === playerBody) { nx = c.ni.x; ny = c.ni.y; nz = c.ni.z; contactRelY = c.rj.y; } else continue;
+                        if (Math.abs(ny) > 0.5) continue; if (contactRelY < -0.3) continue;
 
-                    if (submerged) {
-                        // Buoyancy — push up proportional to submersion depth
-                        const subDepth = Math.min(waterSurface - playerY, playerHalfH * 2);
-                        const buoyancyForce = subDepth * 28 * playerBody.mass;
-                        _cannonImpulse.set(0, buoyancyForce * delta, 0);
-                        playerBody.applyForce(_cannonImpulse, playerBody.position);
+                        let l = Math.sqrt(nx * nx + nz * nz); if (l > 0.0001) { nx /= l; nz /= l; } else continue;
+                        const dot = targetVel.x * nx + targetVel.z * nz; if (dot < 0) { targetVel.x -= dot * nx; targetVel.z -= dot * nz; }
+                    }
 
-                        // Strong water drag — kills excessive velocity
-                        const drag = headUnder ? 0.18 : 0.10;
-                        playerBody.applyImpulse(_cannonImpulse.set(
-                            -playerBody.velocity.x * drag * playerBody.mass,
-                            (playerBody.velocity.y < 0) ? -playerBody.velocity.y * drag * playerBody.mass : 0,
-                            -playerBody.velocity.z * drag * playerBody.mass
-                        ), playerBody.position);
+                    let diffX = targetVel.x - playerBody.velocity.x;
+                    let diffZ = targetVel.z - playerBody.velocity.z;
 
-                        // Space = swim up
-                        if (keys.space) { 
-                            playerBody.applyImpulse(_cannonImpulse2.set(0, 30 * delta * playerBody.mass, 0), playerBody.position);
-                            coyoteTimer = 0; 
+                    let accel = currentlyGrounded ? 18.0 : 4.0;
+
+                    playerBody.applyImpulse(_cannonImpulse.set(
+                        diffX * playerBody.mass * accel * delta,
+                        0,
+                        diffZ * playerBody.mass * accel * delta
+                    ), playerBody.position);
+
+                    let speedSq = playerBody.velocity.x * playerBody.velocity.x + playerBody.velocity.z * playerBody.velocity.z;
+
+                    if (keys.space && coyoteTimer > 0) { 
+                        let jumpTarget = 11;
+                        let requiredImpulse = jumpTarget - playerBody.velocity.y;
+                        if (requiredImpulse > 0) {
+                            playerBody.applyImpulse(_cannonImpulse2.set(0, requiredImpulse * playerBody.mass, 0), playerBody.position);
+                        }
+                        coyoteTimer = 0; 
+                    }
+
+                    if (waterMesh && currentParams && currentParams.waterY !== undefined) {
+                        const waterSurface = currentParams.waterY;
+                        const playerY = playerBody.position.y;
+                        const submerged = playerY < waterSurface;   // feet below water
+                        const headUnder = playerY + playerHalfH * 0.85 < waterSurface; // head under
+
+                        if (submerged) {
+                            // Buoyancy — push up proportional to submersion depth
+                            const subDepth = Math.min(waterSurface - playerY, playerHalfH * 2);
+                            const buoyancyForce = subDepth * 28 * playerBody.mass;
+                            _cannonImpulse.set(0, buoyancyForce * delta, 0);
+                            playerBody.applyForce(_cannonImpulse, playerBody.position);
+
+                            // Strong water drag — kills excessive velocity
+                            const drag = headUnder ? 0.18 : 0.10;
+                            playerBody.applyImpulse(_cannonImpulse.set(
+                                -playerBody.velocity.x * drag * playerBody.mass,
+                                (playerBody.velocity.y < 0) ? -playerBody.velocity.y * drag * playerBody.mass : 0,
+                                -playerBody.velocity.z * drag * playerBody.mass
+                            ), playerBody.position);
+
+                            // Space = swim up
+                            if (keys.space) { 
+                                playerBody.applyImpulse(_cannonImpulse2.set(0, 30 * delta * playerBody.mass, 0), playerBody.position);
+                                coyoteTimer = 0; 
+                            }
                         }
                     }
-                }
 
-                _v1.set(playerBody.position.x, playerBody.position.y + playerHalfH * 0.85, playerBody.position.z);
-                activeCamera.position.lerp(_v1, 0.4);
+                    _v1.set(playerBody.position.x, playerBody.position.y + playerHalfH * 0.85, playerBody.position.z);
+                    activeCamera.position.lerp(_v1, 0.4);
 
-                let targetFov = isSprinting ? 92 : (currentlyGrounded && speedSq > 1) ? 85 : 75;
-                if (Math.abs(activeCamera.fov - targetFov) > 0.1) { activeCamera.fov += (targetFov - activeCamera.fov) * 0.1; activeCamera.updateProjectionMatrix(); }
+                    let targetFov = isSprinting ? 92 : (currentlyGrounded && speedSq > 1) ? 85 : 75;
+                    if (Math.abs(activeCamera.fov - targetFov) > 0.1) { activeCamera.fov += (targetFov - activeCamera.fov) * 0.1; activeCamera.updateProjectionMatrix(); }
 
-                // --- REMOVE THE OLD DOUBLE-GOAL LOGIC AND REPLACE WITH THIS ---
-                if (currentGoal) {
-                    const goalIsLocked = currentGoal.userData.isLocked;
+                    // --- REMOVE THE OLD DOUBLE-GOAL LOGIC AND REPLACE WITH THIS ---
+                    if (currentGoal) {
+                        const goalIsLocked = currentGoal.userData.isLocked;
 
-                    if (goalIsLocked) {
-                        currentGoal.userData.core.material.color.setHex(0xff0000);
-                        currentGoal.userData.core.material.emissive.setHex(0xff0000);
-                    } else {
-                        if (currentGreenBlock) {
-                            // Green block level: Requires Green block at the goal
-                            currentGoal.userData.core.material.color.setHex(0x00ffaa);
-                            currentGoal.userData.core.material.emissive.setHex(0x00cc55);
-
-                            if (distSq(currentGreenBlock.body.position, currentGoal.position) < 4.25) {
-                                currentGoal.userData.core.material.emissive.setHex(0x00ff00);
-                                triggerLevelTransition();
-                            }
+                        if (goalIsLocked) {
+                            currentGoal.userData.core.material.color.setHex(0xff0000);
+                            currentGoal.userData.core.material.emissive.setHex(0xff0000);
                         } else {
-                            // Normal level: Requires Player at the goal
-                            currentGoal.userData.core.material.color.setHex(0x00ffff);
-                            currentGoal.userData.core.material.emissive.setHex(0x00ffff);
+                            if (currentGreenBlock) {
+                                // Green block level: Requires Green block at the goal
+                                currentGoal.userData.core.material.color.setHex(0x00ffaa);
+                                currentGoal.userData.core.material.emissive.setHex(0x00cc55);
 
-                            if (distSq(playerBody.position, currentGoal.position) < 3.25) {
-                                triggerLevelTransition();
+                                if (distSq(currentGreenBlock.body.position, currentGoal.position) < 4.25) {
+                                    currentGoal.userData.core.material.emissive.setHex(0x00ff00);
+                                    triggerLevelTransition();
+                                }
+                            } else {
+                                // Normal level: Requires Player at the goal
+                                currentGoal.userData.core.material.color.setHex(0x00ffff);
+                                currentGoal.userData.core.material.emissive.setHex(0x00ffff);
+
+                                if (distSq(playerBody.position, currentGoal.position) < 3.25) {
+                                    triggerLevelTransition();
+                                }
                             }
                         }
                     }
