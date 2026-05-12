@@ -690,7 +690,7 @@ import {
         map: concreteTexs.albedo,        // <-- Put these back
         normalMap: concreteTexs.normal,  // <-- Put these back
         roughness: 0.30,
-        metalness: 0.35,
+        metalness: 0.85,
         envMapIntensity: 0.2,
         normalScale: new THREE.Vector2(3.0, 3.0)
     });
@@ -702,7 +702,7 @@ import {
         normalMap: concreteTexs.normal,  // <-- Put these back
         color: 0x8a8d8a, 
         roughness: 0.45,
-        metalness: 0.30, 
+        metalness: 0.60, 
         envMapIntensity: 0.1,
         normalScale: new THREE.Vector2(3.0, 3.0)
     });
