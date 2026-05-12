@@ -6909,12 +6909,6 @@ import {
                 }
             });
 
-            // Recessed horizontal structural bars connecting the data banks
-            const barGeo = new THREE.BoxGeometry(0.68, 0.02, 0.02);
-            const barTop = new THREE.Mesh(barGeo, darkPanelMat); barTop.position.set(0, 0.32, -0.02);
-            const barBot = new THREE.Mesh(barGeo, darkPanelMat); barBot.position.set(0, -0.32, -0.02);
-            faceGroup.add(barTop, barBot);
-
             return faceGroup;
         }
 
