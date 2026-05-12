@@ -99,6 +99,12 @@ import {
     let isPlayingCustom = false;
     let isTabSelectorOpen = false;
     let editorTool = 'wall'; 
+    
+    // NEW: Fly Mode & Advanced Tools State
+    let isFlyMode = false;
+    let fillStartCorner = null;
+    let selectedEditorObject = null;
+    let selectedEditorObjectType = null;
     let redStartScale = 1.0; // configurable start size for red cubes
     let customSolidBlocks = new Set();
     let customEntities = new Map(); // Key: "x,y,z", Value: {type, x,y,z, startScale?}
@@ -111,6 +117,7 @@ import {
     let lightColor = 0xffffff;
     let lightIntensity = 3.0;
     let lightRadius = 8.0;
+    
 
     const PHYSICAL_BLOCK_TYPES = new Set(['blue', 'green', 'red', 'yellow', 'big_yellow', 'cyan', 'gray', 'big_gray']);
 
@@ -5790,6 +5797,19 @@ import {
                 e.preventDefault();
                 if (!isTabSelectorOpen) openToolSelector();
             }
+            // NEW: FLY MODE TOGGLE
+            if (e.code === 'KeyF' && !e.repeat) {
+                isFlyMode = !isFlyMode;
+                // Switch physics body type so it ignores gravity while flying
+                playerBody.type = isFlyMode ? CANNON.Body.KINEMATIC : CANNON.Body.DYNAMIC;
+                playerBody.velocity.set(0,0,0);
+                
+                const scaleHud = document.getElementById('scale-hud');
+                scaleHud.textContent = isFlyMode ? "FLY MODE: ON" : "FLY MODE: OFF";
+                scaleHud.style.opacity = '1';
+                clearTimeout(scaleHudTimeout);
+                scaleHudTimeout = setTimeout(() => scaleHud.style.opacity = '0', 1200);
+            }
         }
     });
 
@@ -5812,6 +5832,7 @@ import {
     const EDITOR_TOOLS_LIST = [
         { tool: 'wall',       label: 'Wall',      key: '1', category: 'build' },
         { tool: 'room',       label: 'Hollow Room', key: '-', category: 'build' },
+        { tool: 'fill',       label: 'Box Fill',  key: 'B', category: 'build' }, // NEW
         { tool: 'water',      label: 'Water',     key: '-', category: 'build' },
         { tool: 'blue',       label: 'Blue (Bounce)', key: '2', category: 'items' },
         { tool: 'red',        label: 'Red (Scale)',  key: '3', category: 'items' },
@@ -5866,9 +5887,15 @@ import {
         { hex: 0xffaa00, label: 'Amber'    },
     ];
 
-    // Build light color preset swatches
+// =========================================================================
+    // --- LIVE UI MODIFICATION & PARAMETER LISTENERS ---
+    // =========================================================================
+
+    // 1. LIGHT PRESETS
     (function initLightPresets() {
         const container = document.getElementById('light-presets');
+        if (!container) return;
+        
         LIGHT_COLOR_PRESETS.forEach(({ hex, label }) => {
             const sw = document.createElement('div');
             sw.className = 'lp-swatch' + (hex === lightColor ? ' active' : '');
@@ -5881,84 +5908,184 @@ import {
                 document.querySelectorAll('.lp-swatch').forEach(s => s.classList.remove('active'));
                 sw.classList.add('active');
                 document.getElementById('tp-light-color-pick').value = hexToCSS(hex);
-                // Update ghost mesh color if light tool is active
+                
                 if (editorTool === 'light') ghostMesh.material.color.setHex(hex);
+                
+                // LIVE INSPECTOR UPDATE
+                if (selectedEditorObject && selectedEditorObjectType === 'light') {
+                    selectedEditorObject.color = hex;
+                    updateEditorVisuals();
+                }
             });
             container.appendChild(sw);
         });
     })();
 
-    // Custom color picker
-    document.getElementById('tp-light-color-pick').addEventListener('input', e => {
+    // 2. LIGHT PARAMETERS
+    document.getElementById('tp-light-color-pick')?.addEventListener('input', e => {
         const hex = parseInt(e.target.value.replace('#',''), 16);
         lightColor = hex;
         document.querySelectorAll('.lp-swatch').forEach(s => s.classList.remove('active'));
         if (editorTool === 'light') ghostMesh.material.color.setHex(hex);
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'light') {
+            selectedEditorObject.color = hex;
+            updateEditorVisuals();
+        }
     });
 
-    // Intensity slider
-    document.getElementById('tp-light-intensity').addEventListener('input', e => {
+    document.getElementById('tp-light-intensity')?.addEventListener('input', e => {
         lightIntensity = parseFloat(e.target.value);
         document.getElementById('tp-light-intensity-val').textContent = lightIntensity.toFixed(1);
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'light') {
+            selectedEditorObject.intensity = lightIntensity;
+            updateEditorVisuals();
+        }
     });
 
-    // Radius slider
-    document.getElementById('tp-light-radius').addEventListener('input', e => {
+    document.getElementById('tp-light-radius')?.addEventListener('input', e => {
         lightRadius = parseFloat(e.target.value);
         document.getElementById('tp-light-radius-val').textContent = lightRadius.toFixed(1);
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'light') {
+            selectedEditorObject.radius = lightRadius;
+            updateEditorVisuals();
+        }
     });
 
-    // Red scale
-    document.getElementById('tp-red-scale').addEventListener('input', e => {
+    // 3. RED CUBE PARAMETERS
+    document.getElementById('tp-red-scale')?.addEventListener('input', e => {
         redStartScale = parseFloat(e.target.value);
         document.getElementById('tp-red-scale-val').textContent = redStartScale.toFixed(1);
+        
+        if (editorTool === 'red') ghostMesh.scale.setScalar(redStartScale);
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'red') {
+            selectedEditorObject.startScale = redStartScale;
+            updateEditorVisuals();
+        }
     });
 
-    // Light Radius
-    document.getElementById('tp-light-radius').addEventListener('input', e => {
-        lightRadius = parseFloat(e.target.value);
-        document.getElementById('tp-light-radius-val').textContent = lightRadius.toFixed(1);
-    });
-
-    // Pressure Plate Channel
-    document.getElementById('tp-plate-ch').addEventListener('input', e => {
+    // 4. PLATE PARAMETERS
+    document.getElementById('tp-plate-ch')?.addEventListener('input', e => {
         editorChannel = parseInt(e.target.value);
         document.getElementById('tp-plate-ch-val').textContent = editorChannel;
-        updateLogicVisualizer(); // Live wire preview while dragging
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'plate') {
+            selectedEditorObject.channel = editorChannel;
+        }
+        updateLogicVisualizer(); // Re-draws wires in real-time
     });
 
-    // Door Channel
-    document.getElementById('tp-door-ch').addEventListener('input', e => {
+    // 5. DOOR PARAMETERS
+    document.getElementById('tp-door-ch')?.addEventListener('input', e => {
         editorChannel = parseInt(e.target.value);
         document.getElementById('tp-door-ch-val').textContent = editorChannel;
-        updateLogicVisualizer(); // Live wire preview while dragging
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'door') {
+            selectedEditorObject.channel = editorChannel;
+        }
+        updateLogicVisualizer(); // Re-draws wires in real-time
     });
 
-    let editorFieldInverted = false;
+    document.getElementById('tp-door-w')?.addEventListener('input', e => {
+        editorDoorWidth = parseFloat(e.target.value);
+        document.getElementById('tp-door-w-val').textContent = editorDoorWidth.toFixed(1);
+        
+        if (editorTool === 'door') ghostMesh.scale.set(editorDoorWidth, editorDoorHeight, 0.2);
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'door') {
+            selectedEditorObject.width = editorDoorWidth;
+            updateEditorVisuals();
+        }
+    });
 
-    // Aero Channel Slider
-    document.getElementById('tp-aero-ch').addEventListener('input', e => {
+    document.getElementById('tp-door-h')?.addEventListener('input', e => {
+        editorDoorHeight = parseFloat(e.target.value);
+        document.getElementById('tp-door-h-val').textContent = editorDoorHeight.toFixed(1);
+        
+        if (editorTool === 'door') ghostMesh.scale.set(editorDoorWidth, editorDoorHeight, 0.2);
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'door') {
+            selectedEditorObject.height = editorDoorHeight;
+            updateEditorVisuals();
+        }
+    });
+
+    document.getElementById('tp-door-dist')?.addEventListener('input', e => {
+        editorDoorMoveDist = parseFloat(e.target.value);
+        document.getElementById('tp-door-dist-val').textContent = editorDoorMoveDist.toFixed(1);
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'door') {
+            selectedEditorObject.moveDist = editorDoorMoveDist;
+        }
+    });
+
+    document.querySelectorAll('#toggle-door-dir .toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#toggle-door-dir .toggle-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            editorDoorDir = btn.dataset.dir;
+            
+            if (selectedEditorObject && selectedEditorObjectType === 'door') {
+                selectedEditorObject.dir = editorDoorDir;
+            }
+        });
+    });
+
+    // 6. FIELDS (AERO / ONEWAY) PARAMETERS
+    document.getElementById('tp-aero-ch')?.addEventListener('input', e => {
         editorChannel = parseInt(e.target.value);
         document.getElementById('tp-aero-ch-val').textContent = editorChannel;
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'aero') {
+            selectedEditorObject.channel = editorChannel;
+        }
         updateLogicVisualizer();
     });
 
-    // One-Way Channel Slider
-    document.getElementById('tp-oneway-ch').addEventListener('input', e => {
+    document.getElementById('tp-oneway-ch')?.addEventListener('input', e => {
         editorChannel = parseInt(e.target.value);
         document.getElementById('tp-oneway-ch-val').textContent = editorChannel;
+        
+        if (selectedEditorObject && selectedEditorObjectType === 'oneway') {
+            selectedEditorObject.channel = editorChannel;
+        }
         updateLogicVisualizer();
     });
 
-    // One-Way Inversion Toggle
     document.querySelectorAll('#toggle-oneway-inv .toggle-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('#toggle-oneway-inv .toggle-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             editorFieldInverted = (btn.dataset.inv === 'true');
+            
+            if (selectedEditorObject && selectedEditorObjectType === 'oneway') {
+                selectedEditorObject.inverted = editorFieldInverted;
+                // updateEditorVisuals doesn't strictly change how fields look in the editor 
+                // outside of play mode, but good for consistency
+                updateEditorVisuals(); 
+            }
         });
     });
 
+    // 7. HOLLOW ROOM TOOL (No object selection, just preview scaling)
+    ['x', 'y', 'z'].forEach(axis => {
+        const el = document.getElementById('tp-room-' + axis);
+        if (el) {
+            el.addEventListener('input', e => {
+                roomDim[axis] = parseInt(e.target.value);
+                document.getElementById(`tp-room-${axis}-val`).textContent = roomDim[axis];
+
+                // Instant visual update for the ghost mesh as you drag
+                if (editorTool === 'room' && ghostMesh.visible) {
+                    ghostMesh.scale.set(roomDim.x, roomDim.y, roomDim.z);
+                }
+            });
+        }
+    });
+    
     let selectedLogicChannel = 1;
 
     // Sync Target Channel
@@ -7078,15 +7205,74 @@ import {
                 }
             }
 
-            if (validHit) {
-                const hit = validHit;
-                const norm = hit.face.normal; // Capture the normal immediately
+            const hit = validHit;
+            const norm = hit.face.normal; 
+            const rawP = hit.point.clone();
 
-                if (editorTool === 'water') {
-                    if (e.button === 0) customWaterY = Math.round(hit.point.y);
-                    else if (e.button === 2) customWaterY = undefined;
-                    updateEditorVisuals();
-                    return;
+            // --- MIDDLE CLICK: INSPECT & SELECT ---
+            if (e.button === 1) { 
+                const p = rawP.clone().sub(norm.clone().multiplyScalar(0.5));
+                const gx = Math.round(p.x), gy = Math.round(p.y), gz = Math.round(p.z);
+                
+                selectedEditorObject = null;
+                selectedEditorObjectType = null;
+
+                // Search arrays for the clicked coordinate
+                let found = customLights.find(l => l.x===gx && l.y===gy && l.z===gz);
+                if (found) { selectedEditorObject = found; selectedEditorObjectType = 'light'; }
+                else if (found = customDoors.find(d => d.x===gx && d.y===gy && d.z===gz)) { selectedEditorObject = found; selectedEditorObjectType = 'door'; }
+                else if (found = customPlates.find(pl => pl.x===gx && pl.y===gy && pl.z===gz)) { selectedEditorObject = found; selectedEditorObjectType = 'plate'; }
+                else if (found = customFields.find(f => f.x===gx && f.y===gy && f.z===gz)) { selectedEditorObject = found; selectedEditorObjectType = found.type; }
+                else if (customEntities.has(`${gx},${gy},${gz}`)) { selectedEditorObject = customEntities.get(`${gx},${gy},${gz}`); selectedEditorObjectType = selectedEditorObject.type; }
+
+                if (selectedEditorObject) {
+                    setEditorTool(selectedEditorObjectType);
+                    
+                    // Load data into UI
+                    if (selectedEditorObjectType === 'light') {
+                        lightColor = found.color; lightIntensity = found.intensity; lightRadius = found.radius;
+                        document.getElementById('tp-light-color-pick').value = hexToCSS(found.color);
+                    } else if (selectedEditorObjectType === 'door') {
+                        editorDoorWidth = found.width; editorDoorHeight = found.height; editorDoorMoveDist = found.moveDist; editorChannel = found.channel; editorDoorDir = found.dir;
+                    } else if (selectedEditorObjectType === 'plate' || selectedEditorObjectType === 'aero' || selectedEditorObjectType === 'oneway') {
+                        editorChannel = found.channel; editorFieldInverted = found.inverted || false;
+                    } else if (selectedEditorObjectType === 'red') {
+                        redStartScale = found.startScale || 1.0;
+                    }
+                    updateParamsPanel(selectedEditorObjectType, true);
+                    
+                    const hud = document.getElementById('scale-hud');
+                    hud.textContent = `INSPECTING: ${selectedEditorObjectType.toUpperCase()}`;
+                    hud.style.opacity = '1';
+                    clearTimeout(scaleHudTimeout);
+                    scaleHudTimeout = setTimeout(() => hud.style.opacity = '0', 1200);
+                }
+                return;
+            }
+
+            // --- LEFT CLICK: PLACE / FILL ---
+            if (e.button === 0) { 
+                const p = rawP.clone().add(norm.clone().multiplyScalar(0.5));
+                const gx = Math.round(p.x), gy = Math.round(p.y), gz = Math.round(p.z);
+                const key = `${gx},${gy},${gz}`;
+
+                // NEW: Box Fill Logic
+                if (editorTool === 'fill') {
+                    if (!fillStartCorner) {
+                        fillStartCorner = { x: gx, y: gy, z: gz };
+                    } else {
+                        const minX = Math.min(fillStartCorner.x, gx), maxX = Math.max(fillStartCorner.x, gx);
+                        const minY = Math.min(fillStartCorner.y, gy), maxY = Math.max(fillStartCorner.y, gy);
+                        const minZ = Math.min(fillStartCorner.z, gz), maxZ = Math.max(fillStartCorner.z, gz);
+                        for (let x=minX; x<=maxX; x++) {
+                            for (let y=minY; y<=maxY; y++) {
+                                for (let z=minZ; z<=maxZ; z++) {
+                                    customSolidBlocks.add(`${x},${y},${z}`);
+                                }
+                            }
+                        }
+                        fillStartCorner = null;
+                    }
                 }
 
                 if (e.button === 0) { // Left Click: PLACE
@@ -7542,27 +7728,40 @@ import {
                 if (hits[i].face) { validHit = hits[i]; break; }
             }
 
-            // Inside animate() -> Editor Preview section
             if (validHit) {
                 const hit = validHit;
                 const norm = hit.face.normal;
                 ghostMesh.visible = true;
 
                 const p = hit.point.clone().add(norm.clone().multiplyScalar(0.5));
-                ghostMesh.position.set(Math.round(p.x), Math.round(p.y), Math.round(p.z));
+                const gx = Math.round(p.x), gy = Math.round(p.y), gz = Math.round(p.z);
 
-                // Default scale for most blocks
-                ghostMesh.scale.set(1, 1, 1);
-
-                if (['door', 'oneway', 'aero'].includes(editorTool)) {
-                    if (editorTool === 'door') ghostMesh.scale.set(editorDoorWidth, editorDoorHeight, 0.2);
-                    else ghostMesh.scale.set(3, 3, 0.5); // Preview size for fields
-
-                    // Use proper lookAt based on the face normal
-                    const target = ghostMesh.position.clone().add(norm);
-                    ghostMesh.lookAt(target);
-                } else {
+                // NEW: Box Fill preview spanning logic
+                if (editorTool === 'fill' && fillStartCorner) {
+                    const minX = Math.min(fillStartCorner.x, gx), maxX = Math.max(fillStartCorner.x, gx);
+                    const minY = Math.min(fillStartCorner.y, gy), maxY = Math.max(fillStartCorner.y, gy);
+                    const minZ = Math.min(fillStartCorner.z, gz), maxZ = Math.max(fillStartCorner.z, gz);
+                    
+                    const w = maxX - minX + 1;
+                    const h = maxY - minY + 1;
+                    const d = maxZ - minZ + 1;
+                    
+                    ghostMesh.scale.set(w, h, d);
+                    ghostMesh.position.set(minX + (w-1)/2, minY + (h-1)/2, minZ + (d-1)/2);
                     ghostMesh.rotation.set(0, 0, 0);
+                } else {
+                    // Default single-block placement
+                    ghostMesh.position.set(gx, gy, gz);
+                    ghostMesh.scale.set(1, 1, 1);
+
+                    if (['door', 'oneway', 'aero'].includes(editorTool)) {
+                        if (editorTool === 'door') ghostMesh.scale.set(editorDoorWidth, editorDoorHeight, 0.2);
+                        else ghostMesh.scale.set(3, 3, 0.5); 
+                        const target = ghostMesh.position.clone().add(norm);
+                        ghostMesh.lookAt(target);
+                    } else {
+                        ghostMesh.rotation.set(0, 0, 0);
+                    }
                 }
             }
         }
@@ -7961,8 +8160,34 @@ import {
                 wasGrounded = currentlyGrounded; if (currentlyGrounded) coyoteTimer = COYOTE_TIME; else coyoteTimer -= delta;
 
                 activeCamera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); rgt.copy(fwd).cross(activeCamera.up).normalize();
-
                 targetVel.set(0, 0, 0);
+
+                if (isEditorMode && isFlyMode && !isPlayingCustom) {
+                    // --- FLY MODE MOVEMENT ---
+                    activeCamera.getWorldDirection(fwd); // Re-calc with pitch (Y) so we fly where we look
+                    rgt.copy(fwd).cross(activeCamera.up).normalize();
+                    
+                    if (keys.w) targetVel.add(fwd); if (keys.s) targetVel.sub(fwd);
+                    if (keys.d) targetVel.add(rgt); if (keys.a) targetVel.sub(rgt);
+                    
+                    // Space = Up, Shift = Down
+                    if (keys.space) targetVel.y += 1;
+                    if (keys.shift) targetVel.y -= 1;
+
+                    if (targetVel.lengthSq() > 0) targetVel.normalize().multiplyScalar(20.0);
+                    
+                    // Direct velocity override for kinematic body
+                    playerBody.velocity.set(targetVel.x, targetVel.y, targetVel.z);
+                    playerBody.position.x += targetVel.x * delta;
+                    playerBody.position.y += targetVel.y * delta;
+                    playerBody.position.z += targetVel.z * delta;
+                    
+                    _v1.set(playerBody.position.x, playerBody.position.y + playerHalfH * 0.85, playerBody.position.z);
+                    activeCamera.position.lerp(_v1, 0.4);
+                    return; // Skip standard impulse physics below
+                }
+
+                // --- STANDARD WALKING MOVEMENT ---
                 if(!isCutscene) {
                     if (keys.w) targetVel.add(fwd); if (keys.s) targetVel.sub(fwd);
                     if (keys.d) targetVel.add(rgt); if (keys.a) targetVel.sub(rgt);
