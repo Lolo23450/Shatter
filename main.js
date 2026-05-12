@@ -6596,19 +6596,76 @@ import {
 
         return group;
     }
-
-    // 3. X-Brace Strut Frame
+    
+    // 3. Heavy X-Brace Strut Frame
     function buildDecoFrameBraced(rng = _makeRng(103)) {
-        const group = buildDecoFrameOpen(rng); // Start with open frame
+        const group = buildDecoFrameOpen(rng); // Start with open outer frame
         
-        // Add internal X cross-bracing
-        const braceGeo = new THREE.BoxGeometry(0.08, 1.414, 0.08); // Diagonal length
-        const brace1 = new THREE.Mesh(braceGeo, frameMat);
-        brace1.rotation.z = Math.PI / 4;
-        const brace2 = new THREE.Mesh(braceGeo, frameMat);
-        brace2.rotation.z = -Math.PI / 4;
+        const zOffset = -0.38; // Push the bracing to the back to leave room for panels
 
-        group.add(brace1, brace2);
+        // --- 1. Central Mechanical Hub ---
+        const hubGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 8);
+        hubGeo.rotateX(Math.PI / 2);
+        const hub = new THREE.Mesh(hubGeo, frameMat);
+        hub.position.set(0, 0, zOffset);
+        hub.castShadow = true;
+        group.add(hub);
+
+        // Dark recessed inner core of the hub
+        const innerHubGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.12, 8);
+        innerHubGeo.rotateX(Math.PI / 2);
+        const innerHub = new THREE.Mesh(innerHubGeo, darkPanelMat);
+        innerHub.position.set(0, 0, zOffset);
+        group.add(innerHub);
+
+        // --- 2. Heavy Diagonal Struts ---
+        const strutLength = 0.6; // Fits perfectly between corners and hub
+        const strutGeo = new THREE.BoxGeometry(0.06, strutLength, 0.06);
+        
+        const positions = [
+            { x: 0.22, y: 0.22, rot: -Math.PI / 4 }, // Top Right
+            { x: -0.22, y: -0.22, rot: -Math.PI / 4 }, // Bottom Left
+            { x: -0.22, y: 0.22, rot: Math.PI / 4 }, // Top Left
+            { x: 0.22, y: -0.22, rot: Math.PI / 4 }, // Bottom Right
+        ];
+
+        positions.forEach(p => {
+            const strut = new THREE.Mesh(strutGeo, frameMat);
+            strut.position.set(p.x, p.y, zOffset);
+            strut.rotation.z = p.rot;
+            strut.castShadow = true;
+            group.add(strut);
+        });
+
+        // --- 3. Corner Gusset Plates (Reinforcements) ---
+        const gussetGeo = new THREE.BoxGeometry(0.35, 0.04, 0.06);
+        const gussetPos = [
+            { x: 0.38, y: 0.38, rotZ: -Math.PI / 4 },
+            { x: -0.38, y: -0.38, rotZ: -Math.PI / 4 },
+            { x: -0.38, y: 0.38, rotZ: Math.PI / 4 },
+            { x: 0.38, y: -0.38, rotZ: Math.PI / 4 },
+        ];
+
+        gussetPos.forEach(p => {
+            const gusset = new THREE.Mesh(gussetGeo, darkPanelMat);
+            gusset.position.set(p.x, p.y, zOffset);
+            gusset.rotation.z = p.rotZ;
+            gusset.castShadow = true;
+            group.add(gusset);
+        });
+
+        // --- 4. Hub Bolts ---
+        const boltGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.14, 6);
+        boltGeo.rotateX(Math.PI / 2);
+        const boltDist = 0.1;
+        
+        const boltAngles = [0, Math.PI/2, Math.PI, Math.PI*1.5];
+        boltAngles.forEach(ang => {
+            const bolt = new THREE.Mesh(boltGeo, frameMat);
+            bolt.position.set(Math.cos(ang) * boltDist, Math.sin(ang) * boltDist, zOffset);
+            group.add(bolt);
+        });
+
         return group;
     }
 
@@ -6618,7 +6675,7 @@ import {
     // 4. Blank Acoustic Backpanel
     function buildDecoPanelBlank(rng = _makeRng(201)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.25), darkPanelMat);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.25), darkPanelMat);
         base.castShadow = true;
         group.add(base);
 
@@ -6631,7 +6688,7 @@ import {
     // 5. Louvered Vent Panel
     function buildDecoPanelVent(rng = _makeRng(202)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.25), darkPanelMat);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.25), darkPanelMat);
         group.add(base);
 
         const slatGeo = new THREE.BoxGeometry(0.75, 0.06, 0.06);
@@ -6648,7 +6705,7 @@ import {
     // 6. Glowing Data/Energy Core Panel
     function buildDecoPanelCore(rng = _makeRng(203)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.25), darkPanelMat);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.25), darkPanelMat);
         group.add(base);
 
         // Bright LED strip running down the middle
@@ -6667,10 +6724,10 @@ import {
     // 7. Internal Pipes/Conduit Panel
     function buildDecoPanelPipes(rng = _makeRng(204)) {
         const group = new THREE.Group();
-        const base = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.85, 0.15), darkPanelMat);
+        const base = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.84, 0.15), darkPanelMat);
         group.add(base);
 
-        const pipeGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.85, 8);
+        const pipeGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.84, 8);
         const pipe1 = new THREE.Mesh(pipeGeo, warnMat); // Orange hazard pipe
         pipe1.position.set(-0.2, 0, 0.12);
         
@@ -7162,19 +7219,34 @@ import {
                         });
                     }
                     else if (editorTool.startsWith('decor_')) {
-                        // Remove any existing decoration at the same grid position
-                        customDecorations = customDecorations.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
+                        let isFrame = editorTool.startsWith('decor_frame_');
+                        let isPanel = editorTool.startsWith('decor_panel_');
                         
+                        // ALlow Stacking: Only delete the old object if it's the SAME type of component
+                        customDecorations = customDecorations.filter(d => {
+                            let isSameCell = (d.x === gx && d.y === gy && d.z === gz);
+                            if (!isSameCell) return true; // Keep props in other cells
+                            
+                            let dIsFrame = d.type.startsWith('decor_frame_');
+                            let dIsPanel = d.type.startsWith('decor_panel_');
+                            
+                            if (isFrame && dIsFrame) return false; // New Frame overwrites old Frame
+                            if (isPanel && dIsPanel) return false; // New Panel overwrites old Panel
+                            if (!isFrame && !isPanel && !dIsFrame && !dIsPanel) return false; // Rubble overwrites Rubble
+                            
+                            return true; // Otherwise, KEEP IT! This allows a Frame and Panel to exist together!
+                        });
+
                         let rotY = 0;
                         
-                        // Clean architectural assets snap cleanly to face the wall you click
-                        if (editorTool.startsWith('decor_frame_') || editorTool.startsWith('decor_panel_')) {
-                            if (norm.x > 0.5) rotY = Math.PI / 2;         // Facing +X
-                            else if (norm.x < -0.5) rotY = -Math.PI / 2;  // Facing -X
-                            else if (norm.z < -0.5) rotY = Math.PI;       // Facing -Z
-                            else rotY = 0;                                // Facing +Z (or floor/ceiling)
+                        // Panels snap cleanly to the wall you click on
+                        if (isFrame || isPanel) {
+                            if (norm.x > 0.5) rotY = Math.PI / 2;
+                            else if (norm.x < -0.5) rotY = -Math.PI / 2;
+                            else if (norm.z < -0.5) rotY = Math.PI;
+                            else rotY = 0;
                         } 
-                        // Organic rubble and debris keep the random messy rotation
+                        // Organic rubble stays randomly rotated
                         else {
                             rotY = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.6;
                         }
