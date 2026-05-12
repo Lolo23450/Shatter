@@ -184,7 +184,7 @@ import {
         'yellow': 0xffdd33, 'big_yellow': 0xffaa33, 'big_gray': 0x888888,
         'light': 0xffee44, 'plate': 0xc27a3e, 'door': 0x66ccff, 'room': 0xffffff,
         'water': 0x0055ff, 'logic': 0x9966ff, 'aero': 0x00ffff, 'oneway': 0xffaa00,
-        // DECORATION PROPS
+        // DECORATION PROPS (Ruins)
         'decor_debris':    0x7a7a7a,
         'decor_wall_1x1_a':0x6a6a6a,
         'decor_wall_1x1_b':0x6a6a6a,
@@ -192,14 +192,14 @@ import {
         'decor_wall_2x2':  0x5a5a5a,
         'decor_rubble':    0x8a7266,
         'decor_shattered': 0xb8a898,
-        'decor_vine_hanging': 0x4a7c59,
-        'decor_vine_creeping': 0x3a5c39,
-        'decor_vine_wall': 0x2d5a35,
-        'decor_vine_pillar': 0x5a7c4a,
         'decor_pipes':     0x505c5a,
         'decor_pillar':    0x9ea1a0,
-        'decor_fern':      0x3acc50,
-        'decor_tree':      0x1a6628,
+        // DECORATION PROPS (Clean Architecture)
+        'decor_conduit':   0x2a2a2a, // Dark plastic/cabling
+        'decor_led_strip': 0x00aaff, // Bright glowing blue
+        'decor_vent':      0x3b3b3b, // Gunmetal louver
+        'decor_panel':     0x555555, // Clean gray acoustic padding
+        'decor_powerbox':  0xcc5522, // Industrial safety orange
     };
 
     function applyPOM(material, heightMap, scale = 0.05) {
@@ -5858,14 +5858,14 @@ import {
         { tool: 'decor_wall_2x2',  label: 'Wall Rubble 2x2',key: '-', category: 'decor' },
         { tool: 'decor_rubble',    label: 'Rubble',         key: '-', category: 'decor' },
         { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
-        { tool: 'decor_vine_hanging', label: 'Hanging Vine', key: '-', category: 'decor' },
-        { tool: 'decor_vine_creeping', label: 'Creeping Vine', key: '-', category: 'decor' },
-        { tool: 'decor_vine_wall',    label: 'Wall Ivy',      key: '-', category: 'decor' },
-        { tool: 'decor_vine_pillar',  label: 'Pillar Wrap',   key: '-', category: 'decor' },
         { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
         { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
-        { tool: 'decor_fern',      label: 'Fern',           key: '-', category: 'decor' },
-        { tool: 'decor_tree',      label: 'Tree',           key: '-', category: 'decor' },
+        // NEW CLEAN PROPS:
+        { tool: 'decor_conduit',   label: 'Data Conduits',  key: '-', category: 'decor' },
+        { tool: 'decor_led_strip', label: 'LED Wall Strip', key: '-', category: 'decor' },
+        { tool: 'decor_vent',      label: 'Vent Grate',     key: '-', category: 'decor' },
+        { tool: 'decor_panel',     label: 'Acoustic Panel', key: '-', category: 'decor' },
+        { tool: 'decor_powerbox',  label: 'Utility Box',    key: '-', category: 'decor' },
     ];
 
     function hexToCSS(hex) {
@@ -6465,12 +6465,6 @@ import {
         return group;
     }
 
-    const propTextureLoader = new THREE.TextureLoader();
-    const leavesTex = propTextureLoader.load('./assets/textures/leaves.jpg');
-    leavesTex.colorSpace = THREE.SRGBColorSpace;
-    leavesTex.wrapS = THREE.RepeatWrapping;
-    leavesTex.wrapT = THREE.RepeatWrapping;
-
     function buildDecoRubble(rng = _makeRng(77)) {
         const group = new THREE.Group();
         const mat1 = typeof wallMaterial !== 'undefined' ? wallMaterial : new THREE.MeshStandardMaterial({ color: 0x7a7065, roughness: 1.0 });
@@ -6545,309 +6539,161 @@ import {
         return group;
     }
 
-    // ── OPTIMIZED FERN ───────────────────────────────────────────────────────────
-    function buildDecoFern(rng = _makeRng(33)) {
+// ── CLEAN ARCHITECTURAL DECOR BUILDERS ───────────────────────────────────────
+
+    const cleanMetalMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4, metalness: 0.8 });
+    const darkPlasticMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7, metalness: 0.2 });
+    const panelMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.8, metalness: 0.1 });
+
+    // 1. Parallel Data Conduits (Organized cables with mounting brackets)
+    function buildDecoConduitRun(rng = _makeRng(101)) {
         const group = new THREE.Group();
-        const frondCount = 8 + Math.floor(rng() * 6);
-        const frondMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.8, side: THREE.DoubleSide, alphaTest: 0.5 });
+        const length = 2.0;
+        
+        // 3 parallel pipes
+        const pipeGeo = new THREE.CylinderGeometry(0.02, 0.02, length, 8);
+        for(let i=0; i<3; i++) {
+            const pipe = new THREE.Mesh(pipeGeo, darkPlasticMat);
+            pipe.position.set((i - 1) * 0.08, 0, 0.03);
+            pipe.castShadow = true;
+            group.add(pipe);
+        }
 
-        for (let i = 0; i < frondCount; i++) {
-            const angle = (i / frondCount) * Math.PI * 2 + (rng() - 0.5) * 0.4;
-            const length = 0.8 + rng() * 0.7;
-            const curve = new THREE.QuadraticBezierCurve3(
-                new THREE.Vector3(0, -0.45, 0),
-                new THREE.Vector3(Math.cos(angle) * length * 0.2, length * 0.8, Math.sin(angle) * length * 0.2),
-                new THREE.Vector3(Math.cos(angle) * length, length * 0.1, Math.sin(angle) * length)
-            );
-
-            const stemGeo = new THREE.TubeGeometry(curve, 12, 0.015, 5, false);
-            group.add(new THREE.Mesh(stemGeo, frondMat));
-
-            const leavesPerFrond = 10 + Math.floor(rng() * 5);
-            const frondLeaves = [];
-            for (let j = 1; j < leavesPerFrond; j++) {
-                const t = j / leavesPerFrond;
-                const pos = curve.getPoint(t);
-                const tangent = curve.getTangent(t);
-                const size = (1.0 - t) * 0.25;
-                
-                const leafGeo = new THREE.PlaneGeometry(size, size * 1.5);
-                leafGeo.translate(0, size * 0.5, 0);
-                const lMesh = new THREE.Mesh(leafGeo, frondMat);
-                lMesh.position.copy(pos);
-                lMesh.lookAt(pos.clone().add(tangent));
-                lMesh.rotateZ(Math.PI / 2);
-                lMesh.rotateX(0.5);
-                lMesh.updateMatrix();
-
-                // Convert to non-indexed to ensure compatibility during merge
-                const g1 = leafGeo.clone().applyMatrix4(lMesh.matrix).toNonIndexed();
-                frondLeaves.push(g1);
-                
-                lMesh.rotateX(-1.0);
-                lMesh.updateMatrix();
-                const g2 = leafGeo.clone().applyMatrix4(lMesh.matrix).toNonIndexed();
-                frondLeaves.push(g2);
-            }
-
-            if (frondLeaves.length > 0) {
-                const mergedLeaves = BufferGeometryUtils.mergeGeometries(frondLeaves);
-                if (mergedLeaves) {
-                    const leafMesh = new THREE.Mesh(mergedLeaves, frondMat);
-                    leafMesh.castShadow = true;
-                    group.add(leafMesh);
-                }
-            }
+        // Mounting brackets
+        const bracketGeo = new THREE.BoxGeometry(0.3, 0.05, 0.08);
+        for(let i=-1; i<=1; i++) {
+            const bracket = new THREE.Mesh(bracketGeo, cleanMetalMat);
+            bracket.position.set(0, i * 0.8, 0.04);
+            bracket.castShadow = true;
+            group.add(bracket);
         }
         return group;
     }
 
-    // ── VINE VARIANTS ────────────────────────────────────────────────────────────
-    function _buildVineBase(rng, points, leafCount, colorBase) {
+    // 2. Recessed LED Light Strip
+    function buildDecoLightStrip(rng = _makeRng(202)) {
         const group = new THREE.Group();
-        const curve = new THREE.CatmullRomCurve3(points);
-        const tubeGeo = new THREE.TubeGeometry(curve, 32, 0.025, 6, false);
-        const vineMat = new THREE.MeshStandardMaterial({ color: colorBase, roughness: 0.95, side: THREE.DoubleSide });
-        const vineTube = new THREE.Mesh(tubeGeo, vineMat);
-        vineTube.castShadow = true;
-        group.add(vineTube);
-
-        // Also add a couple of sub-vines branching off
-        const subVineMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(colorBase).offsetHSL(0, 0, 0.04).getHex(), roughness: 0.95, side: THREE.DoubleSide });
-        for (let sv = 0; sv < 3; sv++) {
-            const tStart = 0.1 + rng() * 0.6;
-            const origin = curve.getPoint(tStart);
-            const subPts = [origin.clone()];
-            let sp = origin.clone();
-            const segCount = 3 + Math.floor(rng() * 3);
-            for (let si = 0; si < segCount; si++) {
-                sp = sp.clone().add(new THREE.Vector3((rng()-0.5)*0.5, -0.3 - rng()*0.3, (rng()-0.5)*0.5));
-                subPts.push(sp.clone());
-            }
-            if (subPts.length >= 2) {
-                const subCurve = new THREE.CatmullRomCurve3(subPts);
-                const subGeo = new THREE.TubeGeometry(subCurve, 10, 0.012, 5, false);
-                const subMesh = new THREE.Mesh(subGeo, subVineMat);
-                group.add(subMesh);
-            }
-        }
-
-        const leaves = [];
-        const darkLeaf = new THREE.Color(colorBase).offsetHSL(0, 0.1, -0.05);
-        const brightLeaf = new THREE.Color(colorBase).offsetHSL(0.03, 0.05, 0.08);
-        const leafColors = [colorBase, darkLeaf.getHex(), brightLeaf.getHex()];
+        const length = 1.5;
         
-        for (let i = 0; i < leafCount; i++) {
-            const t = i / leafCount;
-            const pos = curve.getPoint(t);
-            const tangent = curve.getTangent(t);
-            // Larger, more varied leaves
-            const lSize = 0.08 + rng() * 0.18;
-            const lAspect = 1.2 + rng() * 0.8;
-            // Use a rounded triangular leaf shape via plane
-            const lGeo = new THREE.PlaneGeometry(lSize, lSize * lAspect, 1, 1);
-            const lMesh = new THREE.Mesh(lGeo);
-            // Offset leaves outward from stem
-            const spread = 0.05 + rng() * 0.12;
-            const sideAngle = rng() * Math.PI * 2;
-            lMesh.position.set(
-                pos.x + Math.cos(sideAngle) * spread,
-                pos.y,
-                pos.z + Math.sin(sideAngle) * spread
-            );
-            lMesh.lookAt(lMesh.position.clone().add(tangent));
-            lMesh.rotateZ(rng() * Math.PI * 2);
-            lMesh.rotateX((rng() - 0.5) * 1.2);
-            lMesh.updateMatrix();
-            leaves.push(lGeo.clone().applyMatrix4(lMesh.matrix));
-        }
+        // Casing
+        const caseGeo = new THREE.BoxGeometry(0.15, length, 0.05);
+        const casing = new THREE.Mesh(caseGeo, cleanMetalMat);
+        casing.position.set(0, 0, 0.025);
+        group.add(casing);
 
-        const leafMat = new THREE.MeshStandardMaterial({ 
-            color: 0xffffff, map: leavesTex, roughness: 0.85, side: THREE.DoubleSide,
-            alphaTest: 0.1
+        // Glowing Core
+        const coreGeo = new THREE.BoxGeometry(0.08, length - 0.1, 0.06);
+        const coreMat = new THREE.MeshStandardMaterial({ 
+            color: 0xccffff, emissive: 0x00aaff, emissiveIntensity: 2.5, toneMapped: false 
         });
-        const mergedLeaves = BufferGeometryUtils.mergeGeometries(leaves);
-        const leafMesh = new THREE.Mesh(mergedLeaves, leafMat);
-        leafMesh.castShadow = true;
-        group.add(leafMesh);
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.set(0, 0, 0.03);
+        group.add(core);
+
         return group;
     }
 
-    function buildDecoVineHanging(rng = _makeRng(101)) {
+    // 3. Industrial Vent Grate
+    function buildDecoVentGrate(rng = _makeRng(303)) {
         const group = new THREE.Group();
-        // Multiple hanging strands from attachment point
-        const strandCount = 3 + Math.floor(rng() * 3);
-        const leafColors = [0x2d5a1a, 0x3d7a22, 0x1e4012, 0x4a8a2a, 0x244e15];
         
-        for (let s = 0; s < strandCount; s++) {
-            const offsetX = (rng() - 0.5) * 0.5;
-            const offsetZ = (rng() - 0.5) * 0.5;
-            const points = [new THREE.Vector3(offsetX, 0.5, offsetZ)];
-            let lastP = points[0].clone();
-            const segCount = 5 + Math.floor(rng() * 5);
-            const totalDrop = 1.5 + rng() * 2.0;
-            for (let i = 0; i < segCount; i++) {
-                lastP = lastP.clone().add(new THREE.Vector3(
-                    (rng()-0.5) * 0.35,
-                    -(totalDrop / segCount) - rng() * 0.15,
-                    (rng()-0.5) * 0.35
-                ));
-                points.push(lastP.clone());
-            }
-            const baseColor = leafColors[Math.floor(rng() * leafColors.length)];
-            const strand = _buildVineBase(rng, points, 20 + Math.floor(rng() * 20), baseColor);
-            group.add(strand);
-        }
+        // Outer Frame
+        const frameGeo = new THREE.BoxGeometry(1.0, 1.0, 0.1);
+        const frame = new THREE.Mesh(frameGeo, cleanMetalMat);
+        frame.position.set(0, 0, 0.05);
+        group.add(frame);
 
-        // Extra loose leaf clusters at base of strands
-        const clusterMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: leavesTex, roughness: 0.9, side: THREE.DoubleSide });
-        for (let c = 0; c < 8; c++) {
-            const lSize = 0.07 + rng() * 0.14;
-            const lGeo = new THREE.PlaneGeometry(lSize, lSize * (1.3 + rng() * 0.7));
-            const lMesh = new THREE.Mesh(lGeo, clusterMat);
-            lMesh.position.set((rng()-0.5)*0.6, -0.8 - rng()*1.2, (rng()-0.5)*0.6);
-            lMesh.rotation.set(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
-            lMesh.castShadow = true;
-            group.add(lMesh);
+        // Dark Interior
+        const voidGeo = new THREE.PlaneGeometry(0.8, 0.8);
+        const voidMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const voidMesh = new THREE.Mesh(voidGeo, voidMat);
+        voidMesh.position.set(0, 0, 0.101);
+        group.add(voidMesh);
+
+        // Louvers (Slanted slats)
+        const slatGeo = new THREE.BoxGeometry(0.85, 0.05, 0.08);
+        for(let y = -0.35; y <= 0.35; y += 0.15) {
+            const slat = new THREE.Mesh(slatGeo, cleanMetalMat);
+            slat.position.set(0, y, 0.12);
+            slat.rotation.x = Math.PI / 6; // Slant them down
+            slat.castShadow = true;
+            group.add(slat);
         }
         return group;
     }
 
-    function buildDecoVineWall(rng = _makeRng(303)) {
+    // 4. Acoustic / Architectural Wall Panel
+    function buildDecoWallPanel(rng = _makeRng(404)) {
         const group = new THREE.Group();
-        const branches = 3 + Math.floor(rng() * 3);
-        const leafColors = [0x2d5a1a, 0x1e4012, 0x355e20];
-
-        for (let b = 0; b < branches; b++) {
-            const points = [];
-            let lastP = new THREE.Vector3((rng() - 0.5) * 0.8, -0.5, 0.05);
-            points.push(lastP.clone());
-
-            const segs = 6 + Math.floor(rng() * 4);
-            for (let i = 0; i < segs; i++) {
-                lastP = lastP.clone().add(new THREE.Vector3(
-                    (rng() - 0.5) * 0.7,
-                    (1.5 / segs) + rng() * 0.2,
-                    (rng() - 0.5) * 0.1
-                ));
-                points.push(lastP.clone());
-            }
-            const baseColor = leafColors[Math.floor(rng() * leafColors.length)];
-            group.add(_buildVineBase(rng, points, 25, baseColor));
-        }
-        return group;
-    }
-
-    function buildDecoVinePillar(rng = _makeRng(404)) {
-        const group = new THREE.Group();
-        const points = [];
-        const radius = 0.4 + rng() * 0.2;
-        const height = 2.0 + rng() * 1.5;
-        const loops = 2 + rng() * 2;
         
-        for (let i = 0; i <= 20; i++) {
-            const t = i / 20;
-            const angle = t * Math.PI * 2 * loops;
-            points.push(new THREE.Vector3(
-                Math.cos(angle) * radius,
-                (t * height) - 0.5,
-                Math.sin(angle) * radius
-            ));
-        }
-        
-        group.add(_buildVineBase(rng, points, 40, 0x4a7c59));
-        return group;
-    }
+        // Base plate
+        const baseGeo = new THREE.BoxGeometry(1.8, 1.8, 0.05);
+        const base = new THREE.Mesh(baseGeo, panelMat);
+        base.position.set(0, 0, 0.025);
+        base.castShadow = true;
+        group.add(base);
 
-    function buildDecoVineCreeping(rng = _makeRng(202)) {
-        const points = [new THREE.Vector3(0, -0.48, 0)];
-        let lastP = points[0].clone();
-        for(let i=0; i<6; i++) {
-            lastP.add(new THREE.Vector3((rng()-0.5)*1.5, (rng()-0.5)*0.1, (rng()-0.5)*1.5));
-            points.push(lastP.clone());
-        }
-        return _buildVineBase(rng, points, 30, 0x38541c);
-    }
+        // Raised inner padding with slight color variation
+        const innerGeo = new THREE.BoxGeometry(1.6, 1.6, 0.04);
+        const innerMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.9, metalness: 0.0 });
+        const inner = new THREE.Mesh(innerGeo, innerMat);
+        inner.position.set(0, 0, 0.06);
+        inner.castShadow = true;
+        group.add(inner);
 
-    function buildDecoTree(rng = _makeRng(99)) {
-        const group = new THREE.Group();
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3c2c, roughness: 0.95 });
-        const leafMat = new THREE.MeshStandardMaterial({ 
-            color: 0xffffff, map: leavesTex, roughness: 0.9, flatShading: true, side: THREE.DoubleSide, alphaTest: 0.5
+        // 4 industrial bolts in the corners
+        const boltGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.08, 8);
+        boltGeo.rotateX(Math.PI / 2);
+        const offsets = [-0.75, 0.75];
+        offsets.forEach(x => {
+            offsets.forEach(y => {
+                const bolt = new THREE.Mesh(boltGeo, cleanMetalMat);
+                bolt.position.set(x, y, 0.05);
+                group.add(bolt);
+            });
         });
 
-        const branchGeos = [];
-        const branchPts = []; 
-        
-        const trunkH = 3.5 + rng() * 3.0;
-        const basePt = new THREE.Vector3(0, -0.5, 0);
-        const midPt = new THREE.Vector3((rng()-0.5)*1.5, trunkH * 0.4, (rng()-0.5)*1.5);
-        const topPt = new THREE.Vector3((rng()-0.5)*2.0, trunkH, (rng()-0.5)*2.0);
-        
-        const trunkCurve = new THREE.CatmullRomCurve3([basePt, midPt, topPt]);
-        branchGeos.push(new THREE.TubeGeometry(trunkCurve, 10, 0.25, 6, false).toNonIndexed());
-        branchPts.push(topPt);
-        
-        const numRoots = 3 + Math.floor(rng() * 3);
-        for(let i=0; i<numRoots; i++) {
-            const angle = (i/numRoots) * Math.PI * 2 + rng();
-            const rLen = 0.6 + rng() * 0.8;
-            const rootEnd = basePt.clone().add(new THREE.Vector3(Math.cos(angle)*rLen, -0.3-rng()*0.4, Math.sin(angle)*rLen));
-            const rootMid = basePt.clone().add(new THREE.Vector3(0, 0.5 + rng()*0.5, 0));
-            const rootCurve = new THREE.CatmullRomCurve3([rootMid, basePt, rootEnd]);
-            branchGeos.push(new THREE.TubeGeometry(rootCurve, 6, 0.12, 5, false).toNonIndexed());
-        }
+        return group;
+    }
 
-        const numBranches = 3 + Math.floor(rng() * 4);
-        for(let i=0; i<numBranches; i++) {
-            const t = 0.4 + rng() * 0.5; 
-            const start = trunkCurve.getPoint(t);
-            const dir = new THREE.Vector3((rng()-0.5)*2.5, 0.2 + rng()*1.5, (rng()-0.5)*2.5).normalize();
-            const len = 1.0 + rng() * 2.5;
-            const end = start.clone().add(dir.multiplyScalar(len));
-            const sag = (rng() - 0.3) * 1.0;
-            const mid = start.clone().lerp(end, 0.5).add(new THREE.Vector3(0, sag, 0));
-            const branchCurve = new THREE.CatmullRomCurve3([start, mid, end]);
-            branchGeos.push(new THREE.TubeGeometry(branchCurve, 8, 0.1, 5, false).toNonIndexed());
-            branchPts.push(end);
-        }
+    // 5. Electrical Utility Box
+    function buildDecoPowerBox(rng = _makeRng(505)) {
+        const group = new THREE.Group();
+        
+        // Main Box
+        const boxGeo = new THREE.BoxGeometry(0.6, 0.9, 0.25);
+        const boxMat = new THREE.MeshStandardMaterial({ color: 0x883322, roughness: 0.6, metalness: 0.5 }); // Industrial Orange/Rust
+        const box = new THREE.Mesh(boxGeo, boxMat);
+        box.position.set(0, 0, 0.125);
+        box.castShadow = true;
+        group.add(box);
 
-        // Merge Trunk
-        if (branchGeos.length > 0) {
-            const mergedTrunk = BufferGeometryUtils.mergeGeometries(branchGeos);
-            if (mergedTrunk) {
-                const trunkMesh = new THREE.Mesh(mergedTrunk, trunkMat);
-                trunkMesh.castShadow = trunkMesh.receiveShadow = true;
-                group.add(trunkMesh);
-            }
-        }
+        // Warning Label (Yellow/Black stripe illusion)
+        const labelGeo = new THREE.PlaneGeometry(0.4, 0.1);
+        const labelMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+        const label = new THREE.Mesh(labelGeo, labelMat);
+        label.position.set(0, 0.3, 0.251);
+        group.add(label);
 
-        // Merge Leaves
-        const leafGeos = [];
-        branchPts.forEach(pt => {
-            const clusters = 4 + Math.floor(rng() * 5);
-            for(let j=0; j<clusters; j++) {
-                const r = 0.5 + rng() * 0.8;
-                const geo = new THREE.IcosahedronGeometry(r, 1);
-                _deformGeometry(geo, rng, r * 0.4);
-                const m = new THREE.Matrix4();
-                const pos = pt.clone().add(new THREE.Vector3((rng()-0.5)*1.5, (rng()-0.5)*1.0, (rng()-0.5)*1.5));
-                const rot = new THREE.Euler(rng()*Math.PI, rng()*Math.PI, rng()*Math.PI);
-                const scl = new THREE.Vector3(1 + rng()*0.3, 0.6 + rng()*0.5, 1 + rng()*0.3);
-                m.compose(pos, new THREE.Quaternion().setFromEuler(rot), scl);
-                geo.applyMatrix4(m);
-                leafGeos.push(geo.toNonIndexed());
-            }
+        // Power Status Light
+        const lightGeo = new THREE.SphereGeometry(0.04, 8, 8);
+        const isOn = rng() > 0.3; // 70% chance to be powered on
+        const lightMat = new THREE.MeshStandardMaterial({ 
+            color: isOn ? 0x00ff00 : 0x222222, 
+            emissive: isOn ? 0x00ff00 : 0x000000,
+            emissiveIntensity: 2.0
         });
-        
-        if (leafGeos.length > 0) {
-            const mergedLeaves = BufferGeometryUtils.mergeGeometries(leafGeos);
-            if (mergedLeaves) {
-                const leavesMesh = new THREE.Mesh(mergedLeaves, leafMat);
-                leavesMesh.castShadow = leavesMesh.receiveShadow = true;
-                group.add(leavesMesh);
-            }
-        }
+        const light = new THREE.Mesh(lightGeo, lightMat);
+        light.position.set(0.15, 0.1, 0.25);
+        group.add(light);
+
+        // Cables routing up into the ceiling
+        const cableGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.0, 8);
+        const cable1 = new THREE.Mesh(cableGeo, darkPlasticMat);
+        cable1.position.set(-0.15, 0.95, 0.1);
+        const cable2 = new THREE.Mesh(cableGeo, darkPlasticMat);
+        cable2.position.set(0.15, 0.95, 0.1);
+        group.add(cable1, cable2);
 
         return group;
     }
@@ -6861,14 +6707,14 @@ import {
         decor_wall_2x2:  buildDecoWallRubble2x2,
         decor_rubble:    buildDecoRubble,
         decor_shattered: buildDecoShattered,
-        decor_vine_hanging: buildDecoVineHanging,
-        decor_vine_creeping: buildDecoVineCreeping,
-        decor_vine_wall: buildDecoVineWall,
-        decor_vine_pillar: buildDecoVinePillar,
         decor_pipes:     buildDecoPipes,
         decor_pillar:    buildDecoPillar,
-        decor_fern:      buildDecoFern,
-        decor_tree:      buildDecoTree,
+        // NEW CLEAN PROPS:
+        decor_conduit:   buildDecoConduitRun,
+        decor_led_strip: buildDecoLightStrip,
+        decor_vent:      buildDecoVentGrate,
+        decor_panel:     buildDecoWallPanel,
+        decor_powerbox:  buildDecoPowerBox,
     };
 
     // ── 3-D PREVIEW CANVAS RENDERER ───────────────────────────────────────────
@@ -6901,8 +6747,9 @@ import {
             const seeds = { 
                 decor_debris: 111, decor_wall_1x1_a: 222, decor_wall_1x1_b: 333, 
                 decor_wall_1x1_c: 444, decor_wall_2x2: 555,
-                decor_rubble: 77, decor_shattered: 42, decor_fern: 33, decor_tree: 99,
-                decor_vine_wall: 303, decor_vine_pillar: 404 
+                decor_rubble: 77, decor_shattered: 42, decor_pillar: 19, decor_pipes: 88,
+                // NEW:
+                decor_conduit: 101, decor_led_strip: 202, decor_vent: 303, decor_panel: 404, decor_powerbox: 505
             };
             Object.entries(DECOR_BUILDERS).forEach(([type, buildFn]) => {
                 const mesh = buildFn(_makeRng(seeds[type] || 50));
