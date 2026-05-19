@@ -5001,14 +5001,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         } else {
             expandAnimActive = false;
         }
-
-
-
-                        }, 420);
-                    },
-                }
-            );
-        }
     }
 
     function createGoal(x, y, z, isLocked) {
