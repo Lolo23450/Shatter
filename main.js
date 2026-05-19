@@ -16,13 +16,6 @@ import { CHAPTER_LEVEL_NAMES, LEVEL_NAMES, CHAPTERS, LevelBuilder } from './leve
 import { OptimizedSSRPass } from './OptimizedSSRPass.js';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import {
-    HUB_LEVEL_INDEX, HUB_GATES, GATE_BY_ID,
-    getHubWorldParams, HubWorldRuntime,
-    saveHubProgress, loadHubProgress, clearHubProgress,
-    getLevelSelectStatus, defaultHubProgress,
-} from './hub-world.js';
-
 
     function distSq(v1, v2) { return (v1.x - v2.x) * (v1.x - v2.x) + (v1.y - v2.y) * (v1.y - v2.y) + (v1.z - v2.z) * (v1.z - v2.z); }
     function splitmix32(a) { return function() { a |= 0; a = a + 0x9e3779b9 | 0; var t = a ^ a >>> 16; t = Math.imul(t, 0x21f0aaad); t = t ^ t >>> 15; t = Math.imul(t, 0x735a2d97); return ((t = t ^ t >>> 15) >>> 0) / 4294967296; } }
@@ -72,14 +65,6 @@ import {
         isTransitioning = false; buildLevel(currentLevel, false); setTimeout(() => controls.lock(), 100);
     });
 
-    document.getElementById('btn-enter-hub')?.addEventListener('click', () => {
-        AudioSys.init();
-        document.getElementById('main-menu').style.opacity = '0';
-        document.getElementById('main-menu').style.display  = 'none';
-        isTransitioning = false;
-        buildLevel(HUB_LEVEL_INDEX, false);
-        setTimeout(() => controls.lock(), 100);
-    });
 
     // --- PHYSICS ---
     const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -28, 0) });
@@ -952,9 +937,6 @@ import {
     let activeChapter = 0;                       // 0=Ch1  1=Ch2  2=Ch3
     let chaptersUnlocked = [true, false, false]; // Ch1 always unlocked
 
-    let isHubWorld  = false;
-    const hubRuntime = new HubWorldRuntime();
-    let hubProgress  = loadHubProgress();
 
     let isPaused = true; 
     let volBGM = 0.5; let volSFX = 0.5; let volDyn = 0.5;
@@ -1246,7 +1228,6 @@ import {
                 gfx, volAdv, volBGM, volSFX, volDyn,
                 sensitivity: controls ? controls.pointerSpeed : 1.0
             };
-            saveHubProgress(hubProgress);
             localStorage.setItem(this.key, JSON.stringify(data));
         },
         load() {
@@ -1293,7 +1274,6 @@ import {
                 }
                 // Sync the new toggle-button UI with loaded gfx values
                 if (typeof syncToggleFromGfx === 'function') syncToggleFromGfx();
-                hubProgress = loadHubProgress();
             } catch(e) { console.warn("Save data corrupted, resetting."); }
         }
     };
@@ -1569,8 +1549,6 @@ import {
         currentLevel = 0;
         chaptersUnlocked = [true, false, false];
         activeChapter = 0;
-        clearHubProgress();
-        hubProgress = defaultHubProgress();
 
         // 3. Force page reload to return to the clean Main Menu state
         window.location.reload();
@@ -1636,55 +1614,35 @@ import {
                 const isCompleted = (activeChapter < savedCh) || (activeChapter === savedCh && i < savedLvl);
                 const isCurrent   = (activeChapter === savedCh && i === savedLvl);
  
-                // Hub lock check
-                const hubStatus = getLevelSelectStatus(activeChapter, i, hubRuntime.active ? hubRuntime : null);
-                const isLocked  = hubStatus.locked;
-                const gateColor = hubStatus.gateColor
-                    ? '#' + new THREE.Color(hubStatus.gateColor).getHexString()
-                    : '#888';
- 
                 card.className = 'list-card';
                 if (isCompleted) card.classList.add('completed');
                 if (isCurrent)   card.classList.add('current-selection');
-                if (isLocked)    card.classList.add('hub-locked');
  
                 const dotHtml = isCompleted
                     ? `<div class="lc-status-dot"></div>`
                     : isCurrent
                         ? `<div class="lc-current-dot"></div>`
-                        : isLocked
-                            ? `<span style="font-size:12px;opacity:0.4">🔒</span>`
-                            : '';
- 
-                const gateChip = (!isLocked && hubStatus.gateName)
-                    ? `<span style="font-size:9px;letter-spacing:2px;color:${gateColor};opacity:0.65;margin-top:2px;display:block">${hubStatus.gateName}</span>`
-                    : '';
+                        : '';
  
                 card.innerHTML = `
                     <div class="lc-info">
                         <span class="lc-num">LEVEL ${i + 1}</span>
-                        <span class="lc-name" style="${isLocked ? 'color:rgba(255,255,255,0.2)' : ''}">${getLevelName(i)}</span>
-                        ${gateChip}
+                        <span class="lc-name">${getLevelName(i)}</span>
                     </div>${dotHtml}`;
  
-                if (!isLocked) {
-                    card.addEventListener('mouseenter', () => {
-                        document.querySelectorAll('.list-card').forEach(c => c.classList.remove('previewing'));
-                        card.classList.add('previewing');
-                        document.getElementById('preview-title').innerText = getLevelName(i);
-                        document.getElementById('ls-preview-meta').textContent =
-                            isCompleted ? 'COMPLETED' : isCurrent ? 'CURRENT LEVEL' : 'NOW PREVIEWING';
-                        previewTargetLvl = i;
-                        clearTimeout(previewDebounce);
-                        previewDebounce = setTimeout(() => {
-                            if (isPreviewMode && previewTargetLvl === i) buildLevel(i, true);
-                        }, 150);
-                    });
-                    card.addEventListener('click', () => { previewTargetLvl = i; launchFromPreview(); });
-                } else {
-                    card.style.cursor = 'not-allowed';
-                    card.title = `Open ${hubStatus.gateName || 'the gate'} in THE NEXUS first`;
-                }
+                card.addEventListener('mouseenter', () => {
+                    document.querySelectorAll('.list-card').forEach(c => c.classList.remove('previewing'));
+                    card.classList.add('previewing');
+                    document.getElementById('preview-title').innerText = getLevelName(i);
+                    document.getElementById('ls-preview-meta').textContent =
+                        isCompleted ? 'COMPLETED' : isCurrent ? 'CURRENT LEVEL' : 'NOW PREVIEWING';
+                    previewTargetLvl = i;
+                    clearTimeout(previewDebounce);
+                    previewDebounce = setTimeout(() => {
+                        if (isPreviewMode && previewTargetLvl === i) buildLevel(i, true);
+                    }, 150);
+                });
+                card.addEventListener('click', () => { previewTargetLvl = i; launchFromPreview(); });
  
                 list.appendChild(card);
             }
@@ -3400,10 +3358,6 @@ import {
     }
 
     function getLevelParams(lvl) {
-        // ── HUB WORLD ─────────────────────────────────────────────────────────
-        if (lvl === HUB_LEVEL_INDEX) {
-            return getHubWorldParams();
-        }
         // Load a saved custom level
         if (typeof lvl === 'string' && lvl.startsWith('CUSTOM_')) {
             const slot = parseInt(lvl.replace('CUSTOM_', ''));
@@ -4208,10 +4162,6 @@ import {
         clearCurrentLevel(); 
         // createMegaStructures();
         currentParams = getLevelParams(lvlIndex);
-
-        // Tear down any previous hub
-        if (hubRuntime.active) hubRuntime.dispose();
-        isHubWorld = (lvlIndex === HUB_LEVEL_INDEX);
 
         // Spawn level lights declared via builder.addLight()
         if (currentParams.lights && currentParams.lights.length > 0 && !isPreview) {
@@ -5052,37 +5002,8 @@ import {
             expandAnimActive = false;
         }
 
-        // ── HUB WORLD RUNTIME INIT ────────────────────────────────────────────
-        if (isHubWorld && !isPreview) {
-            hubRuntime.init(
-                scene,
-                createCrystalStructure,
-                hubProgress,
-                {
-                    onEnterGate: (gateId, ch, _firstLvl) => {
-                        if (isTransitioning) return;
-    
-                        const gate = GATE_BY_ID[gateId];
-                        // Store return info
-                        hubProgress.returnGateId  = gateId;
-                        hubProgress.returnChapter = activeChapter;
-                        hubProgress.returnLevel   = currentLevel;
-                        saveHubProgress(hubProgress);
-    
-                        // Find first incomplete level in gate
-                        const nextLvl = gate.levels.find((l, i) =>
-                            !hubProgress.completedLevels[`${gateId}_${i}`]
-                        ) ?? gate.levels[0];
-    
-                        activeChapter = gate.ch;
-                        currentLevel  = nextLvl;
-                        SaveSystem.save();
-    
-                        const fo = document.getElementById('fade-overlay');
-                        fo.style.transition = 'opacity 0.4s ease-in-out'; fo.style.opacity = 1;
-                        setTimeout(() => {
-                            buildLevel(currentLevel, false);
-                            fo.style.transition = 'opacity 0.4s ease-in-out'; fo.style.opacity = 0;
+
+
                         }, 420);
                     },
                 }
@@ -5412,33 +5333,6 @@ import {
         prompt.addEventListener('click', dismiss);
     }
 
-    function _showGateClearScreen(gate, onDismiss) {
-        const col = '#' + new THREE.Color(gate.color).getHexString();
-        const rewardHtml = gate.reward
-            ? `<p style="color:${col};letter-spacing:4px;margin-top:16px">✦ CUBE MASTERED: ${gate.reward.toUpperCase()}</p>`
-            : '';
- 
-        const el = document.createElement('div');
-        el.style.cssText = `
-            position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;
-            justify-content:center;color:#fff;font-family:monospace;z-index:9999;
-            background:rgba(0,0,0,0.88);text-align:center;
-        `;
-        el.innerHTML = `
-            <p style="font-size:10px;letter-spacing:8px;color:rgba(255,255,255,0.3)">GATE CLEARED</p>
-            <h1 style="font-size:48px;letter-spacing:8px;color:${col};margin:8px 0">${gate.name}</h1>
-            <p style="font-size:13px;letter-spacing:5px;color:rgba(255,255,255,0.5)">${gate.subtitle}</p>
-            ${rewardHtml}
-            <p id="_gcs-dismiss" style="margin-top:40px;font-size:11px;letter-spacing:6px;
-               color:rgba(255,255,255,0.3);cursor:pointer">[RETURN TO THE NEXUS]</p>
-        `;
-        document.body.appendChild(el);
- 
-        const dismiss = () => { el.remove(); onDismiss(); };
-        document.getElementById('_gcs-dismiss').addEventListener('click', dismiss);
-        setTimeout(dismiss, 9000); // auto-dismiss
-    }
-
     function completeLevel() {
         if (isTransitioning) return;
         isTransitioning = true;
@@ -5447,45 +5341,6 @@ import {
         const overlay = document.getElementById('fade-overlay');
         overlay.style.transition = 'opacity 0.6s ease-in-out';
         overlay.style.opacity = 1;
- 
-        // ── HUB GATE context ──────────────────────────────────────────────
-        if (hubProgress.returnGateId) {
-            // Mark current level complete
-            hubRuntime.onLevelComplete(activeChapter, currentLevel);
-            saveHubProgress(hubProgress);
- 
-            const gate = GATE_BY_ID[hubProgress.returnGateId];
- 
-            // Is there another unfinished level in this gate?
-            const nextSlot = gate.levels.findIndex((l, i) =>
-                !hubProgress.completedLevels[`${gate.id}_${i}`]
-            );
- 
-            if (nextSlot !== -1) {
-                // Load next level inside the gate
-                currentLevel = gate.levels[nextSlot];
-                SaveSystem.save();
-                setTimeout(() => {
-                    buildLevel(currentLevel, false);
-                    overlay.style.transition = 'opacity 0.4s ease-in-out';
-                    overlay.style.opacity = 0;
-                    setTimeout(() => { isTransitioning = false; }, 400);
-                }, 600);
-            } else {
-                // Gate fully cleared — show reward screen then return to hub
-                setTimeout(() => {
-                    isTransitioning = false;
-                    _showGateClearScreen(gate, () => {
-                        hubProgress.returnGateId = null;
-                        saveHubProgress(hubProgress);
-                        activeChapter = hubProgress.returnChapter;
-                        currentLevel  = 0;
-                        buildLevel(HUB_LEVEL_INDEX, false);
-                    });
-                }, 600);
-            }
-            return;
-        }
  
         // ── Standard campaign flow ────────────────────────────────────────
         if (currentLevel === 9) {
@@ -8539,12 +8394,6 @@ import {
             }
 
             if (exitMesh) { exitMesh.rotation.y += 0.01; exitMesh.updateMatrix(); }
-
-            // ── HUB WORLD FRAME UPDATE ────────────────────────────────────────────
-            if (isHubWorld && hubRuntime.active && !isPaused && !isCutscene) {
-                _v1.set(playerBody.position.x, playerBody.position.y, playerBody.position.z);
-                hubRuntime.update(_v1, elapsedTime);
-            }
 
             if (isCutscene) {
                 if (cutsceneType !== 'montage') {
