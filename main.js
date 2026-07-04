@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Timer } from 'three/examples/jsm/misc/Timer.js';
+import { Timer } from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Water } from 'three/examples/jsm/objects/Water.js';
@@ -67,7 +67,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
 
     // --- PHYSICS ---
-    const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -28, 0) });
+    const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -19, 0) });
     world.broadphase = new CANNON.SAPBroadphase(world); world.solver.iterations = 3; world.solver.tolerance = 0.05; 
     world.allowSleep = true; world.sleepTimeLimit = 0.5; 
 
@@ -110,7 +110,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
     let customPlates = []; // Array of {x, y, z, channel}
     let customDoors = [];  // Array of {x, y, z, channel, horizontal}
     let customWaterY = undefined;
-    let roomDim = { x: 7, y: 5, z: 7 };
 
     // Custom Level Save System
     let customLevels = JSON.parse(localStorage.getItem('shatter_custom_levels')) || Array(99).fill(null);
@@ -167,7 +166,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         'wall': 0x454545, 'fill': 0x00ff88, 'blue': 0x3388ff, 'red': 0xff3344, 'green': 0x33ff99, 
         'bomb': 0xffaa00, 'spawn': 0xffffff, 'exit': 0xffff00, 'gray': 0xaaaaaa,
         'yellow': 0xffdd33, 'big_yellow': 0xffaa33, 'big_gray': 0x888888,
-        'light': 0xffee44, 'plate': 0xc27a3e, 'door': 0x66ccff, 'room': 0xffffff,
+        'light': 0xffee44, 'plate': 0xc27a3e, 'door': 0x66ccff,
         'water': 0x0055ff, 'logic': 0x9966ff, 'aero': 0x00ffff, 'oneway': 0xffaa00,
         // DECORATION PROPS (Ruins)
         'decor_debris':    0x7a7a7a,
@@ -177,16 +176,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         'decor_wall_2x2':  0x5a5a5a,
         'decor_rubble':    0x8a7266,
         'decor_shattered': 0xb8a898,
-        'decor_pipes':     0x505c5a,
         'decor_pillar':    0x9ea1a0,
-        // MODULAR CLEAN ARCHITECTURE
-        'decor_frame_open':   0x888888, // Light structural grey
-        'decor_frame_solid':  0x555555, // Heavy dark grey
-        'decor_frame_braced': 0x777777, // Structural grey
-        'decor_panel_blank':  0x444444, // Flat panel grey
-        'decor_panel_vent':   0x333333, // Dark vent
-        'decor_panel_core':   0x00aaff, // Emissive blue core
-        'decor_panel_pipes':  0xcc5511, // Hazard pipe orange
     };
 
     function applyPOM(material, heightMap, scale = 0.05) {
@@ -443,9 +433,15 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
         const makeTex = (canvas, srgb = false) => {
             const t = new THREE.CanvasTexture(canvas);
-            t.wrapS = t.wrapT = THREE.RepeatWrapping; t.generateMipmaps = true;
-            t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
-            if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t;
+            t.wrapS = t.wrapT = THREE.RepeatWrapping; 
+            t.generateMipmaps = true;
+            t.minFilter = THREE.LinearMipmapLinearFilter; 
+            t.magFilter = THREE.LinearFilter;
+            if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+            
+            // Force immediate GPU upload to prevent rendering stalls later
+            renderer.initTexture(t); 
+            return t;
         };
 
         const aoTex = makeTex(aoC);
@@ -664,8 +660,8 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         map: floorTexs.albedo,           // <-- Put these back
         normalMap: floorTexs.normal,     // <-- Put these back
         roughness: 0.15,
-        metalness: 0.6,
-        envMapIntensity: 0.4,
+        metalness: 0.3,
+        envMapIntensity: 0.7,
         normalScale: new THREE.Vector2(2.0, 2.0)
     });
     applyTriplanar(floorMaterial, 0.4); // 0.4 = scale density
@@ -675,8 +671,8 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         map: concreteTexs.albedo,        // <-- Put these back
         normalMap: concreteTexs.normal,  // <-- Put these back
         roughness: 0.30,
-        metalness: 0.85,
-        envMapIntensity: 0.2,
+        metalness: 0.45,
+        envMapIntensity: 0.5,
         normalScale: new THREE.Vector2(3.0, 3.0)
     });
     applyTriplanar(wallMaterial, 0.5);
@@ -685,19 +681,19 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
     const brokenMaterial = new THREE.MeshStandardMaterial({ 
         map: concreteTexs.albedo,        // <-- Put these back
         normalMap: concreteTexs.normal,  // <-- Put these back
-        color: 0x8a8d8a, 
+        color: 0x7a7d7a, 
         roughness: 0.45,
-        metalness: 0.60, 
-        envMapIntensity: 0.1,
+        metalness: 0.40, 
+        envMapIntensity: 0.3,
         normalScale: new THREE.Vector2(3.0, 3.0)
     });
     applyTriplanar(brokenMaterial, 0.5);
 
     // 3. Inject POM!
     // Note: 0.04 is a very strong effect for testing, you can lower it to 0.02 if it looks 'swimming'
-    applyPOM(wallMaterial, concreteTexs.height, 0.04);
-    applyPOM(brokenMaterial, concreteTexs.height, 0.04);
-    applyPOM(floorMaterial, floorTexs.height, 0.03);
+    applyPOM(wallMaterial, concreteTexs.height, 0.08);
+    applyPOM(brokenMaterial, concreteTexs.height, 0.06);
+    applyPOM(floorMaterial, floorTexs.height, 0.05);
 
     const baseEmissiveMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffeedd, emissiveIntensity: 3.0, toneMapped: false });
 
@@ -782,10 +778,12 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
     const levelMaterials  = [];
 
    const baseBlockMat = {
-        roughness: 0.15, metalness: 0.25, // Tweaked to offset lack of clearcoat
-        envMapIntensity: 4.0,
-        transparent: true, opacity: 0.95
-        // Removed clearcoat, ior, sheen, transmission for massive FPS gain and zero visual bugs
+        roughness: 0.15, metalness: 0.15, // Tweaked to offset lack of clearcoat
+        envMapIntensity: 8.0,
+        transparent: true, opacity: 0.45,
+
+        thickness: 0.5,
+        side: THREE.DoubleSide
     };
 
     const blockConfigs = {
@@ -1270,7 +1268,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                 document.getElementById('vol-brightness-val').textContent = volAdv.brightness.toFixed(2);
                 if (data.sensitivity) {
                     document.getElementById('sensitivity-slider').value = data.sensitivity;
-                    document.getElementById('sens-val').innerText = data.sensitivity.toFixed(1);
+                    document.getElementById('sens-val').innerText = data.sensitivity.toFixed(2);
                 }
                 // Sync the new toggle-button UI with loaded gfx values
                 if (typeof syncToggleFromGfx === 'function') syncToggleFromGfx();
@@ -1298,6 +1296,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                 row.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 sel.value = btn.dataset.val;
+                applyGraphics(); // <-- add this so it's live immediately
             });
         });
     }
@@ -1417,7 +1416,8 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         // the resize handler, so it fell out of sync whenever gfx.res changed.
         const physW = Math.max(1, renderer.domElement.width);
         const physH = Math.max(1, renderer.domElement.height);
-        depthCaptureTarget.setSize(physW, physH);
+        const rendererSize = renderer.getSize(new THREE.Vector2());
+        depthCaptureTarget.setSize(rendererSize.x, rendererSize.y);
 
         const pomScale = gfx.pom === 1 ? 0.04 : 0.0;
         wallMaterial.userData.parallaxScale.value = pomScale;
@@ -1737,8 +1737,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             isPlayingCustom = false;
             editorSceneGroup.visible = false;
             ghostMesh.visible = false;
-            document.getElementById('editor-hud').style.display = 'none'; document.getElementById('editor-hotbar').style.display = 'none';
-
             world.removeBody(editorPhysicsFloor);
             world.removeBody(editorStaticBody);
 
@@ -2445,7 +2443,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
     const skyCache = new Map();
 
-    function createWaterNormalTexture({ size = 512, strength = 6 } = {}) { // Increased default strength
+    function createWaterNormalTexture({ size = 256, strength = 6 } = {}) { // Increased default strength
         const TWO_PI = Math.PI * 2;
         const waves = [
             { fx: 3,  fy: 2,  w: 0.45, phase: 0.00 },
@@ -2526,7 +2524,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
     const depthCaptureTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
     depthCaptureTarget.depthTexture = new THREE.DepthTexture(window.innerWidth, window.innerHeight);
-    depthCaptureTarget.depthTexture.type = THREE.UnsignedIntType;
+    depthCaptureTarget.depthTexture.type = THREE.UnsignedShortType;
     const depthTexture = depthCaptureTarget.depthTexture;
 
     const composer = new EffectComposer(renderer, renderTarget);
@@ -2581,22 +2579,26 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
     const VolumetricShader = {
         uniforms: {
-            tDiffuse:                      { value: null },
-            tDepth:                        { value: null },
-            cameraProjectionMatrixInverse: { value: new THREE.Matrix4() },
-            cameraMatrixWorld:             { value: new THREE.Matrix4() },
+            tDiffuse:          { value: null },
+            tDepth:            { value: null },
+            cameraNear:        { value: 0.1 },
+            cameraFar:         { value: 750 },
+            projMatrix:        { value: new THREE.Matrix4() },
+            viewMatrix:        { value: new THREE.Matrix4() },
+            invProjMatrix:     { value: new THREE.Matrix4() },
+            invViewMatrix:     { value: new THREE.Matrix4() },
 
-            pointLightsPos:                { value: pointPosUniformArray },
-            pointLightsColor:              { value: pointColUniformArray },
-            pointLightCount:               { value: 0 },
-            scattering:                    { value: 0.003 },
-            maxDistance:                   { value: 90.0 },
-            volRadiusSq:                   { value: 625.0 },
-            volBrightness:                 { value: 0.35  },
-            time:                          { value: 0.0 }
+            pointLightsPos:    { value: pointPosUniformArray },
+            pointLightsColor:  { value: pointColUniformArray },
+            pointLightCount:   { value: 0 },
+            scattering:        { value: 0.05 },
+            maxDistance:       { value: 90.0 },
+            volRadiusSq:       { value: 625.0 },
+            volBrightness:     { value: 3.0 },
+            time:              { value: 0.0 }
         },
         vertexShader: `
-            out vec2 vUv;
+            varying vec2 vUv;
             void main() {
                 vUv = uv;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
@@ -2604,12 +2606,14 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         `,
         fragmentShader: `
             precision highp float;
-            precision highp sampler2D;
+            varying vec2 vUv;
 
             uniform sampler2D tDiffuse;
             uniform sampler2D tDepth;
-            uniform mat4 cameraProjectionMatrixInverse;
-            uniform mat4 cameraMatrixWorld;
+            uniform float cameraNear;
+            uniform float cameraFar;
+            uniform mat4 invProjMatrix;
+            uniform mat4 invViewMatrix;
 
             #define MAX_POINT_LIGHTS 16
             uniform vec3 pointLightsPos[MAX_POINT_LIGHTS];
@@ -2621,127 +2625,75 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             uniform float volRadiusSq;
             uniform float volBrightness;
             uniform float time;
-            in vec2 vUv;
-            layout(location = 0) out vec4 fragColor;
 
-            const int STEPS = 8;
+            const int STEPS = 24;
 
-            vec3 WorldPosFromDepth(vec2 uv, float depth) {
-                vec4 ndc  = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-                vec4 view = cameraProjectionMatrixInverse * ndc;
-                view /= view.w;
-                return (cameraMatrixWorld * view).xyz;
+            float linearizeDepth(float d) {
+                float z = d * 2.0 - 1.0;
+                return (2.0 * cameraNear * cameraFar) / (cameraFar + cameraNear - z * (cameraFar - cameraNear));
             }
 
-            float IGN(vec2 pixel, float frame) {
-                pixel += frame * vec2(47.0, 17.0);
-                return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+            vec3 worldPosFromDepth(vec2 uv, float depth) {
+                vec4 clip = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+                vec4 viewPos = invProjMatrix * clip;
+                viewPos /= viewPos.w;
+                vec4 worldPos = invViewMatrix * viewPos;
+                return worldPos.xyz;
             }
 
-            vec3 colorGrade(vec3 col) {
-                col = col + vec3(0.004, 0.002, 0.003) * (1.0 - col);
-                col = pow(max(col, 0.0), 1.0 / vec3(0.97, 0.98, 1.02));
-                col = col * vec3(1.04, 1.01, 0.98);
-                return col;
+            float hash(vec2 p) {
+                p = fract(p * vec2(123.34, 456.21));
+                p += dot(p, p + 45.32);
+                return fract(p.x * p.y);
             }
 
             void main() {
-                float depth = texture(tDepth, vUv).r;
+                vec4 baseColor = texture2D(tDiffuse, vUv);
+                float depth = texture2D(tDepth, vUv).r;
 
-                // ── 1. SKY EARLY-OUT ─────────────────────────────────────────────
-                // Sky pixels skip all ray marching, blur, and shadow work entirely.
                 if (depth >= 0.9999) {
-                    fragColor = vec4(colorGrade(texture(tDiffuse, vUv).rgb), 1.0);
+                    gl_FragColor = baseColor;
                     return;
                 }
 
-                vec3 cameraPos = cameraMatrixWorld[3].xyz;
-                vec3 worldPos  = WorldPosFromDepth(vUv, depth);
-                vec3 rayDir    = worldPos - cameraPos;
-                float rayLen   = length(rayDir);
-                rayDir        /= rayLen;
+                vec3 worldPos = worldPosFromDepth(vUv, depth);
+                vec3 camWorldPos = (invViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 
-                // ── 2. ADAPTIVE BLUR ────────────────────────────────────────────
-                // Near geometry: 1 sample + chroma shift (saves 7 texture fetches).
-                // Far geometry: full 8-tap blur.
-                vec2 center = vUv - 0.5;
-                float aberrationStrength = 0.0008 + length(center) * 0.003;
-                vec2 aberrOffset = center * aberrationStrength;
+                vec3 rayVec = worldPos - camWorldPos;
+                float rayLen = length(rayVec);
+                vec3 rayDir = rayVec / max(rayLen, 0.0001);
 
-                float blurFactor = smoothstep(18.0, 65.0, rayLen) * 2.2;
-                vec4 baseColor;
-
-                if (blurFactor < 0.01) {
-                    // Fast path: near geometry — single sample per channel
-                    baseColor   = texture(tDiffuse, vUv);
-                    baseColor.r = texture(tDiffuse, vUv + aberrOffset).r;
-                    baseColor.b = texture(tDiffuse, vUv - aberrOffset).b;
-                } else {
-                    // Full path: 8-tap box blur + chromatic aberration
-                    vec2 texel = 1.0 / vec2(textureSize(tDiffuse, 0));
-                    vec2 o0 = vec2( texel.x,  texel.y) * blurFactor;
-                    vec2 o1 = vec2(-texel.x,  texel.y) * blurFactor;
-                    vec2 o2 = vec2( texel.x, -texel.y) * blurFactor;
-                    vec2 o3 = vec2(-texel.x, -texel.y) * blurFactor;
-
-                    vec4 rp = (texture(tDiffuse, vUv + aberrOffset + o0) +
-                            texture(tDiffuse, vUv + aberrOffset + o1) +
-                            texture(tDiffuse, vUv + aberrOffset + o2) +
-                            texture(tDiffuse, vUv + aberrOffset + o3)) * 0.25;
-
-                    vec4 rn = (texture(tDiffuse, vUv - aberrOffset + o0) +
-                            texture(tDiffuse, vUv - aberrOffset + o1) +
-                            texture(tDiffuse, vUv - aberrOffset + o2) +
-                            texture(tDiffuse, vUv - aberrOffset + o3)) * 0.25;
-
-                    baseColor   = rp;
-                    baseColor.g = (rp.g + rn.g) * 0.5;
-                    baseColor.b = rn.b;
-                }
-
-                // ── 3. VOLUMETRIC SETUP ──────────────────────────────────────────
                 float marchDist = min(rayLen, maxDistance);
-                float stepSize  = marchDist / float(STEPS);
-                float stepWeight = scattering * stepSize;
+                float stepSize = marchDist / float(STEPS);
 
-                float dither     = IGN(gl_FragCoord.xy, floor(mod(time * 60.0, 128.0)));
-                vec3  currentPos = cameraPos + rayDir * (stepSize * dither);
+                float dither = hash(gl_FragCoord.xy + fract(time) * 100.0);
+                vec3 currentPos = camWorldPos + rayDir * (stepSize * dither);
 
-                int  nLights = min(pointLightCount, MAX_POINT_LIGHTS);
                 vec3 totalVolumetric = vec3(0.0);
+                int nLights = min(pointLightCount, MAX_POINT_LIGHTS);
 
                 for (int i = 0; i < STEPS; i++) {
-                    // ── 5. POINT LIGHTS — skip loop entirely when none exist ────
-                    if (nLights > 0) {
-                        for (int j = 0; j < nLights; j++) {
-                            vec3  toLight = pointLightsPos[j] - currentPos;
-                            float distSq  = dot(toLight, toLight);
-                            if (distSq < volRadiusSq) {
-                                float atten = smoothstep(volRadiusSq, 0.0, distSq)
-                                            / (0.5 + distSq * 0.05);
-                                totalVolumetric += pointLightsColor[j] * (atten * volBrightness * stepWeight);
-                            }
+                    for (int j = 0; j < MAX_POINT_LIGHTS; j++) {
+                        if (j >= nLights) break;
+                        vec3 toLight = pointLightsPos[j] - currentPos;
+                        float distSq = dot(toLight, toLight);
+                        if (distSq < volRadiusSq) {
+                            float atten = 1.0 - (distSq / volRadiusSq);
+                            atten = atten * atten;
+                            totalVolumetric += pointLightsColor[j] * atten;
                         }
                     }
-
                     currentPos += rayDir * stepSize;
                 }
 
-                // ── COMPOSITE ────────────────────────────────────────────────────
-                vec3 litColor = baseColor.rgb + totalVolumetric;
+                totalVolumetric *= scattering * stepSize * volBrightness;
 
-                litColor = colorGrade(litColor);
-
-                float vignette = 1.0 - smoothstep(0.45, 1.15, length(center) * 1.35);
-                litColor *= (0.88 + 0.12 * vignette);
-
-                fragColor = vec4(litColor, baseColor.a);
+                gl_FragColor = vec4(baseColor.rgb + totalVolumetric, baseColor.a);
             }
         `
     };
 
     const volumetricPass = new ShaderPass(VolumetricShader);
-    volumetricPass.material.glslVersion = THREE.GLSL3;
     volumetricPass.material.uniforms.tDepth.value = depthTexture;
     composer.addPass(volumetricPass);
 
@@ -2754,6 +2706,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
     composer.addPass(bloomPass);
     const smaaPass = new SMAAPass(window.innerWidth, window.innerHeight);
     composer.addPass(smaaPass);
+
     composer.addPass(new OutputPass());
 
     // PHYSICS: Infinite Flat Floor so the player can walk around while editing
@@ -3357,6 +3310,124 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         dynamicRopes.push({ bodies, segmentMeshes: segMeshes });
     }
 
+    // Single source of truth: builds a LevelBuilder instance from the live editor
+    // state (customSolidBlocks, customEntities, etc). Used identically by quick-test,
+    // full-test, and code export, so they can never drift out of sync with each other.
+    function buildEditorLevelBuilder(name = "CUSTOM PLAYTEST") {
+        const builder = new LevelBuilder(999, name)
+            .setBounds(15, 20, 15)
+            .setSpawn(customSpawn.x, customSpawn.y, customSpawn.z)
+            .setExit(customExit.x, customExit.y, customExit.z)
+            .setCutscene(null);
+
+        if (customWaterY !== undefined) builder.setWater(customWaterY);
+
+        // Solid blocks (walls) — tracked directly on the builder now
+        customSolidBlocks.forEach(key => {
+            const [x, y, z] = key.split(',').map(Number);
+            builder.addSolid(x, y, z);
+        });
+
+        // Interactive dynamic blocks
+        customEntities.forEach(ent => {
+            if (PHYSICAL_BLOCK_TYPES.has(ent.type)) {
+                const opts = {};
+                if (ent.type === 'red' && ent.startScale !== undefined) opts.startScale = ent.startScale;
+                builder.addEntity(ent.type, ent.x, ent.y, ent.z, opts);
+            }
+        });
+
+        // Hazards / destruction zones
+        customDestruction.forEach(bomb => builder.addDestructionZone(bomb.cx, bomb.cy, bomb.cz, 4, 7));
+
+        // Lights
+        customLights.forEach(l => builder.addLight(l.x, l.y, l.z, l.color, l.intensity, l.radius));
+
+        // Mechanisms
+        customPlates.forEach(p => builder.addPlate(p.x, p.y, p.z, p.channel));
+        customDoors.forEach(d => builder.addDoor(d.x, d.y, d.z, d));
+
+        // Fields (aero filters & one-way fields)
+        customFields.forEach(f => {
+            if (f.type === 'aero') builder.addAeroFilter(f.x, f.y, f.z, f.channel, f.w, f.h, f.normal);
+            if (f.type === 'oneway') builder.addOneWayField(f.x, f.y, f.z, f.channel, f.inverted, f.w, f.h, f.normal);
+        });
+
+        // Logic gates
+        for (let ch in logicNodes.configs) {
+            const l = logicNodes.configs[ch];
+            builder.addLogicGate(parseInt(ch), l.type, l.operands || l.sources);
+        }
+
+        return builder;
+    }
+
+    // Serializes a LevelBuilder instance into the chained-call source code used for
+    // permanent/shipped levels. Reads straight off the builder's own data (not off
+    // any separate editor-state arrays), so exported code always matches what was
+    // actually just quick-tested.
+    function serializeLevelBuilderCode(builder) {
+        // Auto-size bounds to the placed solids, with padding, for a tighter shipped level
+        let bX = 5, bY = 5, bZ = 5;
+        builder.solids.forEach(key => {
+            const [x, y, z] = key.split(',').map(Number);
+            bX = Math.max(bX, Math.abs(x) + 1);
+            bY = Math.max(bY, y + 2);
+            bZ = Math.max(bZ, Math.abs(z) + 1);
+        });
+
+        let out = `return builder.setBounds(${bX}, ${bY}, ${bZ})\n`;
+        out += `    .setSpawn(${builder.spawn.x}, ${builder.spawn.y}, ${builder.spawn.z})\n`;
+        out += `    .setExit(${builder.exit.x}, ${builder.exit.y}, ${builder.exit.z})\n`;
+
+        builder.blocks.forEach(ent => {
+            if (ent.type === 'red' && ent.startScale !== undefined && ent.startScale !== 1.0) {
+                out += `    .addEntity('${ent.type}', ${ent.pos.x}, ${ent.pos.y}, ${ent.pos.z}, { startScale: ${ent.startScale} })\n`;
+            } else {
+                out += `    .addEntity('${ent.type}', ${ent.pos.x}, ${ent.pos.y}, ${ent.pos.z})\n`;
+            }
+        });
+
+        builder.destructionZones.forEach(z => {
+            out += `    .addDestructionZone(${z.cx}, ${z.cy}, ${z.cz}, 4, 7)\n`;
+        });
+
+        (builder.lights || []).forEach(light => {
+            const hexStr = '0x' + light.color.toString(16).padStart(6, '0');
+            out += `    .addLight(${light.x}, ${light.y}, ${light.z}, ${hexStr}, ${light.intensity}, ${light.radius})\n`;
+        });
+
+        builder.plates.forEach(p => {
+            out += `    .addPlate(${p.x}, ${p.y}, ${p.z}, ${p.channel})\n`;
+        });
+
+        builder.doors.forEach(d => {
+            out += `    .addDoor(${d.x}, ${d.y}, ${d.z}, { channel: ${d.channel}, dir: '${d.dir}', width: ${d.width}, height: ${d.height}, moveDist: ${d.moveDist} })\n`;
+        });
+
+        builder.fields.forEach(f => {
+            if (f.type === 'aero') out += `    .addAeroFilter(${f.x}, ${f.y}, ${f.z}, ${f.channel}, ${f.w}, ${f.h})\n`;
+            if (f.type === 'oneway') out += `    .addOneWayField(${f.x}, ${f.y}, ${f.z}, ${f.channel}, ${f.inverted}, ${f.w}, ${f.h})\n`;
+        });
+
+        builder.logic.forEach(l => {
+            out += `    .addLogicGate(${l.ch}, '${l.type}', ${JSON.stringify(l.operands)})\n`;
+        });
+
+        if (builder.waterY !== undefined) {
+            out += `    .setWater(${builder.waterY})\n`;
+        }
+
+        const arrStr = JSON.stringify(Array.from(builder.solids));
+        out += `    .addCustomLogic((() => {\n`;
+        out += `        // High-performance closure for grid lookups\n`;
+        out += `        const solids = new Set(${arrStr});\n`;
+        out += `        return (x, y, z) => solids.has(x + ',' + y + ',' + z);\n`;
+        out += `    })()).build();`;
+
+        return out;
+    }
+
     function getLevelParams(lvl) {
         // Load a saved custom level
         if (typeof lvl === 'string' && lvl.startsWith('CUSTOM_')) {
@@ -3408,97 +3479,10 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             return builder.build();
         }
 
-        // --- FIX: LOADING ACTIVE SCRATCHPAD FROM EDITOR ---
+        // --- LOADING ACTIVE SCRATCHPAD FROM EDITOR ---
+        // Single source of truth: same builder used for quick-test, full-test, and export.
         if (lvl === 'CUSTOM') {
-            const builder = new LevelBuilder(999, "CUSTOM LEVEL")
-                .setBounds(15, 20, 15)
-                .setSpawn(customSpawn.x, customSpawn.y, customSpawn.z)
-                .setExit(customExit.x, customExit.y, customExit.z)
-                .setCutscene(null);
-
-            if (customWaterY !== undefined) builder.setWater(customWaterY);
-
-            builder.addCustomLogic((x, y, z) => customSolidBlocks.has(`${x},${y},${z}`));
-
-            customEntities.forEach(ent => {
-                if (PHYSICAL_BLOCK_TYPES.has(ent.type)) {
-                    const opts = ent.type === 'red' ? { startScale: ent.startScale } : {};
-                    builder.addEntity(ent.type, ent.x, ent.y, ent.z, opts);
-                }
-            });
-
-            customDestruction.forEach(bomb => builder.addDestructionZone(bomb.cx, bomb.cy, bomb.cz, 4, 7));
-            customLights.forEach(l => builder.addLight(l.x, l.y, l.z, l.color, l.intensity, l.radius));
-            customPlates.forEach(p => builder.addPlate(p.x, p.y, p.z, p.channel));
-            customDoors.forEach(d => builder.addDoor(d.x, d.y, d.z, d));
-
-            // Map Fields for Editor Playtest
-            customFields.forEach(f => {
-                if (f.type === 'aero') builder.addAeroFilter(f.x, f.y, f.z, f.channel, f.w, f.h, f.normal);
-                if (f.type === 'oneway') builder.addOneWayField(f.x, f.y, f.z, f.channel, f.inverted, f.w, f.h, f.normal);
-            });
-
-            // Map Logic Gate Object to builder Array
-            for (let ch in logicNodes.configs) {
-                const l = logicNodes.configs[ch];
-                builder.addLogicGate(parseInt(ch), l.type, l.operands || l.sources);
-            }
-
-            return builder.build();
-        }
-
-        if (lvl === 'CUSTOM') {
-            const builder = new LevelBuilder(999, "CUSTOM LEVEL")
-                .setBounds(15, 20, 15)
-                .setSpawn(customSpawn.x, customSpawn.y, customSpawn.z)
-                .setExit(customExit.x, customExit.y, customExit.z)
-                .addDestructionZone(0, 0, 0, 0, 0) // No hole - fully enclosed chamber
-                .setCutscene(null);
-
-            if (customWaterY !== undefined) builder.setWater(customWaterY);
-
-            // Add all custom solid blocks
-            builder.addCustomLogic((x, y, z) => {
-                return customSolidBlocks.has(`${x},${y},${z}`);
-            });
-
-            // --- ADD THIS LOOP HERE ---
-            for (let ch in logicNodes.configs) {
-                const l = logicNodes.configs[ch];
-                builder.addLogicGate(parseInt(ch), l.type, l.operands || l.sources);
-            }
-
-            // Add all custom entities
-            customEntities.forEach(ent => {
-                // ONLY add to addEntity if it's a physical block type (red, blue, etc)
-                // Wall, Spawn, and Exit are handled separately by evaluateSolid or markers
-                if (PHYSICAL_BLOCK_TYPES.has(ent.type)) {
-                    const opts = {};
-                    if (ent.type === 'red' && ent.startScale !== undefined) opts.startScale = ent.startScale;
-                    builder.addEntity(ent.type, ent.x, ent.y, ent.z, opts);
-                }
-            });
-
-            // Add all custom destruction zones
-            customDestruction.forEach(bomb => {
-                builder.addDestructionZone(bomb.cx, bomb.cy, bomb.cz, 4, 7);
-            });
-
-            // Add all custom lights
-            customLights.forEach(light => {
-                builder.addLight(light.x, light.y, light.z, light.color, light.intensity, light.radius);
-            });
-
-            customPlates.forEach(p => builder.addPlate(p.x, p.y, p.z, p.channel));
-            customDoors.forEach(d => builder.addDoor(d.x, d.y, d.z, d));
-
-            // ADD THIS:
-            customFields.forEach(f => {
-                if (f.type === 'aero') builder.addAeroFilter(f.x, f.y, f.z, f.channel, f.w, f.h, f.normal);
-                if (f.type === 'oneway') builder.addOneWayField(f.x, f.y, f.z, f.channel, f.inverted, f.w, f.h, f.normal);
-            });
-
-            return builder.build();
+            return buildEditorLevelBuilder("CUSTOM PLAYTEST").build();
         }
         switch (activeChapter) {
             case 1:  return getLevelParamsV2(lvl);
@@ -3516,15 +3500,16 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
         switch (lvl) {
             case 0: // THE ATRIUM
-                return builder.setBounds(10, 12, 20).setSpawn(0, 2, -16).setExit(0, 6, 15).setCutscene('wakeup')
-                    .addHologram("AWAKEN\n[ WASD ] Move  •  [ SPACE ] Jump", 0, 3, -13)
-                    .addCustomLogic((x, y, z) => { 
-                        if (roomBox(x, y, z, 8, 10, 18)) return true; 
-                        if (z >= -18 && z <= -13 && Math.abs(x) <= 3 && y <= 1) return true; // Start
-                        if (z >= -9 && z <= -2 && Math.abs(x) <= 3 && y <= 3) return true;   // Mid
-                        if (z >= 2 && z <= 18 && Math.abs(x) <= 3 && y <= 5) return true;    // Goal
-                        return false; 
-                    }).build();
+                return builder.setBounds(8, 14, 18)
+                    .setSpawn(0, 2, -12)
+                    .setExit(0, 5, 12)
+                    .addDestructionZone(0, 8, -9, 4, 7)
+                    .addLight(0, 3, 0, 0xffeedd, 9, 8)
+                    .addCustomLogic((() => {
+                        // High-performance closure for grid lookups
+                        const solids = new Set(["-7,0,-17","-7,0,-16","-7,0,-15","-7,0,-14","-7,0,-13","-7,0,-12","-7,0,-11","-7,0,-10","-7,0,-9","-7,0,-8","-7,0,-7","-7,0,-6","-7,0,-5","-7,0,-4","-7,0,-3","-7,0,-2","-7,0,-1","-7,0,0","-7,0,1","-7,0,2","-7,0,3","-7,0,4","-7,0,5","-7,0,6","-7,0,7","-7,0,8","-7,0,9","-7,0,10","-7,0,11","-7,0,12","-7,0,13","-7,0,14","-7,0,15","-7,0,16","-7,0,17","-6,0,-17","-6,0,-16","-6,0,-15","-6,0,-14","-6,0,-13","-6,0,-12","-6,0,-11","-6,0,-10","-6,0,-9","-6,0,-8","-6,0,-7","-6,0,-6","-6,0,-5","-6,0,-4","-6,0,-3","-6,0,-2","-6,0,-1","-6,0,0","-6,0,1","-6,0,2","-6,0,3","-6,0,4","-6,0,5","-6,0,6","-6,0,7","-6,0,8","-6,0,9","-6,0,10","-6,0,11","-6,0,12","-6,0,13","-6,0,14","-6,0,15","-6,0,16","-6,0,17","-5,0,-17","-5,0,-16","-5,0,-15","-5,0,-14","-5,0,-13","-5,0,-12","-5,0,-11","-5,0,-10","-5,0,-9","-5,0,-8","-5,0,-7","-5,0,-6","-5,0,-5","-5,0,-4","-5,0,-3","-5,0,-2","-5,0,-1","-5,0,0","-5,0,1","-5,0,2","-5,0,3","-5,0,4","-5,0,5","-5,0,6","-5,0,7","-5,0,8","-5,0,9","-5,0,10","-5,0,11","-5,0,12","-5,0,13","-5,0,14","-5,0,15","-5,0,16","-5,0,17","-5,1,-15","-5,1,-14","-5,1,-13","-5,1,-12","-5,1,-11","-5,1,-10","-5,1,-9","-5,1,-8","-5,1,-7","-5,1,-6","-5,1,-5","-5,1,-4","-5,1,-3","-5,1,-2","-5,1,-1","-5,1,0","-5,1,1","-5,1,2","-5,1,3","-5,1,4","-5,1,5","-5,1,6","-5,1,7","-5,1,8","-5,1,9","-5,1,10","-5,1,11","-5,1,12","-5,1,13","-5,1,14","-5,1,15","-5,2,-15","-5,2,-14","-5,2,-13","-5,2,-12","-5,2,-11","-5,2,-10","-5,2,-9","-5,2,-8","-5,2,-7","-5,2,-6","-5,2,-5","-5,2,-4","-5,2,-3","-5,2,-2","-5,2,-1","-5,2,0","-5,2,1","-5,2,2","-5,2,3","-5,2,4","-5,2,5","-5,2,6","-5,2,7","-5,2,8","-5,2,9","-5,2,10","-5,2,11","-5,2,12","-5,2,13","-5,2,14","-5,2,15","-5,3,-15","-5,3,-14","-5,3,-13","-5,3,-12","-5,3,-11","-5,3,-10","-5,3,-9","-5,3,-8","-5,3,-7","-5,3,-6","-5,3,-5","-5,3,-4","-5,3,-3","-5,3,-2","-5,3,-1","-5,3,0","-5,3,1","-5,3,2","-5,3,3","-5,3,4","-5,3,5","-5,3,6","-5,3,7","-5,3,8","-5,3,9","-5,3,10","-5,3,11","-5,3,12","-5,3,13","-5,3,14","-5,3,15","-5,4,-15","-5,4,-14","-5,4,-13","-5,4,-12","-5,4,-11","-5,4,-10","-5,4,-9","-5,4,-8","-5,4,-7","-5,4,-5","-5,4,-4","-5,4,-3","-5,4,-2","-5,4,-1","-5,4,0","-5,4,1","-5,4,2","-5,4,3","-5,4,4","-5,4,5","-5,4,6","-5,4,7","-5,4,8","-5,4,9","-5,4,10","-5,4,11","-5,4,12","-5,4,13","-5,4,14","-5,4,15","-5,5,-15","-5,5,-14","-5,5,-13","-5,5,-12","-5,5,-11","-5,5,-10","-5,5,-9","-5,5,-8","-5,5,-7","-5,5,-6","-5,5,-5","-5,5,-4","-5,5,-3","-5,5,-2","-5,5,-1","-5,5,0","-5,5,1","-5,5,2","-5,5,3","-5,5,4","-5,5,5","-5,5,6","-5,5,7","-5,5,8","-5,5,9","-5,5,10","-5,5,11","-5,5,12","-5,5,13","-5,5,14","-5,5,15","-5,6,-15","-5,6,-14","-5,6,-13","-5,6,-12","-5,6,-11","-5,6,-10","-5,6,-9","-5,6,-8","-5,6,-7","-5,6,-6","-5,6,-5","-5,6,-4","-5,6,-3","-5,6,-2","-5,6,-1","-5,6,0","-5,6,1","-5,6,2","-5,6,3","-5,6,4","-5,6,5","-5,6,6","-5,6,7","-5,6,8","-5,6,9","-5,6,10","-5,6,11","-5,6,12","-5,6,13","-5,6,14","-5,6,15","-5,7,-15","-5,7,-14","-5,7,-13","-5,7,-12","-5,7,-11","-5,7,-10","-5,7,-9","-5,7,-8","-5,7,-7","-5,7,-6","-5,7,-5","-5,7,-4","-5,7,-3","-5,7,-2","-5,7,-1","-5,7,0","-5,7,1","-5,7,2","-5,7,3","-5,7,4","-5,7,5","-5,7,6","-5,7,7","-5,7,8","-5,7,9","-5,7,10","-5,7,11","-5,7,12","-5,7,13","-5,7,14","-5,7,15","-5,8,-15","-5,8,-14","-5,8,-13","-5,8,-12","-5,8,-11","-5,8,-10","-5,8,-9","-5,8,-8","-5,8,-7","-5,8,-6","-5,8,-5","-5,8,-4","-5,8,-3","-5,8,-2","-5,8,-1","-5,8,0","-5,8,1","-5,8,2","-5,8,3","-5,8,4","-5,8,5","-5,8,6","-5,8,7","-5,8,8","-5,8,9","-5,8,10","-5,8,11","-5,8,12","-5,8,13","-5,8,14","-5,8,15","-5,9,-15","-5,9,-14","-5,9,-13","-5,9,-12","-5,9,-11","-5,9,-10","-5,9,-9","-5,9,-8","-5,9,-7","-5,9,-6","-5,9,-5","-5,9,-4","-5,9,-3","-5,9,-2","-5,9,-1","-5,9,0","-5,9,1","-5,9,2","-5,9,3","-5,9,4","-5,9,5","-5,9,6","-5,9,7","-5,9,8","-5,9,9","-5,9,10","-5,9,11","-5,9,12","-5,9,13","-5,9,14","-5,9,15","-5,10,-15","-5,10,-14","-5,10,-13","-5,10,-12","-5,10,-11","-5,10,-10","-5,10,-9","-5,10,-8","-5,10,-7","-5,10,-6","-5,10,-5","-5,10,-4","-5,10,-3","-5,10,-2","-5,10,-1","-5,10,0","-5,10,1","-5,10,2","-5,10,3","-5,10,4","-5,10,5","-5,10,6","-5,10,7","-5,10,8","-5,10,9","-5,10,10","-5,10,11","-5,10,12","-5,10,13","-5,10,14","-5,10,15","-5,11,-15","-5,11,-14","-5,11,-13","-5,11,-12","-5,11,-11","-5,11,-10","-5,11,-9","-5,11,-8","-5,11,-7","-5,11,-6","-5,11,-5","-5,11,-4","-5,11,-3","-5,11,-2","-5,11,-1","-5,11,0","-5,11,1","-5,11,2","-5,11,3","-5,11,4","-5,11,5","-5,11,6","-5,11,7","-5,11,8","-5,11,9","-5,11,10","-5,11,11","-5,11,12","-5,11,13","-5,11,14","-5,11,15","-5,12,-15","-5,12,-14","-5,12,-13","-5,12,-12","-5,12,-11","-5,12,-10","-5,12,-9","-5,12,-8","-5,12,-7","-5,12,-6","-5,12,-5","-5,12,-4","-5,12,-3","-5,12,-2","-5,12,-1","-5,12,0","-5,12,1","-5,12,2","-5,12,3","-5,12,4","-5,12,5","-5,12,6","-5,12,7","-5,12,8","-5,12,9","-5,12,10","-5,12,11","-5,12,12","-5,12,13","-5,12,14","-5,12,15","-4,0,-17","-4,0,-16","-4,0,-15","-4,0,-14","-4,0,-13","-4,0,-12","-4,0,-11","-4,0,-10","-4,0,-9","-4,0,-8","-4,0,-7","-4,0,-6","-4,0,-5","-4,0,-4","-4,0,-3","-4,0,-2","-4,0,-1","-4,0,0","-4,0,1","-4,0,2","-4,0,3","-4,0,4","-4,0,5","-4,0,6","-4,0,7","-4,0,8","-4,0,9","-4,0,10","-4,0,11","-4,0,12","-4,0,13","-4,0,14","-4,0,15","-4,0,16","-4,0,17","-4,1,-15","-4,1,-14","-4,1,-13","-4,1,-12","-4,1,-11","-4,1,-10","-4,1,-9","-4,1,-8","-4,1,-7","-4,1,-6","-4,1,-5","-4,1,-4","-4,1,-1","-4,1,0","-4,1,1","-4,1,4","-4,1,5","-4,1,6","-4,1,7","-4,1,8","-4,1,9","-4,1,10","-4,1,11","-4,1,12","-4,1,13","-4,1,14","-4,1,15","-4,2,-15","-4,2,-14","-4,2,-13","-4,2,-12","-4,2,-11","-4,2,-10","-4,2,-9","-4,2,-8","-4,2,-7","-4,2,-6","-4,2,-5","-4,2,-4","-4,2,-1","-4,2,0","-4,2,1","-4,2,4","-4,2,5","-4,2,6","-4,2,7","-4,2,8","-4,2,9","-4,2,10","-4,2,11","-4,2,12","-4,2,13","-4,2,14","-4,2,15","-4,3,-15","-4,3,-14","-4,3,-13","-4,3,-12","-4,3,-11","-4,3,-10","-4,3,-9","-4,3,-8","-4,3,-7","-4,3,-6","-4,3,-5","-4,3,-4","-4,3,-1","-4,3,0","-4,3,1","-4,3,4","-4,3,5","-4,3,6","-4,3,7","-4,3,8","-4,3,9","-4,3,10","-4,3,11","-4,3,12","-4,3,13","-4,3,14","-4,3,15","-4,4,-15","-4,4,-14","-4,4,-13","-4,4,-12","-4,4,-11","-4,4,-10","-4,4,-9","-4,4,-8","-4,4,-7","-4,4,-6","-4,4,-5","-4,4,-4","-4,4,-1","-4,4,0","-4,4,1","-4,4,4","-4,4,5","-4,4,6","-4,4,7","-4,4,8","-4,4,9","-4,4,10","-4,4,11","-4,4,12","-4,4,13","-4,4,14","-4,4,15","-4,5,-15","-4,5,-14","-4,5,-13","-4,5,-12","-4,5,-11","-4,5,-10","-4,5,-9","-4,5,-8","-4,5,-7","-4,5,-6","-4,5,-5","-4,5,-4","-4,5,-1","-4,5,0","-4,5,1","-4,5,4","-4,5,5","-4,5,6","-4,5,7","-4,5,8","-4,5,9","-4,5,10","-4,5,11","-4,5,12","-4,5,13","-4,5,14","-4,5,15","-4,6,-15","-4,6,-14","-4,6,-13","-4,6,-12","-4,6,-11","-4,6,-10","-4,6,-9","-4,6,-8","-4,6,-7","-4,6,-6","-4,6,-5","-4,6,-4","-4,6,-1","-4,6,0","-4,6,1","-4,6,4","-4,6,5","-4,6,6","-4,6,7","-4,6,8","-4,6,9","-4,6,10","-4,6,11","-4,6,12","-4,6,13","-4,6,14","-4,6,15","-4,7,-15","-4,7,-14","-4,7,-13","-4,7,-12","-4,7,-11","-4,7,-10","-4,7,-9","-4,7,-8","-4,7,-7","-4,7,-6","-4,7,-5","-4,7,-4","-4,7,-3","-4,7,-2","-4,7,-1","-4,7,0","-4,7,1","-4,7,2","-4,7,3","-4,7,4","-4,7,5","-4,7,6","-4,7,7","-4,7,8","-4,7,9","-4,7,10","-4,7,11","-4,7,12","-4,7,13","-4,7,14","-4,7,15","-4,8,-15","-4,8,-14","-4,8,-13","-4,8,-12","-4,8,-11","-4,8,-10","-4,8,-9","-4,8,-8","-4,8,-7","-4,8,-6","-4,8,-5","-4,8,-4","-4,8,-3","-4,8,-2","-4,8,-1","-4,8,0","-4,8,1","-4,8,2","-4,8,3","-4,8,4","-4,8,5","-4,8,6","-4,8,7","-4,8,8","-4,8,9","-4,8,10","-4,8,11","-4,8,12","-4,8,13","-4,8,14","-4,8,15","-4,9,-15","-4,9,-14","-4,9,-13","-4,9,-12","-4,9,-11","-4,9,-10","-4,9,-9","-4,9,-8","-4,9,-7","-4,9,-6","-4,9,-5","-4,9,-4","-4,9,-3","-4,9,-2","-4,9,-1","-4,9,0","-4,9,1","-4,9,2","-4,9,3","-4,9,4","-4,9,5","-4,9,6","-4,9,7","-4,9,8","-4,9,9","-4,9,10","-4,9,11","-4,9,12","-4,9,13","-4,9,14","-4,9,15","-4,10,-15","-4,10,-14","-4,10,-13","-4,10,-12","-4,10,-11","-4,10,-10","-4,10,-9","-4,10,-8","-4,10,-7","-4,10,-6","-4,10,-5","-4,10,-4","-4,10,-3","-4,10,-2","-4,10,-1","-4,10,0","-4,10,1","-4,10,2","-4,10,3","-4,10,4","-4,10,5","-4,10,6","-4,10,7","-4,10,8","-4,10,9","-4,10,10","-4,10,11","-4,10,12","-4,10,13","-4,10,14","-4,10,15","-4,11,-15","-4,11,-14","-4,11,-13","-4,11,-12","-4,11,-11","-4,11,-10","-4,11,-9","-4,11,-8","-4,11,-7","-4,11,-6","-4,11,-5","-4,11,-4","-4,11,-3","-4,11,-2","-4,11,-1","-4,11,0","-4,11,1","-4,11,2","-4,11,3","-4,11,4","-4,11,5","-4,11,6","-4,11,7","-4,11,8","-4,11,9","-4,11,10","-4,11,11","-4,11,12","-4,11,13","-4,11,14","-4,11,15","-4,12,-15","-4,12,-14","-4,12,-13","-4,12,-12","-4,12,-11","-4,12,-10","-4,12,-9","-4,12,-8","-4,12,-7","-4,12,-6","-4,12,-5","-4,12,-4","-4,12,-3","-4,12,-2","-4,12,-1","-4,12,0","-4,12,1","-4,12,2","-4,12,3","-4,12,4","-4,12,5","-4,12,6","-4,12,7","-4,12,8","-4,12,9","-4,12,10","-4,12,11","-4,12,12","-4,12,13","-4,12,14","-4,12,15","-3,0,-17","-3,0,-16","-3,0,-15","-3,0,-14","-3,0,-13","-3,0,-12","-3,0,-11","-3,0,-10","-3,0,-9","-3,0,-8","-3,0,-7","-3,0,-6","-3,0,-5","-3,0,-4","-3,0,-3","-3,0,-2","-3,0,-1","-3,0,0","-3,0,1","-3,0,2","-3,0,3","-3,0,4","-3,0,5","-3,0,6","-3,0,7","-3,0,8","-3,0,9","-3,0,10","-3,0,11","-3,0,12","-3,0,13","-3,0,14","-3,0,15","-3,0,16","-3,0,17","-3,1,-15","-3,1,-14","-3,1,-13","-3,1,-12","-3,1,-11","-3,1,-10","-3,1,-9","-3,1,-8","-3,1,-7","-3,1,-6","-3,1,-5","-3,1,-4","-3,1,4","-3,1,5","-3,1,6","-3,1,7","-3,1,8","-3,1,9","-3,1,10","-3,1,11","-3,1,12","-3,1,13","-3,1,14","-3,1,15","-3,2,-15","-3,2,-14","-3,2,9","-3,2,10","-3,2,11","-3,2,12","-3,2,13","-3,2,14","-3,2,15","-3,3,-15","-3,3,-14","-3,3,9","-3,3,10","-3,3,11","-3,3,12","-3,3,13","-3,3,14","-3,3,15","-3,4,-15","-3,4,-14","-3,4,9","-3,4,10","-3,4,11","-3,4,12","-3,4,13","-3,4,14","-3,4,15","-3,5,-15","-3,5,-14","-3,5,9","-3,5,13","-3,5,14","-3,5,15","-3,6,-15","-3,6,-14","-3,6,9","-3,6,13","-3,6,14","-3,6,15","-3,7,-15","-3,7,-14","-3,7,9","-3,7,13","-3,7,14","-3,7,15","-3,8,-15","-3,8,-14","-3,8,9","-3,8,13","-3,8,14","-3,8,15","-3,9,-15","-3,9,-14","-3,9,-13","-3,9,-12","-3,9,-11","-3,9,-10","-3,9,-9","-3,9,-8","-3,9,-7","-3,9,-6","-3,9,-5","-3,9,-4","-3,9,-3","-3,9,-2","-3,9,-1","-3,9,0","-3,9,1","-3,9,2","-3,9,3","-3,9,4","-3,9,5","-3,9,6","-3,9,7","-3,9,8","-3,9,9","-3,9,10","-3,9,11","-3,9,12","-3,9,13","-3,9,14","-3,9,15","-3,10,-15","-3,10,-14","-3,10,-13","-3,10,-12","-3,10,-11","-3,10,-10","-3,10,-9","-3,10,-8","-3,10,-7","-3,10,-6","-3,10,-5","-3,10,-4","-3,10,-3","-3,10,-2","-3,10,-1","-3,10,0","-3,10,1","-3,10,2","-3,10,3","-3,10,4","-3,10,5","-3,10,6","-3,10,7","-3,10,8","-3,10,9","-3,10,10","-3,10,11","-3,10,12","-3,10,13","-3,10,14","-3,10,15","-3,11,-15","-3,11,-14","-3,11,-13","-3,11,-12","-3,11,-11","-3,11,-10","-3,11,-9","-3,11,-8","-3,11,-7","-3,11,-6","-3,11,-5","-3,11,-4","-3,11,-3","-3,11,-2","-3,11,-1","-3,11,0","-3,11,1","-3,11,2","-3,11,3","-3,11,4","-3,11,5","-3,11,6","-3,11,7","-3,11,8","-3,11,9","-3,11,10","-3,11,11","-3,11,12","-3,11,13","-3,11,14","-3,11,15","-3,12,-15","-3,12,-14","-3,12,-13","-3,12,-12","-3,12,-11","-3,12,-10","-3,12,-9","-3,12,-8","-3,12,-7","-3,12,-6","-3,12,-5","-3,12,-4","-3,12,-3","-3,12,-2","-3,12,-1","-3,12,0","-3,12,1","-3,12,2","-3,12,3","-3,12,4","-3,12,5","-3,12,6","-3,12,7","-3,12,8","-3,12,9","-3,12,10","-3,12,11","-3,12,12","-3,12,13","-3,12,14","-3,12,15","-2,0,-17","-2,0,-16","-2,0,-15","-2,0,-14","-2,0,-13","-2,0,-12","-2,0,-11","-2,0,-10","-2,0,-9","-2,0,-8","-2,0,-7","-2,0,-6","-2,0,-5","-2,0,-4","-2,0,-3","-2,0,-2","-2,0,-1","-2,0,0","-2,0,1","-2,0,2","-2,0,3","-2,0,4","-2,0,5","-2,0,6","-2,0,7","-2,0,8","-2,0,9","-2,0,10","-2,0,11","-2,0,12","-2,0,13","-2,0,14","-2,0,15","-2,0,16","-2,0,17","-2,1,-15","-2,1,-14","-2,1,-13","-2,1,-12","-2,1,-11","-2,1,-10","-2,1,-9","-2,1,-8","-2,1,-7","-2,1,-6","-2,1,-5","-2,1,-4","-2,1,-3","-2,1,3","-2,1,4","-2,1,5","-2,1,7","-2,1,8","-2,1,9","-2,1,10","-2,1,11","-2,1,12","-2,1,13","-2,1,14","-2,1,15","-2,2,-15","-2,2,-14","-2,2,9","-2,2,10","-2,2,11","-2,2,12","-2,2,13","-2,2,14","-2,2,15","-2,3,-15","-2,3,-14","-2,3,9","-2,3,10","-2,3,11","-2,3,12","-2,3,13","-2,3,14","-2,3,15","-2,4,-15","-2,4,-14","-2,4,9","-2,4,10","-2,4,11","-2,4,12","-2,4,13","-2,4,14","-2,4,15","-2,5,-15","-2,5,-14","-2,5,14","-2,5,15","-2,6,-15","-2,6,-14","-2,6,14","-2,6,15","-2,7,-15","-2,7,-14","-2,7,14","-2,7,15","-2,8,-15","-2,8,-14","-2,8,14","-2,8,15","-2,9,-15","-2,9,-14","-2,9,-13","-2,9,-12","-2,9,-11","-2,9,-10","-2,9,-9","-2,9,-8","-2,9,-7","-2,9,-6","-2,9,-5","-2,9,-4","-2,9,-3","-2,9,-2","-2,9,-1","-2,9,0","-2,9,1","-2,9,2","-2,9,3","-2,9,4","-2,9,5","-2,9,6","-2,9,7","-2,9,8","-2,9,9","-2,9,10","-2,9,11","-2,9,12","-2,9,13","-2,9,14","-2,9,15","-2,10,-15","-2,10,-14","-2,10,-13","-2,10,-12","-2,10,-11","-2,10,-10","-2,10,-9","-2,10,-8","-2,10,-7","-2,10,-6","-2,10,-5","-2,10,-4","-2,10,-3","-2,10,-2","-2,10,-1","-2,10,0","-2,10,1","-2,10,2","-2,10,3","-2,10,4","-2,10,5","-2,10,6","-2,10,7","-2,10,8","-2,10,9","-2,10,10","-2,10,11","-2,10,12","-2,10,13","-2,10,14","-2,10,15","-2,11,-15","-2,11,-14","-2,11,-13","-2,11,-12","-2,11,-11","-2,11,-10","-2,11,-9","-2,11,-8","-2,11,-7","-2,11,-6","-2,11,-5","-2,11,-4","-2,11,-3","-2,11,-2","-2,11,-1","-2,11,0","-2,11,1","-2,11,2","-2,11,3","-2,11,4","-2,11,5","-2,11,6","-2,11,7","-2,11,8","-2,11,9","-2,11,10","-2,11,11","-2,11,12","-2,11,13","-2,11,14","-2,11,15","-2,12,-15","-2,12,-14","-2,12,-13","-2,12,-12","-2,12,-11","-2,12,-10","-2,12,-9","-2,12,-8","-2,12,-7","-2,12,-6","-2,12,-5","-2,12,-4","-2,12,-3","-2,12,-2","-2,12,-1","-2,12,0","-2,12,1","-2,12,2","-2,12,3","-2,12,4","-2,12,5","-2,12,6","-2,12,7","-2,12,8","-2,12,9","-2,12,10","-2,12,11","-2,12,12","-2,12,13","-2,12,14","-2,12,15","-1,0,-17","-1,0,-16","-1,0,-15","-1,0,-14","-1,0,-13","-1,0,-12","-1,0,-11","-1,0,-10","-1,0,-9","-1,0,-8","-1,0,-7","-1,0,-6","-1,0,-5","-1,0,-4","-1,0,-3","-1,0,-2","-1,0,-1","-1,0,0","-1,0,1","-1,0,2","-1,0,3","-1,0,4","-1,0,5","-1,0,6","-1,0,7","-1,0,8","-1,0,9","-1,0,10","-1,0,11","-1,0,12","-1,0,13","-1,0,14","-1,0,15","-1,0,16","-1,0,17","-1,1,-15","-1,1,-14","-1,1,-13","-1,1,-12","-1,1,-11","-1,1,-10","-1,1,-9","-1,1,-8","-1,1,-7","-1,1,-6","-1,1,-5","-1,1,-4","-1,1,-3","-1,1,-2","-1,1,-1","-1,1,0","-1,1,1","-1,1,2","-1,1,3","-1,1,4","-1,1,5","-1,1,6","-1,1,7","-1,1,8","-1,1,9","-1,1,10","-1,1,11","-1,1,12","-1,1,13","-1,1,14","-1,1,15","-1,2,-15","-1,2,-14","-1,2,9","-1,2,10","-1,2,11","-1,2,12","-1,2,13","-1,2,14","-1,2,15","-1,3,-15","-1,3,-14","-1,3,9","-1,3,10","-1,3,11","-1,3,12","-1,3,13","-1,3,14","-1,3,15","-1,4,-15","-1,4,-14","-1,4,9","-1,4,10","-1,4,11","-1,4,12","-1,4,13","-1,4,14","-1,4,15","-1,5,-15","-1,5,-14","-1,5,14","-1,5,15","-1,6,-15","-1,6,-14","-1,6,14","-1,6,15","-1,7,-15","-1,7,-14","-1,7,14","-1,7,15","-1,8,-15","-1,8,-14","-1,8,14","-1,8,15","-1,9,-15","-1,9,-14","-1,9,-13","-1,9,-12","-1,9,-11","-1,9,-10","-1,9,-9","-1,9,-8","-1,9,-7","-1,9,-6","-1,9,-5","-1,9,-4","-1,9,-3","-1,9,-2","-1,9,-1","-1,9,0","-1,9,1","-1,9,2","-1,9,3","-1,9,4","-1,9,5","-1,9,6","-1,9,7","-1,9,8","-1,9,9","-1,9,10","-1,9,11","-1,9,12","-1,9,13","-1,9,14","-1,9,15","-1,10,-15","-1,10,-14","-1,10,-13","-1,10,-12","-1,10,-11","-1,10,-10","-1,10,-9","-1,10,-8","-1,10,-7","-1,10,-6","-1,10,-5","-1,10,-4","-1,10,-3","-1,10,-2","-1,10,-1","-1,10,0","-1,10,1","-1,10,2","-1,10,3","-1,10,4","-1,10,5","-1,10,6","-1,10,7","-1,10,8","-1,10,9","-1,10,10","-1,10,11","-1,10,12","-1,10,13","-1,10,14","-1,10,15","-1,11,-15","-1,11,-14","-1,11,-13","-1,11,-12","-1,11,-11","-1,11,-10","-1,11,-9","-1,11,-8","-1,11,-7","-1,11,-6","-1,11,-5","-1,11,-4","-1,11,-3","-1,11,-2","-1,11,-1","-1,11,0","-1,11,1","-1,11,2","-1,11,3","-1,11,4","-1,11,5","-1,11,6","-1,11,7","-1,11,8","-1,11,9","-1,11,10","-1,11,11","-1,11,12","-1,11,13","-1,11,14","-1,11,15","-1,12,-15","-1,12,-14","-1,12,-13","-1,12,-12","-1,12,-11","-1,12,-10","-1,12,-9","-1,12,-8","-1,12,-7","-1,12,-6","-1,12,-5","-1,12,-4","-1,12,-3","-1,12,-2","-1,12,-1","-1,12,0","-1,12,1","-1,12,2","-1,12,3","-1,12,4","-1,12,5","-1,12,6","-1,12,7","-1,12,8","-1,12,9","-1,12,10","-1,12,11","-1,12,12","-1,12,13","-1,12,14","-1,12,15","0,0,-17","0,0,-16","0,0,-15","0,0,-14","0,0,-13","0,0,-12","0,0,-11","0,0,-10","0,0,-9","0,0,-8","0,0,-7","0,0,-6","0,0,-5","0,0,-4","0,0,-3","0,0,-2","0,0,-1","0,0,0","0,0,1","0,0,2","0,0,3","0,0,4","0,0,5","0,0,6","0,0,7","0,0,8","0,0,9","0,0,10","0,0,11","0,0,12","0,0,13","0,0,14","0,0,15","0,0,16","0,0,17","0,1,-15","0,1,-14","0,1,-13","0,1,-12","0,1,-11","0,1,-10","0,1,-9","0,1,-8","0,1,-7","0,1,-6","0,1,-5","0,1,-4","0,1,-3","0,1,-2","0,1,-1","0,1,0","0,1,1","0,1,2","0,1,3","0,1,4","0,1,6","0,1,8","0,1,9","0,1,10","0,1,11","0,1,12","0,1,13","0,1,14","0,1,15","0,2,-15","0,2,-14","0,2,9","0,2,10","0,2,11","0,2,12","0,2,13","0,2,14","0,2,15","0,3,-15","0,3,-14","0,3,9","0,3,10","0,3,11","0,3,12","0,3,13","0,3,14","0,3,15","0,4,-15","0,4,-14","0,4,9","0,4,10","0,4,11","0,4,12","0,4,13","0,4,14","0,4,15","0,5,-15","0,5,-14","0,5,14","0,5,15","0,6,-15","0,6,-14","0,6,14","0,6,15","0,7,-15","0,7,-14","0,7,14","0,7,15","0,8,-15","0,8,-14","0,8,14","0,8,15","0,9,-15","0,9,-14","0,9,-13","0,9,-12","0,9,-11","0,9,-10","0,9,-9","0,9,-8","0,9,-7","0,9,-6","0,9,-5","0,9,-4","0,9,-3","0,9,-2","0,9,-1","0,9,0","0,9,1","0,9,2","0,9,3","0,9,5","0,9,6","0,9,7","0,9,8","0,9,9","0,9,10","0,9,11","0,9,12","0,9,13","0,9,14","0,9,15","0,10,-15","0,10,-14","0,10,-13","0,10,-12","0,10,-11","0,10,-10","0,10,-9","0,10,-8","0,10,-7","0,10,-6","0,10,-5","0,10,-4","0,10,-3","0,10,-2","0,10,-1","0,10,0","0,10,1","0,10,2","0,10,3","0,10,4","0,10,5","0,10,6","0,10,7","0,10,8","0,10,9","0,10,10","0,10,11","0,10,12","0,10,13","0,10,14","0,10,15","0,11,-15","0,11,-14","0,11,-13","0,11,-12","0,11,-11","0,11,-10","0,11,-9","0,11,-8","0,11,-7","0,11,-6","0,11,-5","0,11,-4","0,11,-3","0,11,-2","0,11,-1","0,11,0","0,11,1","0,11,2","0,11,3","0,11,4","0,11,5","0,11,6","0,11,7","0,11,8","0,11,9","0,11,10","0,11,11","0,11,12","0,11,13","0,11,14","0,11,15","0,12,-15","0,12,-14","0,12,-13","0,12,-12","0,12,-11","0,12,-10","0,12,-9","0,12,-8","0,12,-7","0,12,-6","0,12,-5","0,12,-4","0,12,-3","0,12,-2","0,12,-1","0,12,0","0,12,1","0,12,2","0,12,3","0,12,4","0,12,5","0,12,6","0,12,7","0,12,8","0,12,9","0,12,10","0,12,11","0,12,12","0,12,13","0,12,14","0,12,15","1,0,-17","1,0,-16","1,0,-15","1,0,-14","1,0,-13","1,0,-12","1,0,-11","1,0,-10","1,0,-9","1,0,-8","1,0,-7","1,0,-6","1,0,-5","1,0,-4","1,0,-3","1,0,-2","1,0,-1","1,0,0","1,0,1","1,0,2","1,0,3","1,0,4","1,0,5","1,0,6","1,0,7","1,0,8","1,0,9","1,0,10","1,0,11","1,0,12","1,0,13","1,0,14","1,0,15","1,0,16","1,0,17","1,1,-15","1,1,-14","1,1,-13","1,1,-12","1,1,-11","1,1,-10","1,1,-9","1,1,-8","1,1,-7","1,1,-6","1,1,-5","1,1,-4","1,1,-3","1,1,-2","1,1,0","1,1,1","1,1,2","1,1,3","1,1,4","1,1,5","1,1,7","1,1,8","1,1,9","1,1,10","1,1,11","1,1,12","1,1,13","1,1,14","1,1,15","1,2,-15","1,2,-14","1,2,10","1,2,11","1,2,12","1,2,13","1,2,14","1,2,15","1,3,-15","1,3,-14","1,3,10","1,3,11","1,3,12","1,3,13","1,3,14","1,3,15","1,4,-15","1,4,-14","1,4,9","1,4,10","1,4,11","1,4,12","1,4,13","1,4,14","1,4,15","1,5,-15","1,5,-14","1,5,14","1,5,15","1,6,-15","1,6,-14","1,6,15","1,7,-15","1,7,-14","1,7,14","1,7,15","1,8,-15","1,8,-14","1,8,14","1,8,15","1,9,-15","1,9,-14","1,9,-13","1,9,-12","1,9,-11","1,9,-10","1,9,-9","1,9,-8","1,9,-7","1,9,-6","1,9,-5","1,9,-4","1,9,-3","1,9,-2","1,9,-1","1,9,0","1,9,1","1,9,2","1,9,3","1,9,4","1,9,5","1,9,6","1,9,7","1,9,8","1,9,9","1,9,10","1,9,11","1,9,13","1,9,14","1,9,15","1,10,-15","1,10,-14","1,10,-13","1,10,-12","1,10,-11","1,10,-10","1,10,-9","1,10,-8","1,10,-7","1,10,-6","1,10,-5","1,10,-4","1,10,-3","1,10,-2","1,10,-1","1,10,0","1,10,1","1,10,2","1,10,3","1,10,4","1,10,5","1,10,6","1,10,7","1,10,8","1,10,9","1,10,10","1,10,11","1,10,12","1,10,13","1,10,14","1,10,15","1,11,-15","1,11,-14","1,11,-13","1,11,-12","1,11,-11","1,11,-10","1,11,-9","1,11,-8","1,11,-7","1,11,-6","1,11,-5","1,11,-4","1,11,-3","1,11,-2","1,11,-1","1,11,0","1,11,1","1,11,2","1,11,3","1,11,4","1,11,5","1,11,6","1,11,7","1,11,8","1,11,9","1,11,10","1,11,11","1,11,12","1,11,13","1,11,14","1,11,15","1,12,-15","1,12,-14","1,12,-13","1,12,-12","1,12,-11","1,12,-10","1,12,-9","1,12,-8","1,12,-7","1,12,-6","1,12,-5","1,12,-4","1,12,-3","1,12,-2","1,12,-1","1,12,0","1,12,1","1,12,2","1,12,3","1,12,4","1,12,5","1,12,6","1,12,7","1,12,8","1,12,9","1,12,10","1,12,11","1,12,12","1,12,13","1,12,14","1,12,15","2,0,-17","2,0,-16","2,0,-15","2,0,-14","2,0,-13","2,0,-12","2,0,-11","2,0,-10","2,0,-9","2,0,-8","2,0,-7","2,0,-6","2,0,-5","2,0,-4","2,0,-3","2,0,-2","2,0,-1","2,0,0","2,0,1","2,0,2","2,0,3","2,0,4","2,0,5","2,0,6","2,0,7","2,0,8","2,0,9","2,0,10","2,0,11","2,0,12","2,0,13","2,0,14","2,0,15","2,0,16","2,0,17","2,1,-15","2,1,-14","2,1,-13","2,1,-12","2,1,-11","2,1,-10","2,1,-9","2,1,-8","2,1,-7","2,1,-6","2,1,-5","2,1,-4","2,1,-3","2,1,3","2,1,4","2,1,5","2,1,6","2,1,7","2,1,8","2,1,9","2,1,10","2,1,11","2,1,12","2,1,13","2,1,14","2,1,15","2,2,-15","2,2,-14","2,2,9","2,2,10","2,2,11","2,2,12","2,2,13","2,2,14","2,2,15","2,3,-15","2,3,-14","2,3,9","2,3,10","2,3,11","2,3,12","2,3,13","2,3,14","2,3,15","2,4,-15","2,4,-14","2,4,9","2,4,10","2,4,11","2,4,12","2,4,13","2,4,14","2,4,15","2,5,-15","2,5,-14","2,5,14","2,5,15","2,6,-15","2,6,-14","2,6,14","2,6,15","2,7,-15","2,7,-14","2,7,14","2,7,15","2,8,-15","2,8,-14","2,8,14","2,8,15","2,9,-15","2,9,-14","2,9,-13","2,9,-12","2,9,-11","2,9,-10","2,9,-9","2,9,-8","2,9,-7","2,9,-6","2,9,-5","2,9,-4","2,9,-3","2,9,-2","2,9,-1","2,9,0","2,9,1","2,9,2","2,9,3","2,9,4","2,9,5","2,9,6","2,9,7","2,9,8","2,9,9","2,9,10","2,9,11","2,9,12","2,9,13","2,9,14","2,9,15","2,10,-15","2,10,-14","2,10,-13","2,10,-12","2,10,-11","2,10,-10","2,10,-9","2,10,-8","2,10,-7","2,10,-6","2,10,-5","2,10,-4","2,10,-3","2,10,-2","2,10,-1","2,10,0","2,10,1","2,10,2","2,10,3","2,10,4","2,10,5","2,10,6","2,10,7","2,10,8","2,10,9","2,10,10","2,10,11","2,10,12","2,10,13","2,10,14","2,10,15","2,11,-15","2,11,-14","2,11,-13","2,11,-12","2,11,-11","2,11,-10","2,11,-9","2,11,-8","2,11,-7","2,11,-6","2,11,-5","2,11,-4","2,11,-3","2,11,-2","2,11,-1","2,11,0","2,11,1","2,11,2","2,11,3","2,11,4","2,11,5","2,11,6","2,11,7","2,11,8","2,11,9","2,11,10","2,11,11","2,11,12","2,11,13","2,11,14","2,11,15","2,12,-15","2,12,-14","2,12,-13","2,12,-12","2,12,-11","2,12,-10","2,12,-9","2,12,-8","2,12,-7","2,12,-6","2,12,-5","2,12,-4","2,12,-3","2,12,-2","2,12,-1","2,12,0","2,12,1","2,12,2","2,12,3","2,12,4","2,12,5","2,12,6","2,12,7","2,12,8","2,12,9","2,12,10","2,12,11","2,12,12","2,12,13","2,12,14","2,12,15","3,0,-17","3,0,-16","3,0,-15","3,0,-14","3,0,-13","3,0,-12","3,0,-11","3,0,-10","3,0,-9","3,0,-8","3,0,-7","3,0,-6","3,0,-5","3,0,-4","3,0,-3","3,0,-2","3,0,-1","3,0,0","3,0,1","3,0,2","3,0,3","3,0,4","3,0,5","3,0,6","3,0,7","3,0,8","3,0,9","3,0,10","3,0,11","3,0,12","3,0,13","3,0,14","3,0,15","3,0,16","3,0,17","3,1,-15","3,1,-14","3,1,-13","3,1,-12","3,1,-11","3,1,-10","3,1,-9","3,1,-8","3,1,-7","3,1,-6","3,1,-5","3,1,-4","3,1,4","3,1,5","3,1,6","3,1,7","3,1,8","3,1,9","3,1,10","3,1,11","3,1,12","3,1,13","3,1,14","3,1,15","3,2,-15","3,2,-14","3,2,9","3,2,10","3,2,11","3,2,12","3,2,13","3,2,14","3,2,15","3,3,-15","3,3,-14","3,3,9","3,3,10","3,3,11","3,3,12","3,3,13","3,3,14","3,3,15","3,4,-15","3,4,-14","3,4,9","3,4,10","3,4,11","3,4,12","3,4,13","3,4,14","3,4,15","3,5,-15","3,5,-14","3,5,9","3,5,13","3,5,14","3,5,15","3,6,-15","3,6,-14","3,6,9","3,6,13","3,6,14","3,6,15","3,7,-15","3,7,-14","3,7,9","3,7,13","3,7,14","3,7,15","3,8,-15","3,8,-14","3,8,9","3,8,13","3,8,14","3,8,15","3,9,-15","3,9,-14","3,9,-13","3,9,-12","3,9,-11","3,9,-10","3,9,-9","3,9,-8","3,9,-7","3,9,-6","3,9,-5","3,9,-4","3,9,-3","3,9,-2","3,9,-1","3,9,0","3,9,1","3,9,2","3,9,3","3,9,4","3,9,5","3,9,6","3,9,7","3,9,8","3,9,9","3,9,10","3,9,11","3,9,12","3,9,13","3,9,14","3,9,15","3,10,-15","3,10,-14","3,10,-13","3,10,-12","3,10,-11","3,10,-10","3,10,-9","3,10,-8","3,10,-7","3,10,-6","3,10,-5","3,10,-4","3,10,-3","3,10,-2","3,10,-1","3,10,0","3,10,1","3,10,2","3,10,3","3,10,4","3,10,5","3,10,6","3,10,7","3,10,8","3,10,9","3,10,10","3,10,11","3,10,12","3,10,13","3,10,14","3,10,15","3,11,-15","3,11,-14","3,11,-13","3,11,-12","3,11,-11","3,11,-10","3,11,-9","3,11,-8","3,11,-7","3,11,-6","3,11,-5","3,11,-4","3,11,-3","3,11,-2","3,11,-1","3,11,0","3,11,1","3,11,2","3,11,3","3,11,4","3,11,5","3,11,6","3,11,7","3,11,8","3,11,9","3,11,10","3,11,11","3,11,12","3,11,13","3,11,14","3,11,15","3,12,-15","3,12,-14","3,12,-13","3,12,-12","3,12,-11","3,12,-10","3,12,-9","3,12,-8","3,12,-7","3,12,-6","3,12,-5","3,12,-4","3,12,-3","3,12,-2","3,12,-1","3,12,0","3,12,1","3,12,2","3,12,3","3,12,4","3,12,5","3,12,6","3,12,7","3,12,8","3,12,9","3,12,10","3,12,11","3,12,12","3,12,13","3,12,14","3,12,15","4,0,-17","4,0,-16","4,0,-15","4,0,-14","4,0,-13","4,0,-12","4,0,-11","4,0,-10","4,0,-9","4,0,-8","4,0,-7","4,0,-6","4,0,-5","4,0,-4","4,0,-3","4,0,-2","4,0,-1","4,0,0","4,0,1","4,0,2","4,0,3","4,0,4","4,0,5","4,0,6","4,0,7","4,0,8","4,0,9","4,0,10","4,0,11","4,0,12","4,0,13","4,0,14","4,0,15","4,0,16","4,0,17","4,1,-15","4,1,-14","4,1,-13","4,1,-12","4,1,-11","4,1,-10","4,1,-9","4,1,-8","4,1,-7","4,1,-6","4,1,-5","4,1,-4","4,1,-1","4,1,0","4,1,1","4,1,4","4,1,5","4,1,6","4,1,7","4,1,8","4,1,9","4,1,10","4,1,11","4,1,12","4,1,13","4,1,14","4,1,15","4,2,-15","4,2,-14","4,2,-13","4,2,-12","4,2,-11","4,2,-10","4,2,-9","4,2,-8","4,2,-7","4,2,-6","4,2,-5","4,2,-4","4,2,-1","4,2,0","4,2,1","4,2,4","4,2,5","4,2,6","4,2,7","4,2,8","4,2,9","4,2,10","4,2,11","4,2,12","4,2,13","4,2,14","4,2,15","4,3,-15","4,3,-14","4,3,-13","4,3,-12","4,3,-11","4,3,-10","4,3,-9","4,3,-8","4,3,-7","4,3,-6","4,3,-5","4,3,-4","4,3,-1","4,3,0","4,3,1","4,3,4","4,3,5","4,3,6","4,3,7","4,3,8","4,3,9","4,3,10","4,3,11","4,3,12","4,3,13","4,3,14","4,3,15","4,4,-15","4,4,-14","4,4,-13","4,4,-12","4,4,-11","4,4,-10","4,4,-9","4,4,-8","4,4,-7","4,4,-6","4,4,-5","4,4,-4","4,4,-1","4,4,0","4,4,1","4,4,4","4,4,5","4,4,6","4,4,7","4,4,8","4,4,9","4,4,10","4,4,11","4,4,12","4,4,13","4,4,14","4,4,15","4,5,-15","4,5,-14","4,5,-13","4,5,-12","4,5,-11","4,5,-10","4,5,-9","4,5,-8","4,5,-7","4,5,-6","4,5,-5","4,5,-4","4,5,-1","4,5,0","4,5,1","4,5,4","4,5,5","4,5,6","4,5,7","4,5,8","4,5,9","4,5,10","4,5,11","4,5,12","4,5,13","4,5,14","4,5,15","4,6,-15","4,6,-14","4,6,-13","4,6,-12","4,6,-11","4,6,-10","4,6,-9","4,6,-8","4,6,-7","4,6,-6","4,6,-5","4,6,-4","4,6,-1","4,6,0","4,6,1","4,6,4","4,6,5","4,6,6","4,6,7","4,6,8","4,6,9","4,6,10","4,6,11","4,6,12","4,6,13","4,6,14","4,6,15","4,7,-15","4,7,-14","4,7,-13","4,7,-12","4,7,-11","4,7,-10","4,7,-9","4,7,-8","4,7,-7","4,7,-6","4,7,-5","4,7,-4","4,7,-3","4,7,-2","4,7,-1","4,7,0","4,7,1","4,7,2","4,7,3","4,7,4","4,7,5","4,7,6","4,7,7","4,7,8","4,7,9","4,7,10","4,7,11","4,7,12","4,7,13","4,7,14","4,7,15","4,8,-15","4,8,-14","4,8,-13","4,8,-12","4,8,-11","4,8,-10","4,8,-9","4,8,-8","4,8,-7","4,8,-6","4,8,-5","4,8,-4","4,8,-3","4,8,-2","4,8,-1","4,8,0","4,8,1","4,8,2","4,8,3","4,8,4","4,8,5","4,8,6","4,8,7","4,8,8","4,8,9","4,8,10","4,8,11","4,8,12","4,8,13","4,8,14","4,8,15","4,9,-15","4,9,-14","4,9,-13","4,9,-12","4,9,-11","4,9,-10","4,9,-9","4,9,-8","4,9,-7","4,9,-6","4,9,-5","4,9,-4","4,9,-3","4,9,-2","4,9,-1","4,9,0","4,9,1","4,9,2","4,9,3","4,9,4","4,9,5","4,9,6","4,9,7","4,9,8","4,9,9","4,9,10","4,9,11","4,9,12","4,9,13","4,9,14","4,9,15","4,10,-15","4,10,-14","4,10,-13","4,10,-12","4,10,-11","4,10,-10","4,10,-9","4,10,-8","4,10,-7","4,10,-6","4,10,-5","4,10,-4","4,10,-3","4,10,-2","4,10,-1","4,10,0","4,10,1","4,10,2","4,10,3","4,10,4","4,10,5","4,10,6","4,10,7","4,10,8","4,10,9","4,10,10","4,10,11","4,10,12","4,10,13","4,10,14","4,10,15","4,11,-15","4,11,-14","4,11,-13","4,11,-12","4,11,-11","4,11,-10","4,11,-9","4,11,-8","4,11,-7","4,11,-6","4,11,-5","4,11,-4","4,11,-3","4,11,-2","4,11,-1","4,11,0","4,11,1","4,11,2","4,11,3","4,11,4","4,11,5","4,11,6","4,11,7","4,11,8","4,11,9","4,11,10","4,11,11","4,11,12","4,11,13","4,11,14","4,11,15","4,12,-15","4,12,-14","4,12,-13","4,12,-12","4,12,-11","4,12,-10","4,12,-9","4,12,-8","4,12,-7","4,12,-6","4,12,-5","4,12,-4","4,12,-3","4,12,-2","4,12,-1","4,12,0","4,12,1","4,12,2","4,12,3","4,12,4","4,12,5","4,12,6","4,12,7","4,12,8","4,12,9","4,12,10","4,12,11","4,12,12","4,12,13","4,12,14","4,12,15","5,0,-17","5,0,-16","5,0,-15","5,0,-14","5,0,-13","5,0,-12","5,0,-11","5,0,-10","5,0,-9","5,0,-8","5,0,-7","5,0,-6","5,0,-5","5,0,-4","5,0,-3","5,0,-2","5,0,-1","5,0,0","5,0,1","5,0,2","5,0,3","5,0,4","5,0,5","5,0,6","5,0,7","5,0,8","5,0,9","5,0,10","5,0,11","5,0,12","5,0,13","5,0,14","5,0,15","5,0,16","5,0,17","5,1,-15","5,1,-14","5,1,-13","5,1,-12","5,1,-11","5,1,-10","5,1,-9","5,1,-8","5,1,-7","5,1,-6","5,1,-5","5,1,-4","5,1,-3","5,1,-2","5,1,-1","5,1,0","5,1,1","5,1,2","5,1,3","5,1,4","5,1,5","5,1,6","5,1,7","5,1,8","5,1,9","5,1,10","5,1,11","5,1,12","5,1,13","5,1,14","5,1,15","5,2,-15","5,2,-14","5,2,-13","5,2,-12","5,2,-11","5,2,-10","5,2,-9","5,2,-8","5,2,-7","5,2,-6","5,2,-5","5,2,-4","5,2,-3","5,2,-2","5,2,-1","5,2,0","5,2,1","5,2,2","5,2,3","5,2,4","5,2,5","5,2,6","5,2,7","5,2,8","5,2,9","5,2,10","5,2,11","5,2,12","5,2,13","5,2,14","5,2,15","5,3,-15","5,3,-14","5,3,-13","5,3,-12","5,3,-11","5,3,-9","5,3,-8","5,3,-7","5,3,-6","5,3,-5","5,3,-4","5,3,-3","5,3,-2","5,3,-1","5,3,0","5,3,1","5,3,2","5,3,3","5,3,4","5,3,5","5,3,6","5,3,7","5,3,8","5,3,9","5,3,10","5,3,11","5,3,12","5,3,13","5,3,14","5,3,15","5,4,-15","5,4,-14","5,4,-13","5,4,-12","5,4,-11","5,4,-10","5,4,-9","5,4,-8","5,4,-7","5,4,-6","5,4,-5","5,4,-4","5,4,-3","5,4,-2","5,4,-1","5,4,0","5,4,1","5,4,2","5,4,3","5,4,4","5,4,5","5,4,6","5,4,7","5,4,8","5,4,9","5,4,10","5,4,11","5,4,12","5,4,13","5,4,14","5,4,15","5,5,-15","5,5,-14","5,5,-13","5,5,-12","5,5,-11","5,5,-10","5,5,-9","5,5,-8","5,5,-7","5,5,-6","5,5,-5","5,5,-4","5,5,-3","5,5,-2","5,5,-1","5,5,0","5,5,1","5,5,2","5,5,3","5,5,4","5,5,5","5,5,6","5,5,7","5,5,8","5,5,9","5,5,10","5,5,11","5,5,12","5,5,13","5,5,14","5,5,15","5,6,-15","5,6,-14","5,6,-13","5,6,-12","5,6,-11","5,6,-10","5,6,-9","5,6,-8","5,6,-7","5,6,-6","5,6,-5","5,6,-4","5,6,-3","5,6,-2","5,6,-1","5,6,0","5,6,1","5,6,2","5,6,3","5,6,4","5,6,5","5,6,6","5,6,7","5,6,8","5,6,9","5,6,10","5,6,11","5,6,12","5,6,13","5,6,14","5,6,15","5,7,-15","5,7,-14","5,7,-13","5,7,-12","5,7,-11","5,7,-10","5,7,-9","5,7,-8","5,7,-7","5,7,-6","5,7,-5","5,7,-4","5,7,-3","5,7,-2","5,7,-1","5,7,0","5,7,1","5,7,2","5,7,3","5,7,4","5,7,5","5,7,6","5,7,7","5,7,8","5,7,9","5,7,10","5,7,11","5,7,12","5,7,13","5,7,14","5,7,15","5,8,-15","5,8,-14","5,8,-13","5,8,-12","5,8,-11","5,8,-10","5,8,-9","5,8,-8","5,8,-7","5,8,-6","5,8,-5","5,8,-4","5,8,-3","5,8,-2","5,8,-1","5,8,0","5,8,1","5,8,2","5,8,3","5,8,4","5,8,5","5,8,6","5,8,7","5,8,8","5,8,9","5,8,10","5,8,11","5,8,12","5,8,13","5,8,14","5,8,15","5,9,-15","5,9,-14","5,9,-13","5,9,-12","5,9,-11","5,9,-10","5,9,-9","5,9,-8","5,9,-7","5,9,-6","5,9,-5","5,9,-4","5,9,-3","5,9,-2","5,9,-1","5,9,0","5,9,1","5,9,2","5,9,3","5,9,4","5,9,5","5,9,6","5,9,7","5,9,8","5,9,9","5,9,10","5,9,11","5,9,12","5,9,13","5,9,14","5,9,15","5,10,-15","5,10,-14","5,10,-13","5,10,-12","5,10,-11","5,10,-10","5,10,-9","5,10,-8","5,10,-7","5,10,-6","5,10,-5","5,10,-4","5,10,-3","5,10,-2","5,10,-1","5,10,0","5,10,1","5,10,2","5,10,3","5,10,4","5,10,5","5,10,6","5,10,7","5,10,8","5,10,9","5,10,10","5,10,11","5,10,12","5,10,13","5,10,14","5,10,15","5,11,-15","5,11,-14","5,11,-13","5,11,-12","5,11,-11","5,11,-10","5,11,-9","5,11,-8","5,11,-7","5,11,-6","5,11,-5","5,11,-4","5,11,-3","5,11,-2","5,11,-1","5,11,0","5,11,1","5,11,2","5,11,3","5,11,4","5,11,5","5,11,6","5,11,7","5,11,8","5,11,9","5,11,10","5,11,11","5,11,12","5,11,13","5,11,14","5,11,15","5,12,-15","5,12,-14","5,12,-13","5,12,-12","5,12,-11","5,12,-10","5,12,-9","5,12,-8","5,12,-7","5,12,-6","5,12,-5","5,12,-4","5,12,-3","5,12,-2","5,12,-1","5,12,0","5,12,1","5,12,2","5,12,3","5,12,4","5,12,5","5,12,6","5,12,7","5,12,8","5,12,9","5,12,10","5,12,11","5,12,12","5,12,13","5,12,14","5,12,15","6,0,-17","6,0,-16","6,0,-15","6,0,-14","6,0,-13","6,0,-12","6,0,-11","6,0,-10","6,0,-9","6,0,-8","6,0,-7","6,0,-6","6,0,-5","6,0,-4","6,0,-3","6,0,-2","6,0,-1","6,0,0","6,0,1","6,0,2","6,0,3","6,0,4","6,0,5","6,0,6","6,0,7","6,0,8","6,0,9","6,0,10","6,0,11","6,0,12","6,0,13","6,0,14","6,0,15","6,0,16","6,0,17","7,0,-17","7,0,-16","7,0,-15","7,0,-14","7,0,-13","7,0,-12","7,0,-11","7,0,-10","7,0,-9","7,0,-8","7,0,-7","7,0,-6","7,0,-5","7,0,-4","7,0,-3","7,0,-2","7,0,-1","7,0,0","7,0,1","7,0,2","7,0,3","7,0,4","7,0,5","7,0,6","7,0,7","7,0,8","7,0,9","7,0,10","7,0,11","7,0,12","7,0,13","7,0,14","7,0,15","7,0,16","7,0,17","1,1,-1","0,1,7","0,9,4","1,1,6","0,1,5","1,3,9","1,2,9","1,9,12","1,6,14","1,2,4","0,2,4","-1,2,4","1,2,5","0,2,5","-1,2,5","-2,1,6","-1,2,6","0,2,6","1,2,6","3,2,-4","3,3,-4","2,2,-4","1,2,-4","0,2,-4","-1,2,-4","-2,2,-4","-2,3,-4","-3,2,-4","-3,3,-4","2,3,-4","1,3,-4","0,3,-4","-1,3,-4","3,2,-5","2,2,-5","1,2,-5","0,2,-5","-2,2,-5","-3,2,-5","-1,2,-5","-3,3,-5","-2,3,-5","-1,3,-5","0,3,-5","1,3,-5","2,3,-5","3,3,-5","2,2,4","2,2,5","2,2,6","3,2,4","3,2,5","3,2,6","2,3,4","2,3,5","2,3,6","3,3,4","3,3,5","3,3,6","-3,2,4","-3,2,5","-3,2,6","-3,3,4","-3,3,5","-3,3,6","-2,2,4","-2,2,5","-2,2,6","-2,3,4","-2,3,5","-2,3,6"]);
+                        return (x, y, z) => solids.has(x + ',' + y + ',' + z);
+                    })()).build();
 
             case 1: // THE CORRIDOR (Original Hardcoded Array Restored)
                 return builder.setBounds(7, 14, 17)
@@ -3541,7 +3526,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
             case 2: // THE SHAFTS
                 return builder.setBounds(10, 25, 18).setSpawn(0, 2, -15).setExit(0, 16, 15)
-                    .addHologram("TOOLS ARE MOBILE\nBring the foundation with you.", 0, 3, -12)
                     .addEntity('blue', 0, 2, -8) 
                     .addCustomLogic((x, y, z) => {
                         if (roomBox(x, y, z, 8, 22, 17)) return true;
@@ -3554,7 +3538,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
             case 3: // THE PENTHOUSE
                 return builder.setBounds(8, 18, 8).setSpawn(0, 2, 6).setExit(0, 12.5, 6)
-                    .addHologram("RED BLOCK: Look & [SCROLL WHEEL] to Scale", 0, 2.5, 4)
                     .addEntity('red', 0, 1.45, 1.5, { startScale: 2.9 })
                     .addCustomLogic((x, y, z) => { 
                         if (roomBox(x, y, z, 7, 18, 8)) return true;
@@ -3571,18 +3554,19 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     }).build();
 
             case 4: // THE WELL
-                return builder.setBounds(10, 15, 20).setSpawn(0, 7, -16).setExit(0, 7, 15)
-                    .addEntity('yellow', 0, 7, -12).setWater(3.5, { color: 0x003366, distortionScale: 1.8 })
-                    .addCustomLogic((x, y, z) => {
-                        if (roomBox(x, y, z, 9, 14, 18)) return true;
-                        if (Math.abs(z) >= 5 && y <= 6) return true; // Start and Exit ledges
-                        if (x <= -6 && x >= -9 && z > -5 && z <= 1 && y <= Math.floor(1 - z) + 1 && y <= 6) return true; // Recovery stairs
-                        return y <= 0;
-                    }).build();
+                return builder.setBounds(12, 17, 22)
+                    .setSpawn(0, 7, -16)
+                    .setExit(0, 8, 15)
+                    .addEntity('yellow', 0, 7, -12)
+                    .setWater(3)
+                    .addCustomLogic((() => {
+                        // High-performance closure for grid lookups
+                        const solids = new Set(["-11,0,-21","-11,0,-20","-11,0,-19","-11,0,-18","-11,0,-17","-11,0,-16","-11,0,-15","-11,0,-14","-11,0,-13","-11,0,-12","-11,0,-11","-11,0,-10","-11,0,-9","-11,0,-8","-11,0,-7","-11,0,-6","-11,0,-5","-11,0,-4","-11,0,-3","-11,0,-2","-11,0,-1","-11,0,0","-11,0,1","-11,0,2","-11,0,3","-11,0,4","-11,0,5","-11,0,6","-11,0,7","-11,0,8","-11,0,9","-11,0,10","-11,0,11","-11,0,12","-11,0,13","-11,0,14","-11,0,15","-11,0,16","-11,0,17","-11,0,18","-11,0,19","-11,0,20","-11,0,21","-10,0,-21","-10,0,-20","-10,0,-19","-10,0,-18","-10,0,-17","-10,0,-16","-10,0,-15","-10,0,-14","-10,0,-13","-10,0,-12","-10,0,-11","-10,0,-10","-10,0,-9","-10,0,-8","-10,0,-7","-10,0,-6","-10,0,-5","-10,0,-4","-10,0,-3","-10,0,-2","-10,0,-1","-10,0,0","-10,0,1","-10,0,2","-10,0,3","-10,0,4","-10,0,5","-10,0,6","-10,0,7","-10,0,8","-10,0,9","-10,0,10","-10,0,11","-10,0,12","-10,0,13","-10,0,14","-10,0,15","-10,0,16","-10,0,17","-10,0,18","-10,0,19","-10,0,20","-10,0,21","-10,1,-20","-10,1,-19","-10,1,-18","-10,1,-17","-10,1,-16","-10,1,-15","-10,1,-14","-10,1,-13","-10,1,-12","-10,1,-11","-10,1,-10","-10,1,-9","-10,1,-8","-10,1,-7","-10,1,-6","-10,1,-5","-10,1,-4","-10,1,-3","-10,1,-2","-10,1,-1","-10,1,0","-10,1,1","-10,1,2","-10,1,3","-10,1,4","-10,1,5","-10,1,6","-10,1,7","-10,1,8","-10,1,9","-10,1,10","-10,1,11","-10,1,12","-10,1,13","-10,1,14","-10,1,15","-10,1,16","-10,1,17","-10,1,18","-10,1,19","-10,1,20","-10,2,-20","-10,2,-19","-10,2,-18","-10,2,-17","-10,2,-16","-10,2,-15","-10,2,-14","-10,2,-13","-10,2,-12","-10,2,-11","-10,2,-10","-10,2,-9","-10,2,-8","-10,2,-7","-10,2,-6","-10,2,-5","-10,2,-4","-10,2,-3","-10,2,-2","-10,2,-1","-10,2,0","-10,2,1","-10,2,2","-10,2,3","-10,2,4","-10,2,5","-10,2,6","-10,2,7","-10,2,8","-10,2,9","-10,2,10","-10,2,11","-10,2,12","-10,2,13","-10,2,14","-10,2,15","-10,2,16","-10,2,17","-10,2,18","-10,2,19","-10,2,20","-10,3,-20","-10,3,-19","-10,3,-18","-10,3,-17","-10,3,-16","-10,3,-15","-10,3,-14","-10,3,-13","-10,3,-12","-10,3,-11","-10,3,-10","-10,3,-9","-10,3,-8","-10,3,-7","-10,3,-6","-10,3,-5","-10,3,-4","-10,3,-3","-10,3,-2","-10,3,-1","-10,3,0","-10,3,1","-10,3,2","-10,3,3","-10,3,4","-10,3,5","-10,3,6","-10,3,7","-10,3,8","-10,3,9","-10,3,10","-10,3,11","-10,3,12","-10,3,13","-10,3,14","-10,3,15","-10,3,16","-10,3,17","-10,3,18","-10,3,19","-10,3,20","-10,4,-20","-10,4,-19","-10,4,-18","-10,4,-17","-10,4,-16","-10,4,-15","-10,4,-14","-10,4,-13","-10,4,-12","-10,4,-11","-10,4,-10","-10,4,-9","-10,4,-8","-10,4,-7","-10,4,-6","-10,4,-5","-10,4,-4","-10,4,-3","-10,4,-2","-10,4,-1","-10,4,0","-10,4,1","-10,4,2","-10,4,3","-10,4,4","-10,4,5","-10,4,6","-10,4,7","-10,4,8","-10,4,9","-10,4,10","-10,4,11","-10,4,12","-10,4,13","-10,4,14","-10,4,15","-10,4,16","-10,4,17","-10,4,18","-10,4,19","-10,4,20","-10,5,-20","-10,5,-19","-10,5,-18","-10,5,-17","-10,5,-16","-10,5,-15","-10,5,-14","-10,5,-13","-10,5,-12","-10,5,-11","-10,5,-10","-10,5,-9","-10,5,-8","-10,5,-7","-10,5,-6","-10,5,-5","-10,5,-4","-10,5,-3","-10,5,-2","-10,5,-1","-10,5,0","-10,5,1","-10,5,2","-10,5,3","-10,5,4","-10,5,5","-10,5,6","-10,5,7","-10,5,8","-10,5,9","-10,5,10","-10,5,11","-10,5,12","-10,5,13","-10,5,14","-10,5,15","-10,5,16","-10,5,17","-10,5,18","-10,5,19","-10,5,20","-10,6,-20","-10,6,-19","-10,6,-18","-10,6,-17","-10,6,-16","-10,6,-15","-10,6,-14","-10,6,-13","-10,6,-12","-10,6,-11","-10,6,-10","-10,6,-9","-10,6,-8","-10,6,-7","-10,6,-6","-10,6,-5","-10,6,-4","-10,6,-3","-10,6,-2","-10,6,-1","-10,6,0","-10,6,1","-10,6,2","-10,6,3","-10,6,4","-10,6,5","-10,6,6","-10,6,7","-10,6,8","-10,6,9","-10,6,10","-10,6,11","-10,6,12","-10,6,13","-10,6,14","-10,6,15","-10,6,16","-10,6,17","-10,6,18","-10,6,19","-10,6,20","-10,7,-20","-10,7,-19","-10,7,-18","-10,7,-17","-10,7,-16","-10,7,-15","-10,7,-14","-10,7,-13","-10,7,-12","-10,7,-11","-10,7,-10","-10,7,-9","-10,7,-8","-10,7,-7","-10,7,-6","-10,7,-5","-10,7,-4","-10,7,-3","-10,7,-2","-10,7,-1","-10,7,0","-10,7,1","-10,7,2","-10,7,3","-10,7,4","-10,7,5","-10,7,6","-10,7,7","-10,7,8","-10,7,9","-10,7,10","-10,7,11","-10,7,12","-10,7,13","-10,7,14","-10,7,15","-10,7,16","-10,7,17","-10,7,18","-10,7,19","-10,7,20","-10,8,-20","-10,8,-19","-10,8,-18","-10,8,-17","-10,8,-16","-10,8,-15","-10,8,-14","-10,8,-13","-10,8,-12","-10,8,-11","-10,8,-10","-10,8,-9","-10,8,-8","-10,8,-7","-10,8,-6","-10,8,-5","-10,8,-4","-10,8,-3","-10,8,-2","-10,8,-1","-10,8,0","-10,8,1","-10,8,2","-10,8,3","-10,8,4","-10,8,5","-10,8,6","-10,8,7","-10,8,8","-10,8,9","-10,8,10","-10,8,11","-10,8,12","-10,8,13","-10,8,14","-10,8,15","-10,8,16","-10,8,17","-10,8,18","-10,8,19","-10,8,20","-10,9,-20","-10,9,-19","-10,9,-18","-10,9,-17","-10,9,-16","-10,9,-15","-10,9,-14","-10,9,-13","-10,9,-12","-10,9,-11","-10,9,-10","-10,9,-9","-10,9,-8","-10,9,-7","-10,9,-6","-10,9,-5","-10,9,-4","-10,9,-3","-10,9,-2","-10,9,-1","-10,9,0","-10,9,1","-10,9,2","-10,9,3","-10,9,4","-10,9,5","-10,9,6","-10,9,7","-10,9,8","-10,9,9","-10,9,10","-10,9,11","-10,9,12","-10,9,13","-10,9,14","-10,9,15","-10,9,16","-10,9,17","-10,9,18","-10,9,19","-10,9,20","-10,10,-20","-10,10,-19","-10,10,-18","-10,10,-17","-10,10,-16","-10,10,-15","-10,10,-14","-10,10,-13","-10,10,-12","-10,10,-11","-10,10,-10","-10,10,-9","-10,10,-8","-10,10,-7","-10,10,-6","-10,10,-5","-10,10,-4","-10,10,-3","-10,10,-2","-10,10,-1","-10,10,0","-10,10,1","-10,10,2","-10,10,3","-10,10,4","-10,10,5","-10,10,6","-10,10,7","-10,10,8","-10,10,9","-10,10,10","-10,10,11","-10,10,12","-10,10,13","-10,10,14","-10,10,15","-10,10,16","-10,10,17","-10,10,18","-10,10,19","-10,10,20","-10,11,-20","-10,11,-19","-10,11,-18","-10,11,-17","-10,11,-16","-10,11,-15","-10,11,-14","-10,11,-13","-10,11,-12","-10,11,-11","-10,11,-10","-10,11,-9","-10,11,-8","-10,11,-7","-10,11,-6","-10,11,-5","-10,11,-4","-10,11,-3","-10,11,-2","-10,11,-1","-10,11,0","-10,11,1","-10,11,2","-10,11,3","-10,11,4","-10,11,5","-10,11,6","-10,11,7","-10,11,8","-10,11,9","-10,11,10","-10,11,11","-10,11,12","-10,11,13","-10,11,14","-10,11,15","-10,11,16","-10,11,17","-10,11,18","-10,11,19","-10,11,20","-10,12,-20","-10,12,-19","-10,12,-18","-10,12,-17","-10,12,-16","-10,12,-15","-10,12,-14","-10,12,-13","-10,12,-12","-10,12,-11","-10,12,-10","-10,12,-9","-10,12,-8","-10,12,-7","-10,12,-6","-10,12,-5","-10,12,-4","-10,12,-3","-10,12,-2","-10,12,-1","-10,12,0","-10,12,1","-10,12,2","-10,12,3","-10,12,4","-10,12,5","-10,12,6","-10,12,7","-10,12,8","-10,12,9","-10,12,10","-10,12,11","-10,12,12","-10,12,13","-10,12,14","-10,12,15","-10,12,16","-10,12,17","-10,12,18","-10,12,19","-10,12,20","-10,13,-20","-10,13,-19","-10,13,-18","-10,13,-17","-10,13,-16","-10,13,-15","-10,13,-14","-10,13,-13","-10,13,-12","-10,13,-11","-10,13,-10","-10,13,-9","-10,13,-8","-10,13,-7","-10,13,-6","-10,13,-5","-10,13,-4","-10,13,-3","-10,13,-2","-10,13,-1","-10,13,0","-10,13,1","-10,13,2","-10,13,3","-10,13,4","-10,13,5","-10,13,6","-10,13,7","-10,13,8","-10,13,9","-10,13,10","-10,13,11","-10,13,12","-10,13,13","-10,13,14","-10,13,15","-10,13,16","-10,13,17","-10,13,18","-10,13,19","-10,13,20","-10,14,-20","-10,14,-19","-10,14,-18","-10,14,-17","-10,14,-16","-10,14,-15","-10,14,-14","-10,14,-13","-10,14,-12","-10,14,-11","-10,14,-10","-10,14,-9","-10,14,-8","-10,14,-7","-10,14,-6","-10,14,-5","-10,14,-4","-10,14,-3","-10,14,-2","-10,14,-1","-10,14,0","-10,14,1","-10,14,2","-10,14,3","-10,14,4","-10,14,5","-10,14,6","-10,14,7","-10,14,8","-10,14,9","-10,14,10","-10,14,11","-10,14,12","-10,14,13","-10,14,14","-10,14,15","-10,14,16","-10,14,17","-10,14,18","-10,14,19","-10,14,20","-10,15,-20","-10,15,-19","-10,15,-18","-10,15,-17","-10,15,-16","-10,15,-15","-10,15,-14","-10,15,-13","-10,15,-12","-10,15,-11","-10,15,-10","-10,15,-9","-10,15,-8","-10,15,-7","-10,15,-6","-10,15,-5","-10,15,-4","-10,15,-3","-10,15,-2","-10,15,-1","-10,15,0","-10,15,1","-10,15,2","-10,15,3","-10,15,4","-10,15,5","-10,15,6","-10,15,7","-10,15,8","-10,15,9","-10,15,10","-10,15,11","-10,15,12","-10,15,13","-10,15,14","-10,15,15","-10,15,16","-10,15,17","-10,15,18","-10,15,19","-10,15,20","-9,0,-21","-9,0,-20","-9,0,-19","-9,0,-18","-9,0,-17","-9,0,-16","-9,0,-15","-9,0,-14","-9,0,-13","-9,0,-12","-9,0,-11","-9,0,-10","-9,0,-9","-9,0,-8","-9,0,-7","-9,0,-6","-9,0,-5","-9,0,-4","-9,0,-3","-9,0,-2","-9,0,-1","-9,0,0","-9,0,1","-9,0,2","-9,0,3","-9,0,4","-9,0,5","-9,0,6","-9,0,7","-9,0,8","-9,0,9","-9,0,10","-9,0,11","-9,0,12","-9,0,13","-9,0,14","-9,0,15","-9,0,16","-9,0,17","-9,0,18","-9,0,19","-9,0,20","-9,0,21","-9,1,-20","-9,1,-19","-9,1,-18","-9,1,-17","-9,1,-16","-9,1,-15","-9,1,-14","-9,1,-13","-9,1,-12","-9,1,-11","-9,1,-10","-9,1,-9","-9,1,-8","-9,1,-7","-9,1,-6","-9,1,-5","-9,1,-4","-9,1,-3","-9,1,-2","-9,1,-1","-9,1,0","-9,1,1","-9,1,2","-9,1,3","-9,1,4","-9,1,5","-9,1,6","-9,1,7","-9,1,8","-9,1,9","-9,1,10","-9,1,11","-9,1,12","-9,1,13","-9,1,14","-9,1,15","-9,1,16","-9,1,17","-9,1,18","-9,1,19","-9,1,20","-9,2,-20","-9,2,-19","-9,2,-18","-9,2,-17","-9,2,-16","-9,2,-15","-9,2,-14","-9,2,-13","-9,2,-12","-9,2,-11","-9,2,-10","-9,2,-9","-9,2,-8","-9,2,-7","-9,2,-6","-9,2,-5","-9,2,-4","-9,2,-3","-9,2,-2","-9,2,-1","-9,2,0","-9,2,1","-9,2,2","-9,2,3","-9,2,4","-9,2,5","-9,2,6","-9,2,7","-9,2,8","-9,2,9","-9,2,10","-9,2,11","-9,2,12","-9,2,13","-9,2,14","-9,2,15","-9,2,16","-9,2,17","-9,2,18","-9,2,19","-9,2,20","-9,3,-20","-9,3,-19","-9,3,-18","-9,3,-17","-9,3,-16","-9,3,-15","-9,3,-14","-9,3,-13","-9,3,-12","-9,3,-11","-9,3,-10","-9,3,-9","-9,3,-8","-9,3,-7","-9,3,-6","-9,3,-5","-9,3,-4","-9,3,-3","-9,3,-2","-9,3,-1","-9,3,0","-9,3,1","-9,3,2","-9,3,3","-9,3,4","-9,3,5","-9,3,6","-9,3,7","-9,3,8","-9,3,9","-9,3,10","-9,3,11","-9,3,12","-9,3,13","-9,3,14","-9,3,15","-9,3,16","-9,3,17","-9,3,18","-9,3,19","-9,3,20","-9,4,-20","-9,4,-19","-9,4,-18","-9,4,-17","-9,4,-16","-9,4,-15","-9,4,-14","-9,4,-13","-9,4,-12","-9,4,-11","-9,4,-10","-9,4,-9","-9,4,-8","-9,4,-7","-9,4,-6","-9,4,-5","-9,4,-4","-9,4,-3","-9,4,-2","-9,4,-1","-9,4,0","-9,4,1","-9,4,2","-9,4,3","-9,4,4","-9,4,5","-9,4,6","-9,4,7","-9,4,8","-9,4,9","-9,4,10","-9,4,11","-9,4,12","-9,4,13","-9,4,14","-9,4,15","-9,4,16","-9,4,17","-9,4,18","-9,4,19","-9,4,20","-9,5,-20","-9,5,-19","-9,5,-18","-9,5,-17","-9,5,-16","-9,5,-15","-9,5,-14","-9,5,-13","-9,5,-12","-9,5,-11","-9,5,-10","-9,5,-9","-9,5,-8","-9,5,-7","-9,5,-6","-9,5,-5","-9,5,-4","-9,5,-3","-9,5,-2","-9,5,-1","-9,5,0","-9,5,1","-9,5,2","-9,5,3","-9,5,4","-9,5,5","-9,5,6","-9,5,7","-9,5,8","-9,5,9","-9,5,10","-9,5,11","-9,5,12","-9,5,13","-9,5,14","-9,5,15","-9,5,16","-9,5,17","-9,5,18","-9,5,19","-9,5,20","-9,6,-20","-9,6,-19","-9,6,-18","-9,6,-17","-9,6,-16","-9,6,-15","-9,6,-14","-9,6,-13","-9,6,-12","-9,6,-11","-9,6,-10","-9,6,-9","-9,6,-8","-9,6,-7","-9,6,-6","-9,6,-5","-9,6,-4","-9,6,-3","-9,6,-2","-9,6,-1","-9,6,0","-9,6,1","-9,6,2","-9,6,3","-9,6,4","-9,6,5","-9,6,6","-9,6,7","-9,6,8","-9,6,9","-9,6,10","-9,6,11","-9,6,12","-9,6,13","-9,6,14","-9,6,15","-9,6,16","-9,6,17","-9,6,18","-9,6,19","-9,6,20","-9,7,-20","-9,7,-19","-9,7,-18","-9,7,-17","-9,7,-16","-9,7,-15","-9,7,-14","-9,7,-13","-9,7,-12","-9,7,-11","-9,7,-10","-9,7,-9","-9,7,-8","-9,7,-7","-9,7,-6","-9,7,-5","-9,7,-4","-9,7,-3","-9,7,-2","-9,7,-1","-9,7,0","-9,7,1","-9,7,2","-9,7,3","-9,7,4","-9,7,5","-9,7,6","-9,7,7","-9,7,8","-9,7,9","-9,7,10","-9,7,11","-9,7,12","-9,7,13","-9,7,14","-9,7,15","-9,7,16","-9,7,17","-9,7,18","-9,7,19","-9,7,20","-9,8,-20","-9,8,-19","-9,8,-18","-9,8,-17","-9,8,-16","-9,8,-15","-9,8,-14","-9,8,-13","-9,8,-12","-9,8,-11","-9,8,-10","-9,8,-9","-9,8,-8","-9,8,-7","-9,8,-6","-9,8,-5","-9,8,-4","-9,8,-3","-9,8,-2","-9,8,-1","-9,8,0","-9,8,1","-9,8,2","-9,8,3","-9,8,4","-9,8,5","-9,8,6","-9,8,7","-9,8,8","-9,8,9","-9,8,10","-9,8,11","-9,8,12","-9,8,13","-9,8,14","-9,8,15","-9,8,16","-9,8,17","-9,8,18","-9,8,19","-9,8,20","-9,9,-20","-9,9,-19","-9,9,-18","-9,9,-17","-9,9,-16","-9,9,-15","-9,9,-14","-9,9,-13","-9,9,-12","-9,9,-11","-9,9,-10","-9,9,-9","-9,9,-8","-9,9,-7","-9,9,-6","-9,9,-5","-9,9,-4","-9,9,-3","-9,9,-2","-9,9,-1","-9,9,0","-9,9,1","-9,9,2","-9,9,3","-9,9,4","-9,9,5","-9,9,6","-9,9,7","-9,9,8","-9,9,9","-9,9,10","-9,9,11","-9,9,12","-9,9,13","-9,9,14","-9,9,15","-9,9,16","-9,9,17","-9,9,18","-9,9,19","-9,9,20","-9,10,-20","-9,10,-19","-9,10,-18","-9,10,-17","-9,10,-16","-9,10,-15","-9,10,-14","-9,10,-13","-9,10,-12","-9,10,-11","-9,10,-10","-9,10,-9","-9,10,-8","-9,10,-7","-9,10,-6","-9,10,-5","-9,10,-4","-9,10,-3","-9,10,-2","-9,10,-1","-9,10,0","-9,10,1","-9,10,2","-9,10,3","-9,10,4","-9,10,5","-9,10,6","-9,10,7","-9,10,8","-9,10,9","-9,10,10","-9,10,11","-9,10,12","-9,10,13","-9,10,14","-9,10,15","-9,10,16","-9,10,17","-9,10,18","-9,10,19","-9,10,20","-9,11,-20","-9,11,-19","-9,11,-18","-9,11,-17","-9,11,-16","-9,11,-15","-9,11,-14","-9,11,-13","-9,11,-12","-9,11,-11","-9,11,-10","-9,11,-9","-9,11,-8","-9,11,-7","-9,11,-6","-9,11,-5","-9,11,-4","-9,11,-3","-9,11,-2","-9,11,-1","-9,11,0","-9,11,1","-9,11,2","-9,11,3","-9,11,4","-9,11,5","-9,11,6","-9,11,7","-9,11,8","-9,11,9","-9,11,10","-9,11,11","-9,11,12","-9,11,13","-9,11,14","-9,11,15","-9,11,16","-9,11,17","-9,11,18","-9,11,19","-9,11,20","-9,12,-20","-9,12,-19","-9,12,-18","-9,12,-17","-9,12,-16","-9,12,-15","-9,12,-14","-9,12,-13","-9,12,-12","-9,12,-11","-9,12,-10","-9,12,-9","-9,12,-8","-9,12,-7","-9,12,-6","-9,12,-5","-9,12,-4","-9,12,-3","-9,12,-2","-9,12,-1","-9,12,0","-9,12,1","-9,12,2","-9,12,3","-9,12,4","-9,12,5","-9,12,6","-9,12,7","-9,12,8","-9,12,9","-9,12,10","-9,12,11","-9,12,12","-9,12,13","-9,12,14","-9,12,15","-9,12,16","-9,12,17","-9,12,18","-9,12,19","-9,12,20","-9,13,-20","-9,13,-19","-9,13,-18","-9,13,-17","-9,13,-16","-9,13,-15","-9,13,-14","-9,13,-13","-9,13,-12","-9,13,-11","-9,13,-10","-9,13,-9","-9,13,-8","-9,13,-7","-9,13,-6","-9,13,-5","-9,13,-4","-9,13,-3","-9,13,-2","-9,13,-1","-9,13,0","-9,13,1","-9,13,2","-9,13,3","-9,13,4","-9,13,5","-9,13,6","-9,13,7","-9,13,8","-9,13,9","-9,13,10","-9,13,11","-9,13,12","-9,13,13","-9,13,14","-9,13,15","-9,13,16","-9,13,17","-9,13,18","-9,13,19","-9,13,20","-9,14,-20","-9,14,-19","-9,14,-18","-9,14,-17","-9,14,-16","-9,14,-15","-9,14,-14","-9,14,-13","-9,14,-12","-9,14,-11","-9,14,-10","-9,14,-9","-9,14,-8","-9,14,-7","-9,14,-6","-9,14,-5","-9,14,-4","-9,14,-3","-9,14,-2","-9,14,-1","-9,14,0","-9,14,1","-9,14,2","-9,14,3","-9,14,4","-9,14,5","-9,14,6","-9,14,7","-9,14,8","-9,14,9","-9,14,10","-9,14,11","-9,14,12","-9,14,13","-9,14,14","-9,14,15","-9,14,16","-9,14,17","-9,14,18","-9,14,19","-9,14,20","-9,15,-20","-9,15,-19","-9,15,-18","-9,15,-17","-9,15,-16","-9,15,-15","-9,15,-14","-9,15,-13","-9,15,-12","-9,15,-11","-9,15,-10","-9,15,-9","-9,15,-8","-9,15,-7","-9,15,-6","-9,15,-5","-9,15,-4","-9,15,-3","-9,15,-2","-9,15,-1","-9,15,0","-9,15,1","-9,15,2","-9,15,3","-9,15,4","-9,15,5","-9,15,6","-9,15,7","-9,15,8","-9,15,9","-9,15,10","-9,15,11","-9,15,12","-9,15,13","-9,15,14","-9,15,15","-9,15,16","-9,15,17","-9,15,18","-9,15,19","-9,15,20","-8,0,-21","-8,0,-20","-8,0,-19","-8,0,-18","-8,0,-17","-8,0,-16","-8,0,-15","-8,0,-14","-8,0,-13","-8,0,-12","-8,0,-11","-8,0,-10","-8,0,-9","-8,0,-8","-8,0,-7","-8,0,-6","-8,0,-5","-8,0,-4","-8,0,-3","-8,0,-2","-8,0,-1","-8,0,0","-8,0,1","-8,0,2","-8,0,3","-8,0,4","-8,0,5","-8,0,6","-8,0,7","-8,0,8","-8,0,9","-8,0,10","-8,0,11","-8,0,12","-8,0,13","-8,0,14","-8,0,15","-8,0,16","-8,0,17","-8,0,18","-8,0,19","-8,0,20","-8,0,21","-8,1,-20","-8,1,-19","-8,1,-18","-8,1,-17","-8,1,-16","-8,1,-15","-8,1,-14","-8,1,-13","-8,1,-12","-8,1,-11","-8,1,-10","-8,1,-9","-8,1,-8","-8,1,-7","-8,1,-6","-8,1,-5","-8,1,-4","-8,1,-3","-8,1,-2","-8,1,-1","-8,1,0","-8,1,1","-8,1,5","-8,1,6","-8,1,7","-8,1,8","-8,1,9","-8,1,10","-8,1,11","-8,1,12","-8,1,13","-8,1,14","-8,1,15","-8,1,16","-8,1,17","-8,1,18","-8,1,19","-8,1,20","-8,2,-20","-8,2,-19","-8,2,-18","-8,2,-17","-8,2,-16","-8,2,-15","-8,2,-14","-8,2,-13","-8,2,-12","-8,2,-11","-8,2,-10","-8,2,-9","-8,2,-8","-8,2,-7","-8,2,-6","-8,2,-5","-8,2,-4","-8,2,-3","-8,2,-2","-8,2,-1","-8,2,0","-8,2,5","-8,2,6","-8,2,7","-8,2,8","-8,2,9","-8,2,10","-8,2,11","-8,2,12","-8,2,13","-8,2,14","-8,2,15","-8,2,16","-8,2,17","-8,2,18","-8,2,19","-8,2,20","-8,3,-20","-8,3,-19","-8,3,-18","-8,3,-17","-8,3,-16","-8,3,-15","-8,3,-14","-8,3,-13","-8,3,-12","-8,3,-11","-8,3,-10","-8,3,-9","-8,3,-8","-8,3,-7","-8,3,-6","-8,3,-5","-8,3,-4","-8,3,-3","-8,3,-2","-8,3,-1","-8,3,5","-8,3,6","-8,3,7","-8,3,8","-8,3,9","-8,3,10","-8,3,11","-8,3,12","-8,3,13","-8,3,14","-8,3,15","-8,3,16","-8,3,17","-8,3,18","-8,3,19","-8,3,20","-8,4,-20","-8,4,-19","-8,4,-18","-8,4,-17","-8,4,-16","-8,4,-15","-8,4,-14","-8,4,-13","-8,4,-12","-8,4,-11","-8,4,-10","-8,4,-9","-8,4,-8","-8,4,-7","-8,4,-6","-8,4,-5","-8,4,-4","-8,4,-3","-8,4,-2","-8,4,5","-8,4,6","-8,4,7","-8,4,8","-8,4,9","-8,4,10","-8,4,11","-8,4,12","-8,4,13","-8,4,14","-8,4,15","-8,4,16","-8,4,17","-8,4,18","-8,4,19","-8,4,20","-8,5,-20","-8,5,-19","-8,5,-18","-8,5,-17","-8,5,-16","-8,5,-15","-8,5,-14","-8,5,-13","-8,5,-12","-8,5,-11","-8,5,-10","-8,5,-9","-8,5,-8","-8,5,-7","-8,5,-6","-8,5,-5","-8,5,-4","-8,5,-3","-8,5,5","-8,5,6","-8,5,7","-8,5,8","-8,5,9","-8,5,10","-8,5,11","-8,5,12","-8,5,13","-8,5,14","-8,5,15","-8,5,16","-8,5,17","-8,5,18","-8,5,19","-8,5,20","-8,6,-20","-8,6,-19","-8,6,-18","-8,6,-17","-8,6,-16","-8,6,-15","-8,6,-14","-8,6,-13","-8,6,-12","-8,6,-11","-8,6,-10","-8,6,-9","-8,6,-8","-8,6,-7","-8,6,-6","-8,6,-5","-8,6,-4","-8,6,5","-8,6,6","-8,6,7","-8,6,8","-8,6,9","-8,6,10","-8,6,11","-8,6,12","-8,6,13","-8,6,14","-8,6,15","-8,6,16","-8,6,17","-8,6,18","-8,6,19","-8,6,20","-8,7,-20","-8,7,-19","-8,7,-18","-8,7,5","-8,7,6","-8,7,7","-8,7,8","-8,7,9","-8,7,10","-8,7,11","-8,7,12","-8,7,13","-8,7,14","-8,7,15","-8,7,16","-8,7,17","-8,7,18","-8,7,19","-8,7,20","-8,8,-20","-8,8,-19","-8,8,-18","-8,8,18","-8,8,19","-8,8,20","-8,9,-20","-8,9,-19","-8,9,-18","-8,9,18","-8,9,19","-8,9,20","-8,10,-20","-8,10,-19","-8,10,-18","-8,10,18","-8,10,19","-8,10,20","-8,11,-20","-8,11,-19","-8,11,-18","-8,11,18","-8,11,19","-8,11,20","-8,12,-20","-8,12,-19","-8,12,-18","-8,12,18","-8,12,19","-8,12,20","-8,13,-20","-8,13,-19","-8,13,-18","-8,13,18","-8,13,19","-8,13,20","-8,14,-20","-8,14,-19","-8,14,-18","-8,14,-17","-8,14,-16","-8,14,-15","-8,14,-14","-8,14,-13","-8,14,-12","-8,14,-11","-8,14,-10","-8,14,-9","-8,14,-8","-8,14,-7","-8,14,-6","-8,14,-5","-8,14,-4","-8,14,-3","-8,14,-2","-8,14,-1","-8,14,0","-8,14,1","-8,14,2","-8,14,3","-8,14,4","-8,14,5","-8,14,6","-8,14,7","-8,14,8","-8,14,9","-8,14,10","-8,14,11","-8,14,12","-8,14,13","-8,14,14","-8,14,15","-8,14,16","-8,14,17","-8,14,18","-8,14,19","-8,14,20","-8,15,-20","-8,15,-19","-8,15,-18","-8,15,-17","-8,15,-16","-8,15,-15","-8,15,-14","-8,15,-13","-8,15,-12","-8,15,-11","-8,15,-10","-8,15,-9","-8,15,-8","-8,15,-7","-8,15,-6","-8,15,-5","-8,15,-4","-8,15,-3","-8,15,-2","-8,15,-1","-8,15,0","-8,15,1","-8,15,2","-8,15,3","-8,15,4","-8,15,5","-8,15,6","-8,15,7","-8,15,8","-8,15,9","-8,15,10","-8,15,11","-8,15,12","-8,15,13","-8,15,14","-8,15,15","-8,15,16","-8,15,17","-8,15,18","-8,15,19","-8,15,20","-7,0,-21","-7,0,-20","-7,0,-19","-7,0,-18","-7,0,-17","-7,0,-16","-7,0,-15","-7,0,-14","-7,0,-13","-7,0,-12","-7,0,-11","-7,0,-10","-7,0,-9","-7,0,-8","-7,0,-7","-7,0,-6","-7,0,-5","-7,0,-4","-7,0,-3","-7,0,-2","-7,0,-1","-7,0,0","-7,0,1","-7,0,2","-7,0,3","-7,0,4","-7,0,5","-7,0,6","-7,0,7","-7,0,8","-7,0,9","-7,0,10","-7,0,11","-7,0,12","-7,0,13","-7,0,14","-7,0,15","-7,0,16","-7,0,17","-7,0,18","-7,0,19","-7,0,20","-7,0,21","-7,1,-20","-7,1,-19","-7,1,-18","-7,1,-17","-7,1,-16","-7,1,-15","-7,1,-14","-7,1,-13","-7,1,-12","-7,1,-11","-7,1,-10","-7,1,-9","-7,1,-8","-7,1,-7","-7,1,-6","-7,1,-5","-7,1,-4","-7,1,-3","-7,1,-2","-7,1,-1","-7,1,0","-7,1,1","-7,1,5","-7,1,6","-7,1,7","-7,1,8","-7,1,9","-7,1,10","-7,1,11","-7,1,12","-7,1,13","-7,1,14","-7,1,15","-7,1,16","-7,1,17","-7,1,18","-7,1,19","-7,1,20","-7,2,-20","-7,2,-19","-7,2,-18","-7,2,-17","-7,2,-16","-7,2,-15","-7,2,-14","-7,2,-13","-7,2,-12","-7,2,-11","-7,2,-10","-7,2,-9","-7,2,-8","-7,2,-7","-7,2,-6","-7,2,-5","-7,2,-4","-7,2,-3","-7,2,-2","-7,2,-1","-7,2,0","-7,2,5","-7,2,6","-7,2,7","-7,2,8","-7,2,9","-7,2,10","-7,2,11","-7,2,12","-7,2,13","-7,2,14","-7,2,15","-7,2,16","-7,2,17","-7,2,18","-7,2,19","-7,2,20","-7,3,-20","-7,3,-19","-7,3,-18","-7,3,-17","-7,3,-16","-7,3,-15","-7,3,-14","-7,3,-13","-7,3,-12","-7,3,-11","-7,3,-10","-7,3,-9","-7,3,-8","-7,3,-7","-7,3,-6","-7,3,-5","-7,3,-4","-7,3,-3","-7,3,-2","-7,3,-1","-7,3,5","-7,3,6","-7,3,7","-7,3,8","-7,3,9","-7,3,10","-7,3,11","-7,3,12","-7,3,13","-7,3,14","-7,3,15","-7,3,16","-7,3,17","-7,3,18","-7,3,19","-7,3,20","-7,4,-20","-7,4,-19","-7,4,-18","-7,4,-17","-7,4,-16","-7,4,-15","-7,4,-14","-7,4,-13","-7,4,-12","-7,4,-11","-7,4,-10","-7,4,-9","-7,4,-8","-7,4,-7","-7,4,-6","-7,4,-5","-7,4,-4","-7,4,-3","-7,4,-2","-7,4,5","-7,4,6","-7,4,7","-7,4,8","-7,4,9","-7,4,10","-7,4,11","-7,4,12","-7,4,13","-7,4,14","-7,4,15","-7,4,16","-7,4,17","-7,4,18","-7,4,19","-7,4,20","-7,5,-20","-7,5,-19","-7,5,-18","-7,5,-17","-7,5,-16","-7,5,-15","-7,5,-14","-7,5,-13","-7,5,-12","-7,5,-11","-7,5,-10","-7,5,-9","-7,5,-8","-7,5,-7","-7,5,-6","-7,5,-5","-7,5,-4","-7,5,-3","-7,5,5","-7,5,6","-7,5,7","-7,5,8","-7,5,9","-7,5,10","-7,5,11","-7,5,12","-7,5,13","-7,5,14","-7,5,15","-7,5,16","-7,5,17","-7,5,18","-7,5,19","-7,5,20","-7,6,-20","-7,6,-19","-7,6,-18","-7,6,-17","-7,6,-16","-7,6,-15","-7,6,-14","-7,6,-13","-7,6,-12","-7,6,-11","-7,6,-10","-7,6,-9","-7,6,-8","-7,6,-7","-7,6,-6","-7,6,-5","-7,6,-4","-7,6,5","-7,6,6","-7,6,7","-7,6,8","-7,6,9","-7,6,10","-7,6,11","-7,6,12","-7,6,13","-7,6,14","-7,6,15","-7,6,16","-7,6,17","-7,6,18","-7,6,19","-7,6,20","-7,7,-20","-7,7,-19","-7,7,-18","-7,7,5","-7,7,6","-7,7,7","-7,7,8","-7,7,9","-7,7,10","-7,7,11","-7,7,12","-7,7,13","-7,7,14","-7,7,15","-7,7,16","-7,7,17","-7,7,18","-7,7,19","-7,7,20","-7,8,-20","-7,8,-19","-7,8,-18","-7,8,18","-7,8,19","-7,8,20","-7,9,-20","-7,9,-19","-7,9,-18","-7,9,18","-7,9,19","-7,9,20","-7,10,-20","-7,10,-19","-7,10,-18","-7,10,18","-7,10,19","-7,10,20","-7,11,-20","-7,11,-19","-7,11,-18","-7,11,18","-7,11,19","-7,11,20","-7,12,-20","-7,12,-19","-7,12,-18","-7,12,18","-7,12,19","-7,12,20","-7,13,-20","-7,13,-19","-7,13,-18","-7,13,18","-7,13,19","-7,13,20","-7,14,-20","-7,14,-19","-7,14,-18","-7,14,-17","-7,14,-16","-7,14,-15","-7,14,-14","-7,14,-13","-7,14,-12","-7,14,-11","-7,14,-10","-7,14,-9","-7,14,-8","-7,14,-7","-7,14,-6","-7,14,-5","-7,14,-4","-7,14,-3","-7,14,-2","-7,14,-1","-7,14,0","-7,14,1","-7,14,2","-7,14,3","-7,14,4","-7,14,5","-7,14,6","-7,14,7","-7,14,8","-7,14,9","-7,14,10","-7,14,11","-7,14,12","-7,14,13","-7,14,14","-7,14,15","-7,14,16","-7,14,17","-7,14,18","-7,14,19","-7,14,20","-7,15,-20","-7,15,-19","-7,15,-18","-7,15,-17","-7,15,-16","-7,15,-15","-7,15,-14","-7,15,-13","-7,15,-12","-7,15,-11","-7,15,-10","-7,15,-9","-7,15,-8","-7,15,-7","-7,15,-6","-7,15,-5","-7,15,-4","-7,15,-3","-7,15,-2","-7,15,-1","-7,15,0","-7,15,1","-7,15,2","-7,15,3","-7,15,4","-7,15,5","-7,15,6","-7,15,7","-7,15,8","-7,15,9","-7,15,10","-7,15,11","-7,15,12","-7,15,13","-7,15,14","-7,15,15","-7,15,16","-7,15,17","-7,15,18","-7,15,19","-7,15,20","-6,0,-21","-6,0,-20","-6,0,-19","-6,0,-18","-6,0,-17","-6,0,-16","-6,0,-15","-6,0,-14","-6,0,-13","-6,0,-12","-6,0,-11","-6,0,-10","-6,0,-9","-6,0,-8","-6,0,-7","-6,0,-6","-6,0,-5","-6,0,-4","-6,0,-3","-6,0,-2","-6,0,-1","-6,0,0","-6,0,1","-6,0,2","-6,0,3","-6,0,4","-6,0,5","-6,0,6","-6,0,7","-6,0,8","-6,0,9","-6,0,10","-6,0,11","-6,0,12","-6,0,13","-6,0,14","-6,0,15","-6,0,16","-6,0,17","-6,0,18","-6,0,19","-6,0,20","-6,0,21","-6,1,-20","-6,1,-19","-6,1,-18","-6,1,-17","-6,1,-16","-6,1,-15","-6,1,-14","-6,1,-13","-6,1,-12","-6,1,-11","-6,1,-10","-6,1,-9","-6,1,-8","-6,1,-7","-6,1,-6","-6,1,-5","-6,1,-4","-6,1,-3","-6,1,-2","-6,1,-1","-6,1,0","-6,1,1","-6,1,5","-6,1,6","-6,1,7","-6,1,8","-6,1,9","-6,1,10","-6,1,11","-6,1,12","-6,1,13","-6,1,14","-6,1,15","-6,1,16","-6,1,17","-6,1,18","-6,1,19","-6,1,20","-6,2,-20","-6,2,-19","-6,2,-18","-6,2,-17","-6,2,-16","-6,2,-15","-6,2,-14","-6,2,-13","-6,2,-12","-6,2,-11","-6,2,-10","-6,2,-9","-6,2,-8","-6,2,-7","-6,2,-6","-6,2,-5","-6,2,-4","-6,2,-3","-6,2,-2","-6,2,-1","-6,2,0","-6,2,5","-6,2,6","-6,2,7","-6,2,8","-6,2,9","-6,2,10","-6,2,11","-6,2,12","-6,2,13","-6,2,14","-6,2,15","-6,2,16","-6,2,17","-6,2,18","-6,2,19","-6,2,20","-6,3,-20","-6,3,-19","-6,3,-18","-6,3,-17","-6,3,-16","-6,3,-15","-6,3,-14","-6,3,-13","-6,3,-12","-6,3,-11","-6,3,-10","-6,3,-9","-6,3,-8","-6,3,-7","-6,3,-6","-6,3,-5","-6,3,-4","-6,3,-3","-6,3,-2","-6,3,-1","-6,3,5","-6,3,6","-6,3,7","-6,3,8","-6,3,9","-6,3,10","-6,3,11","-6,3,12","-6,3,13","-6,3,14","-6,3,15","-6,3,16","-6,3,17","-6,3,18","-6,3,19","-6,3,20","-6,4,-20","-6,4,-19","-6,4,-18","-6,4,-17","-6,4,-16","-6,4,-15","-6,4,-14","-6,4,-13","-6,4,-12","-6,4,-11","-6,4,-10","-6,4,-9","-6,4,-8","-6,4,-7","-6,4,-6","-6,4,-5","-6,4,-4","-6,4,-3","-6,4,-2","-6,4,5","-6,4,6","-6,4,7","-6,4,8","-6,4,9","-6,4,10","-6,4,11","-6,4,12","-6,4,13","-6,4,14","-6,4,15","-6,4,16","-6,4,17","-6,4,18","-6,4,19","-6,4,20","-6,5,-20","-6,5,-19","-6,5,-18","-6,5,-17","-6,5,-16","-6,5,-15","-6,5,-14","-6,5,-13","-6,5,-12","-6,5,-11","-6,5,-10","-6,5,-9","-6,5,-8","-6,5,-7","-6,5,-6","-6,5,-5","-6,5,-4","-6,5,-3","-6,5,5","-6,5,6","-6,5,7","-6,5,8","-6,5,9","-6,5,10","-6,5,11","-6,5,12","-6,5,13","-6,5,14","-6,5,15","-6,5,16","-6,5,17","-6,5,18","-6,5,19","-6,5,20","-6,6,-20","-6,6,-19","-6,6,-18","-6,6,-17","-6,6,-16","-6,6,-15","-6,6,-14","-6,6,-13","-6,6,-12","-6,6,-11","-6,6,-10","-6,6,-9","-6,6,-8","-6,6,-7","-6,6,-6","-6,6,-5","-6,6,-4","-6,6,5","-6,6,6","-6,6,7","-6,6,8","-6,6,9","-6,6,10","-6,6,11","-6,6,12","-6,6,13","-6,6,14","-6,6,15","-6,6,16","-6,6,17","-6,6,18","-6,6,19","-6,6,20","-6,7,-20","-6,7,-19","-6,7,-18","-6,7,5","-6,7,6","-6,7,7","-6,7,8","-6,7,9","-6,7,10","-6,7,11","-6,7,12","-6,7,13","-6,7,14","-6,7,15","-6,7,16","-6,7,17","-6,7,18","-6,7,19","-6,7,20","-6,8,-20","-6,8,-19","-6,8,-18","-6,8,18","-6,8,19","-6,8,20","-6,9,-20","-6,9,-19","-6,9,-18","-6,9,18","-6,9,19","-6,9,20","-6,10,-20","-6,10,-19","-6,10,-18","-6,10,18","-6,10,19","-6,10,20","-6,11,-20","-6,11,-19","-6,11,-18","-6,11,18","-6,11,19","-6,11,20","-6,12,-20","-6,12,-19","-6,12,-18","-6,12,18","-6,12,19","-6,12,20","-6,13,-20","-6,13,-19","-6,13,-18","-6,13,18","-6,13,19","-6,13,20","-6,14,-20","-6,14,-19","-6,14,-18","-6,14,-17","-6,14,-16","-6,14,-15","-6,14,-14","-6,14,-13","-6,14,-12","-6,14,-11","-6,14,-10","-6,14,-9","-6,14,-8","-6,14,-7","-6,14,-6","-6,14,-5","-6,14,-4","-6,14,-3","-6,14,-2","-6,14,-1","-6,14,0","-6,14,1","-6,14,2","-6,14,3","-6,14,4","-6,14,5","-6,14,6","-6,14,7","-6,14,8","-6,14,9","-6,14,10","-6,14,11","-6,14,12","-6,14,13","-6,14,14","-6,14,15","-6,14,16","-6,14,17","-6,14,18","-6,14,19","-6,14,20","-6,15,-20","-6,15,-19","-6,15,-18","-6,15,-17","-6,15,-16","-6,15,-15","-6,15,-14","-6,15,-13","-6,15,-12","-6,15,-11","-6,15,-10","-6,15,-9","-6,15,-8","-6,15,-7","-6,15,-6","-6,15,-5","-6,15,-4","-6,15,-3","-6,15,-2","-6,15,-1","-6,15,0","-6,15,1","-6,15,2","-6,15,3","-6,15,4","-6,15,5","-6,15,6","-6,15,7","-6,15,8","-6,15,9","-6,15,10","-6,15,11","-6,15,12","-6,15,13","-6,15,14","-6,15,15","-6,15,16","-6,15,17","-6,15,18","-6,15,19","-6,15,20","-5,0,-21","-5,0,-20","-5,0,-19","-5,0,-18","-5,0,-17","-5,0,-16","-5,0,-15","-5,0,-14","-5,0,-13","-5,0,-12","-5,0,-11","-5,0,-10","-5,0,-9","-5,0,-8","-5,0,-7","-5,0,-6","-5,0,-5","-5,0,-4","-5,0,-3","-5,0,-2","-5,0,-1","-5,0,0","-5,0,1","-5,0,2","-5,0,3","-5,0,4","-5,0,5","-5,0,6","-5,0,7","-5,0,8","-5,0,9","-5,0,10","-5,0,11","-5,0,12","-5,0,13","-5,0,14","-5,0,15","-5,0,16","-5,0,17","-5,0,18","-5,0,19","-5,0,20","-5,0,21","-5,1,-20","-5,1,-19","-5,1,-18","-5,1,-17","-5,1,-16","-5,1,-15","-5,1,-14","-5,1,-13","-5,1,-12","-5,1,-11","-5,1,-10","-5,1,-9","-5,1,-8","-5,1,-7","-5,1,-6","-5,1,-5","-5,1,5","-5,1,6","-5,1,7","-5,1,8","-5,1,9","-5,1,10","-5,1,11","-5,1,12","-5,1,13","-5,1,14","-5,1,15","-5,1,16","-5,1,17","-5,1,18","-5,1,19","-5,1,20","-5,2,-20","-5,2,-19","-5,2,-18","-5,2,-17","-5,2,-16","-5,2,-15","-5,2,-14","-5,2,-13","-5,2,-12","-5,2,-11","-5,2,-10","-5,2,-9","-5,2,-8","-5,2,-7","-5,2,-6","-5,2,-5","-5,2,5","-5,2,6","-5,2,7","-5,2,8","-5,2,9","-5,2,10","-5,2,11","-5,2,12","-5,2,13","-5,2,14","-5,2,15","-5,2,16","-5,2,17","-5,2,18","-5,2,19","-5,2,20","-5,3,-20","-5,3,-19","-5,3,-18","-5,3,-17","-5,3,-16","-5,3,-15","-5,3,-14","-5,3,-13","-5,3,-12","-5,3,-11","-5,3,-10","-5,3,-9","-5,3,-8","-5,3,-7","-5,3,-6","-5,3,-5","-5,3,5","-5,3,6","-5,3,7","-5,3,8","-5,3,9","-5,3,10","-5,3,11","-5,3,12","-5,3,13","-5,3,14","-5,3,15","-5,3,16","-5,3,17","-5,3,18","-5,3,19","-5,3,20","-5,4,-20","-5,4,-19","-5,4,-18","-5,4,-17","-5,4,-16","-5,4,-15","-5,4,-14","-5,4,-13","-5,4,-12","-5,4,-11","-5,4,-10","-5,4,-9","-5,4,-8","-5,4,-7","-5,4,-6","-5,4,-5","-5,4,5","-5,4,6","-5,4,7","-5,4,8","-5,4,9","-5,4,10","-5,4,11","-5,4,12","-5,4,13","-5,4,14","-5,4,15","-5,4,16","-5,4,17","-5,4,18","-5,4,19","-5,4,20","-5,5,-20","-5,5,-19","-5,5,-18","-5,5,-17","-5,5,-16","-5,5,-15","-5,5,-14","-5,5,-13","-5,5,-12","-5,5,-11","-5,5,-10","-5,5,-9","-5,5,-8","-5,5,-7","-5,5,-6","-5,5,-5","-5,5,5","-5,5,6","-5,5,7","-5,5,8","-5,5,9","-5,5,10","-5,5,11","-5,5,12","-5,5,13","-5,5,14","-5,5,15","-5,5,16","-5,5,17","-5,5,18","-5,5,19","-5,5,20","-5,6,-20","-5,6,-19","-5,6,-18","-5,6,-17","-5,6,-16","-5,6,-15","-5,6,-14","-5,6,-13","-5,6,-12","-5,6,-11","-5,6,-10","-5,6,-9","-5,6,-8","-5,6,-7","-5,6,-6","-5,6,-5","-5,6,5","-5,6,6","-5,6,7","-5,6,8","-5,6,9","-5,6,10","-5,6,11","-5,6,12","-5,6,13","-5,6,14","-5,6,15","-5,6,16","-5,6,17","-5,6,18","-5,6,19","-5,6,20","-5,7,-20","-5,7,-19","-5,7,-18","-5,7,5","-5,7,6","-5,7,7","-5,7,8","-5,7,9","-5,7,10","-5,7,11","-5,7,12","-5,7,13","-5,7,14","-5,7,15","-5,7,16","-5,7,17","-5,7,18","-5,7,19","-5,7,20","-5,8,-20","-5,8,-19","-5,8,-18","-5,8,18","-5,8,19","-5,8,20","-5,9,-20","-5,9,-19","-5,9,-18","-5,9,18","-5,9,19","-5,9,20","-5,10,-20","-5,10,-19","-5,10,-18","-5,10,18","-5,10,19","-5,10,20","-5,11,-20","-5,11,-19","-5,11,-18","-5,11,18","-5,11,19","-5,11,20","-5,12,-20","-5,12,-19","-5,12,-18","-5,12,18","-5,12,19","-5,12,20","-5,13,-20","-5,13,-19","-5,13,-18","-5,13,18","-5,13,19","-5,13,20","-5,14,-20","-5,14,-19","-5,14,-18","-5,14,-17","-5,14,-16","-5,14,-15","-5,14,-14","-5,14,-13","-5,14,-12","-5,14,-11","-5,14,-10","-5,14,-9","-5,14,-8","-5,14,-7","-5,14,-6","-5,14,-5","-5,14,-4","-5,14,-3","-5,14,-2","-5,14,-1","-5,14,0","-5,14,1","-5,14,2","-5,14,3","-5,14,4","-5,14,5","-5,14,6","-5,14,7","-5,14,8","-5,14,9","-5,14,10","-5,14,11","-5,14,12","-5,14,13","-5,14,14","-5,14,15","-5,14,16","-5,14,17","-5,14,18","-5,14,19","-5,14,20","-5,15,-20","-5,15,-19","-5,15,-18","-5,15,-17","-5,15,-16","-5,15,-15","-5,15,-14","-5,15,-13","-5,15,-12","-5,15,-11","-5,15,-10","-5,15,-9","-5,15,-8","-5,15,-7","-5,15,-6","-5,15,-5","-5,15,-4","-5,15,-3","-5,15,-2","-5,15,-1","-5,15,0","-5,15,1","-5,15,2","-5,15,3","-5,15,4","-5,15,5","-5,15,6","-5,15,7","-5,15,8","-5,15,9","-5,15,10","-5,15,11","-5,15,12","-5,15,13","-5,15,14","-5,15,15","-5,15,16","-5,15,17","-5,15,18","-5,15,19","-5,15,20","-4,0,-21","-4,0,-20","-4,0,-19","-4,0,-18","-4,0,-17","-4,0,-16","-4,0,-15","-4,0,-14","-4,0,-13","-4,0,-12","-4,0,-11","-4,0,-10","-4,0,-9","-4,0,-8","-4,0,-7","-4,0,-6","-4,0,-5","-4,0,-4","-4,0,-3","-4,0,-2","-4,0,-1","-4,0,0","-4,0,1","-4,0,2","-4,0,3","-4,0,4","-4,0,5","-4,0,6","-4,0,7","-4,0,8","-4,0,9","-4,0,10","-4,0,11","-4,0,12","-4,0,13","-4,0,14","-4,0,15","-4,0,16","-4,0,17","-4,0,18","-4,0,19","-4,0,20","-4,0,21","-4,1,-20","-4,1,-19","-4,1,-18","-4,1,-17","-4,1,-16","-4,1,-15","-4,1,-14","-4,1,-13","-4,1,-12","-4,1,-11","-4,1,-10","-4,1,-9","-4,1,-8","-4,1,-7","-4,1,-6","-4,1,-5","-4,1,5","-4,1,6","-4,1,7","-4,1,8","-4,1,9","-4,1,10","-4,1,11","-4,1,12","-4,1,13","-4,1,14","-4,1,15","-4,1,16","-4,1,17","-4,1,18","-4,1,19","-4,1,20","-4,2,-20","-4,2,-19","-4,2,-18","-4,2,-17","-4,2,-16","-4,2,-15","-4,2,-14","-4,2,-13","-4,2,-12","-4,2,-11","-4,2,-10","-4,2,-9","-4,2,-8","-4,2,-7","-4,2,-6","-4,2,-5","-4,2,5","-4,2,6","-4,2,7","-4,2,8","-4,2,9","-4,2,10","-4,2,11","-4,2,12","-4,2,13","-4,2,14","-4,2,15","-4,2,16","-4,2,17","-4,2,18","-4,2,19","-4,2,20","-4,3,-20","-4,3,-19","-4,3,-18","-4,3,-17","-4,3,-16","-4,3,-15","-4,3,-14","-4,3,-13","-4,3,-12","-4,3,-11","-4,3,-10","-4,3,-9","-4,3,-8","-4,3,-7","-4,3,-6","-4,3,-5","-4,3,5","-4,3,6","-4,3,7","-4,3,8","-4,3,9","-4,3,10","-4,3,11","-4,3,12","-4,3,13","-4,3,14","-4,3,15","-4,3,16","-4,3,17","-4,3,18","-4,3,19","-4,3,20","-4,4,-20","-4,4,-19","-4,4,-18","-4,4,-17","-4,4,-16","-4,4,-15","-4,4,-14","-4,4,-13","-4,4,-12","-4,4,-11","-4,4,-10","-4,4,-9","-4,4,-8","-4,4,-7","-4,4,-6","-4,4,-5","-4,4,5","-4,4,6","-4,4,7","-4,4,8","-4,4,9","-4,4,10","-4,4,11","-4,4,12","-4,4,13","-4,4,14","-4,4,15","-4,4,16","-4,4,17","-4,4,18","-4,4,19","-4,4,20","-4,5,-20","-4,5,-19","-4,5,-18","-4,5,-17","-4,5,-16","-4,5,-15","-4,5,-14","-4,5,-13","-4,5,-12","-4,5,-11","-4,5,-10","-4,5,-9","-4,5,-8","-4,5,-7","-4,5,-6","-4,5,-5","-4,5,5","-4,5,6","-4,5,7","-4,5,8","-4,5,9","-4,5,10","-4,5,11","-4,5,12","-4,5,13","-4,5,14","-4,5,15","-4,5,16","-4,5,17","-4,5,18","-4,5,19","-4,5,20","-4,6,-20","-4,6,-19","-4,6,-18","-4,6,-17","-4,6,-16","-4,6,-15","-4,6,-14","-4,6,-13","-4,6,-12","-4,6,-11","-4,6,-10","-4,6,-9","-4,6,-8","-4,6,-7","-4,6,-6","-4,6,-5","-4,6,5","-4,6,6","-4,6,7","-4,6,8","-4,6,9","-4,6,10","-4,6,11","-4,6,12","-4,6,13","-4,6,14","-4,6,15","-4,6,16","-4,6,17","-4,6,18","-4,6,19","-4,6,20","-4,7,-20","-4,7,-19","-4,7,-18","-4,7,5","-4,7,6","-4,7,7","-4,7,8","-4,7,9","-4,7,10","-4,7,11","-4,7,12","-4,7,13","-4,7,14","-4,7,15","-4,7,16","-4,7,17","-4,7,18","-4,7,19","-4,7,20","-4,8,-20","-4,8,-19","-4,8,-18","-4,8,18","-4,8,19","-4,8,20","-4,9,-20","-4,9,-19","-4,9,-18","-4,9,18","-4,9,19","-4,9,20","-4,10,-20","-4,10,-19","-4,10,-18","-4,10,18","-4,10,19","-4,10,20","-4,11,-20","-4,11,-19","-4,11,-18","-4,11,18","-4,11,19","-4,11,20","-4,12,-20","-4,12,-19","-4,12,-18","-4,12,18","-4,12,19","-4,12,20","-4,13,-20","-4,13,-19","-4,13,-18","-4,13,18","-4,13,19","-4,13,20","-4,14,-20","-4,14,-19","-4,14,-18","-4,14,-17","-4,14,-16","-4,14,-15","-4,14,-14","-4,14,-13","-4,14,-12","-4,14,-11","-4,14,-10","-4,14,-9","-4,14,-8","-4,14,-7","-4,14,-6","-4,14,-5","-4,14,-4","-4,14,-3","-4,14,-2","-4,14,-1","-4,14,0","-4,14,1","-4,14,2","-4,14,3","-4,14,4","-4,14,5","-4,14,6","-4,14,7","-4,14,8","-4,14,9","-4,14,10","-4,14,11","-4,14,12","-4,14,13","-4,14,14","-4,14,15","-4,14,16","-4,14,17","-4,14,18","-4,14,19","-4,14,20","-4,15,-20","-4,15,-19","-4,15,-18","-4,15,-17","-4,15,-16","-4,15,-15","-4,15,-14","-4,15,-13","-4,15,-12","-4,15,-11","-4,15,-10","-4,15,-9","-4,15,-8","-4,15,-7","-4,15,-6","-4,15,-5","-4,15,-4","-4,15,-3","-4,15,-2","-4,15,-1","-4,15,0","-4,15,1","-4,15,2","-4,15,3","-4,15,4","-4,15,5","-4,15,6","-4,15,7","-4,15,8","-4,15,9","-4,15,10","-4,15,11","-4,15,12","-4,15,13","-4,15,14","-4,15,15","-4,15,16","-4,15,17","-4,15,18","-4,15,19","-4,15,20","-3,0,-21","-3,0,-20","-3,0,-19","-3,0,-18","-3,0,-17","-3,0,-16","-3,0,-15","-3,0,-14","-3,0,-13","-3,0,-12","-3,0,-11","-3,0,-10","-3,0,-9","-3,0,-8","-3,0,-7","-3,0,-6","-3,0,-5","-3,0,-4","-3,0,-3","-3,0,-2","-3,0,-1","-3,0,0","-3,0,1","-3,0,2","-3,0,3","-3,0,4","-3,0,5","-3,0,6","-3,0,7","-3,0,8","-3,0,9","-3,0,10","-3,0,11","-3,0,12","-3,0,13","-3,0,14","-3,0,15","-3,0,16","-3,0,17","-3,0,18","-3,0,19","-3,0,20","-3,0,21","-3,1,-20","-3,1,-19","-3,1,-18","-3,1,-17","-3,1,-16","-3,1,-15","-3,1,-14","-3,1,-13","-3,1,-12","-3,1,-11","-3,1,-10","-3,1,-9","-3,1,-8","-3,1,-7","-3,1,-6","-3,1,-5","-3,1,5","-3,1,6","-3,1,7","-3,1,8","-3,1,9","-3,1,10","-3,1,11","-3,1,12","-3,1,13","-3,1,14","-3,1,15","-3,1,16","-3,1,17","-3,1,18","-3,1,19","-3,1,20","-3,2,-20","-3,2,-19","-3,2,-18","-3,2,-17","-3,2,-16","-3,2,-15","-3,2,-14","-3,2,-13","-3,2,-12","-3,2,-11","-3,2,-10","-3,2,-9","-3,2,-8","-3,2,-7","-3,2,-6","-3,2,-5","-3,2,5","-3,2,6","-3,2,7","-3,2,8","-3,2,9","-3,2,10","-3,2,11","-3,2,12","-3,2,13","-3,2,14","-3,2,15","-3,2,16","-3,2,17","-3,2,18","-3,2,19","-3,2,20","-3,3,-20","-3,3,-19","-3,3,-18","-3,3,-17","-3,3,-16","-3,3,-15","-3,3,-14","-3,3,-13","-3,3,-12","-3,3,-11","-3,3,-10","-3,3,-9","-3,3,-8","-3,3,-7","-3,3,-6","-3,3,-5","-3,3,5","-3,3,6","-3,3,7","-3,3,8","-3,3,9","-3,3,10","-3,3,11","-3,3,12","-3,3,13","-3,3,14","-3,3,15","-3,3,16","-3,3,17","-3,3,18","-3,3,19","-3,3,20","-3,4,-20","-3,4,-19","-3,4,-18","-3,4,-17","-3,4,-16","-3,4,-15","-3,4,-14","-3,4,-13","-3,4,-12","-3,4,-11","-3,4,-10","-3,4,-9","-3,4,-8","-3,4,-7","-3,4,-6","-3,4,-5","-3,4,5","-3,4,6","-3,4,7","-3,4,8","-3,4,9","-3,4,10","-3,4,11","-3,4,12","-3,4,13","-3,4,14","-3,4,15","-3,4,16","-3,4,17","-3,4,18","-3,4,19","-3,4,20","-3,5,-20","-3,5,-19","-3,5,-18","-3,5,-17","-3,5,-16","-3,5,-15","-3,5,-14","-3,5,-13","-3,5,-12","-3,5,-11","-3,5,-10","-3,5,-9","-3,5,-8","-3,5,-7","-3,5,-6","-3,5,-5","-3,5,5","-3,5,6","-3,5,7","-3,5,8","-3,5,9","-3,5,10","-3,5,11","-3,5,12","-3,5,13","-3,5,14","-3,5,15","-3,5,16","-3,5,17","-3,5,18","-3,5,19","-3,5,20","-3,6,-20","-3,6,-19","-3,6,-18","-3,6,-17","-3,6,-16","-3,6,-15","-3,6,-14","-3,6,-13","-3,6,-12","-3,6,-11","-3,6,-10","-3,6,-9","-3,6,-8","-3,6,-7","-3,6,-6","-3,6,-5","-3,6,5","-3,6,6","-3,6,7","-3,6,8","-3,6,9","-3,6,10","-3,6,11","-3,6,12","-3,6,13","-3,6,14","-3,6,15","-3,6,16","-3,6,17","-3,6,18","-3,6,19","-3,6,20","-3,7,-20","-3,7,-19","-3,7,-18","-3,7,5","-3,7,6","-3,7,7","-3,7,8","-3,7,9","-3,7,10","-3,7,11","-3,7,12","-3,7,13","-3,7,14","-3,7,15","-3,7,16","-3,7,17","-3,7,18","-3,7,19","-3,7,20","-3,8,-20","-3,8,-19","-3,8,-18","-3,8,18","-3,8,19","-3,8,20","-3,9,-20","-3,9,-19","-3,9,-18","-3,9,18","-3,9,19","-3,9,20","-3,10,-20","-3,10,-19","-3,10,-18","-3,10,18","-3,10,19","-3,10,20","-3,11,-20","-3,11,-19","-3,11,-18","-3,11,18","-3,11,19","-3,11,20","-3,12,-20","-3,12,-19","-3,12,-18","-3,12,18","-3,12,19","-3,12,20","-3,13,-20","-3,13,-19","-3,13,-18","-3,13,18","-3,13,19","-3,13,20","-3,14,-20","-3,14,-19","-3,14,-18","-3,14,-17","-3,14,-16","-3,14,-15","-3,14,-14","-3,14,-13","-3,14,-12","-3,14,-11","-3,14,-10","-3,14,-9","-3,14,-8","-3,14,-7","-3,14,-6","-3,14,-5","-3,14,-4","-3,14,-3","-3,14,-2","-3,14,-1","-3,14,0","-3,14,1","-3,14,2","-3,14,3","-3,14,4","-3,14,5","-3,14,6","-3,14,7","-3,14,8","-3,14,9","-3,14,10","-3,14,11","-3,14,12","-3,14,13","-3,14,14","-3,14,15","-3,14,16","-3,14,17","-3,14,18","-3,14,19","-3,14,20","-3,15,-20","-3,15,-19","-3,15,-18","-3,15,-17","-3,15,-16","-3,15,-15","-3,15,-14","-3,15,-13","-3,15,-12","-3,15,-11","-3,15,-10","-3,15,-9","-3,15,-8","-3,15,-7","-3,15,-6","-3,15,-5","-3,15,-4","-3,15,-3","-3,15,-2","-3,15,-1","-3,15,0","-3,15,1","-3,15,2","-3,15,3","-3,15,4","-3,15,5","-3,15,6","-3,15,7","-3,15,8","-3,15,9","-3,15,10","-3,15,11","-3,15,12","-3,15,13","-3,15,14","-3,15,15","-3,15,16","-3,15,17","-3,15,18","-3,15,19","-3,15,20","-2,0,-21","-2,0,-20","-2,0,-19","-2,0,-18","-2,0,-17","-2,0,-16","-2,0,-15","-2,0,-14","-2,0,-13","-2,0,-12","-2,0,-11","-2,0,-10","-2,0,-9","-2,0,-8","-2,0,-7","-2,0,-6","-2,0,-5","-2,0,-4","-2,0,-3","-2,0,-2","-2,0,-1","-2,0,0","-2,0,1","-2,0,2","-2,0,3","-2,0,4","-2,0,5","-2,0,6","-2,0,7","-2,0,8","-2,0,9","-2,0,10","-2,0,11","-2,0,12","-2,0,13","-2,0,14","-2,0,15","-2,0,16","-2,0,17","-2,0,18","-2,0,19","-2,0,20","-2,0,21","-2,1,-20","-2,1,-19","-2,1,-18","-2,1,-17","-2,1,-16","-2,1,-15","-2,1,-14","-2,1,-13","-2,1,-12","-2,1,-11","-2,1,-10","-2,1,-9","-2,1,-8","-2,1,-7","-2,1,-6","-2,1,-5","-2,1,5","-2,1,6","-2,1,7","-2,1,8","-2,1,9","-2,1,10","-2,1,11","-2,1,12","-2,1,13","-2,1,14","-2,1,15","-2,1,16","-2,1,17","-2,1,18","-2,1,19","-2,1,20","-2,2,-20","-2,2,-19","-2,2,-18","-2,2,-17","-2,2,-16","-2,2,-15","-2,2,-14","-2,2,-13","-2,2,-12","-2,2,-11","-2,2,-10","-2,2,-9","-2,2,-8","-2,2,-7","-2,2,-6","-2,2,-5","-2,2,5","-2,2,6","-2,2,7","-2,2,8","-2,2,9","-2,2,10","-2,2,11","-2,2,12","-2,2,13","-2,2,14","-2,2,15","-2,2,16","-2,2,17","-2,2,18","-2,2,19","-2,2,20","-2,3,-20","-2,3,-19","-2,3,-18","-2,3,-17","-2,3,-16","-2,3,-15","-2,3,-14","-2,3,-13","-2,3,-12","-2,3,-11","-2,3,-10","-2,3,-9","-2,3,-8","-2,3,-7","-2,3,-6","-2,3,-5","-2,3,5","-2,3,6","-2,3,7","-2,3,8","-2,3,9","-2,3,10","-2,3,11","-2,3,12","-2,3,13","-2,3,14","-2,3,15","-2,3,16","-2,3,17","-2,3,18","-2,3,19","-2,3,20","-2,4,-20","-2,4,-19","-2,4,-18","-2,4,-17","-2,4,-16","-2,4,-15","-2,4,-14","-2,4,-13","-2,4,-12","-2,4,-11","-2,4,-10","-2,4,-9","-2,4,-8","-2,4,-7","-2,4,-6","-2,4,-5","-2,4,5","-2,4,6","-2,4,7","-2,4,8","-2,4,9","-2,4,10","-2,4,11","-2,4,12","-2,4,13","-2,4,14","-2,4,15","-2,4,16","-2,4,17","-2,4,18","-2,4,19","-2,4,20","-2,5,-20","-2,5,-19","-2,5,-18","-2,5,-17","-2,5,-16","-2,5,-15","-2,5,-14","-2,5,-13","-2,5,-12","-2,5,-11","-2,5,-10","-2,5,-9","-2,5,-8","-2,5,-7","-2,5,-6","-2,5,-5","-2,5,5","-2,5,6","-2,5,7","-2,5,8","-2,5,9","-2,5,10","-2,5,11","-2,5,12","-2,5,13","-2,5,14","-2,5,15","-2,5,16","-2,5,17","-2,5,18","-2,5,19","-2,5,20","-2,6,-20","-2,6,-19","-2,6,-18","-2,6,-17","-2,6,-16","-2,6,-15","-2,6,-14","-2,6,-13","-2,6,-12","-2,6,-11","-2,6,-10","-2,6,-9","-2,6,-8","-2,6,-7","-2,6,-6","-2,6,-5","-2,6,5","-2,6,6","-2,6,7","-2,6,8","-2,6,9","-2,6,10","-2,6,11","-2,6,12","-2,6,13","-2,6,14","-2,6,15","-2,6,16","-2,6,17","-2,6,18","-2,6,19","-2,6,20","-2,7,-20","-2,7,-19","-2,7,-18","-2,7,5","-2,7,6","-2,7,7","-2,7,8","-2,7,9","-2,7,10","-2,7,11","-2,7,12","-2,7,13","-2,7,14","-2,7,15","-2,7,16","-2,7,17","-2,7,18","-2,7,19","-2,7,20","-2,8,-20","-2,8,-19","-2,8,-18","-2,8,18","-2,8,19","-2,8,20","-2,9,-20","-2,9,-19","-2,9,-18","-2,9,18","-2,9,19","-2,9,20","-2,10,-20","-2,10,-19","-2,10,-18","-2,10,18","-2,10,19","-2,10,20","-2,11,-20","-2,11,-19","-2,11,-18","-2,11,18","-2,11,19","-2,11,20","-2,12,-20","-2,12,-19","-2,12,-18","-2,12,18","-2,12,19","-2,12,20","-2,13,-20","-2,13,-19","-2,13,-18","-2,13,18","-2,13,19","-2,13,20","-2,14,-20","-2,14,-19","-2,14,-18","-2,14,-17","-2,14,-16","-2,14,-15","-2,14,-14","-2,14,-13","-2,14,-12","-2,14,-11","-2,14,-10","-2,14,-9","-2,14,-8","-2,14,-7","-2,14,-6","-2,14,-5","-2,14,-4","-2,14,-3","-2,14,-2","-2,14,-1","-2,14,0","-2,14,1","-2,14,2","-2,14,3","-2,14,4","-2,14,5","-2,14,6","-2,14,7","-2,14,8","-2,14,9","-2,14,10","-2,14,11","-2,14,12","-2,14,13","-2,14,14","-2,14,15","-2,14,16","-2,14,17","-2,14,18","-2,14,19","-2,14,20","-2,15,-20","-2,15,-19","-2,15,-18","-2,15,-17","-2,15,-16","-2,15,-15","-2,15,-14","-2,15,-13","-2,15,-12","-2,15,-11","-2,15,-10","-2,15,-9","-2,15,-8","-2,15,-7","-2,15,-6","-2,15,-5","-2,15,-4","-2,15,-3","-2,15,-2","-2,15,-1","-2,15,0","-2,15,1","-2,15,2","-2,15,3","-2,15,4","-2,15,5","-2,15,6","-2,15,7","-2,15,8","-2,15,9","-2,15,10","-2,15,11","-2,15,12","-2,15,13","-2,15,14","-2,15,15","-2,15,16","-2,15,17","-2,15,18","-2,15,19","-2,15,20","-1,0,-21","-1,0,-20","-1,0,-19","-1,0,-18","-1,0,-17","-1,0,-16","-1,0,-15","-1,0,-14","-1,0,-13","-1,0,-12","-1,0,-11","-1,0,-10","-1,0,-9","-1,0,-8","-1,0,-7","-1,0,-6","-1,0,-5","-1,0,-4","-1,0,-3","-1,0,-2","-1,0,-1","-1,0,0","-1,0,1","-1,0,2","-1,0,3","-1,0,4","-1,0,5","-1,0,6","-1,0,7","-1,0,8","-1,0,9","-1,0,10","-1,0,11","-1,0,12","-1,0,13","-1,0,14","-1,0,15","-1,0,16","-1,0,17","-1,0,18","-1,0,19","-1,0,20","-1,0,21","-1,1,-20","-1,1,-19","-1,1,-18","-1,1,-17","-1,1,-16","-1,1,-15","-1,1,-14","-1,1,-13","-1,1,-12","-1,1,-11","-1,1,-10","-1,1,-9","-1,1,-8","-1,1,-7","-1,1,-6","-1,1,-5","-1,1,5","-1,1,6","-1,1,7","-1,1,8","-1,1,9","-1,1,10","-1,1,11","-1,1,12","-1,1,13","-1,1,14","-1,1,15","-1,1,16","-1,1,17","-1,1,18","-1,1,19","-1,1,20","-1,2,-20","-1,2,-19","-1,2,-18","-1,2,-17","-1,2,-16","-1,2,-15","-1,2,-14","-1,2,-13","-1,2,-12","-1,2,-11","-1,2,-10","-1,2,-9","-1,2,-8","-1,2,-7","-1,2,-6","-1,2,-5","-1,2,5","-1,2,6","-1,2,7","-1,2,8","-1,2,9","-1,2,10","-1,2,11","-1,2,12","-1,2,13","-1,2,14","-1,2,15","-1,2,16","-1,2,17","-1,2,18","-1,2,19","-1,2,20","-1,3,-20","-1,3,-19","-1,3,-18","-1,3,-17","-1,3,-16","-1,3,-15","-1,3,-14","-1,3,-13","-1,3,-12","-1,3,-11","-1,3,-10","-1,3,-9","-1,3,-8","-1,3,-7","-1,3,-6","-1,3,-5","-1,3,5","-1,3,6","-1,3,7","-1,3,8","-1,3,9","-1,3,10","-1,3,11","-1,3,12","-1,3,13","-1,3,14","-1,3,15","-1,3,16","-1,3,17","-1,3,18","-1,3,19","-1,3,20","-1,4,-20","-1,4,-19","-1,4,-18","-1,4,-17","-1,4,-16","-1,4,-15","-1,4,-14","-1,4,-13","-1,4,-12","-1,4,-11","-1,4,-10","-1,4,-9","-1,4,-8","-1,4,-7","-1,4,-6","-1,4,-5","-1,4,5","-1,4,6","-1,4,7","-1,4,8","-1,4,9","-1,4,10","-1,4,11","-1,4,12","-1,4,13","-1,4,14","-1,4,15","-1,4,16","-1,4,17","-1,4,18","-1,4,19","-1,4,20","-1,5,-20","-1,5,-19","-1,5,-18","-1,5,-17","-1,5,-16","-1,5,-15","-1,5,-14","-1,5,-13","-1,5,-12","-1,5,-11","-1,5,-10","-1,5,-9","-1,5,-8","-1,5,-7","-1,5,-6","-1,5,-5","-1,5,5","-1,5,6","-1,5,7","-1,5,8","-1,5,9","-1,5,10","-1,5,11","-1,5,12","-1,5,13","-1,5,14","-1,5,15","-1,5,16","-1,5,17","-1,5,18","-1,5,19","-1,5,20","-1,6,-20","-1,6,-19","-1,6,-18","-1,6,-17","-1,6,-16","-1,6,-15","-1,6,-14","-1,6,-13","-1,6,-12","-1,6,-11","-1,6,-10","-1,6,-9","-1,6,-8","-1,6,-7","-1,6,-6","-1,6,-5","-1,6,5","-1,6,6","-1,6,7","-1,6,8","-1,6,9","-1,6,10","-1,6,11","-1,6,12","-1,6,13","-1,6,14","-1,6,15","-1,6,16","-1,6,17","-1,6,18","-1,6,19","-1,6,20","-1,7,-20","-1,7,-19","-1,7,-18","-1,7,5","-1,7,6","-1,7,7","-1,7,8","-1,7,9","-1,7,10","-1,7,11","-1,7,12","-1,7,13","-1,7,14","-1,7,15","-1,7,16","-1,7,17","-1,7,18","-1,7,19","-1,7,20","-1,8,-20","-1,8,-19","-1,8,-18","-1,8,18","-1,8,19","-1,8,20","-1,9,-20","-1,9,-19","-1,9,-18","-1,9,18","-1,9,19","-1,9,20","-1,10,-20","-1,10,-19","-1,10,-18","-1,10,18","-1,10,19","-1,10,20","-1,11,-20","-1,11,-19","-1,11,-18","-1,11,18","-1,11,19","-1,11,20","-1,12,-20","-1,12,-19","-1,12,-18","-1,12,18","-1,12,19","-1,12,20","-1,13,-20","-1,13,-19","-1,13,-18","-1,13,18","-1,13,19","-1,13,20","-1,14,-20","-1,14,-19","-1,14,-18","-1,14,-17","-1,14,-16","-1,14,-15","-1,14,-14","-1,14,-13","-1,14,-12","-1,14,-11","-1,14,-10","-1,14,-9","-1,14,-8","-1,14,-7","-1,14,-6","-1,14,-5","-1,14,-4","-1,14,-3","-1,14,-2","-1,14,-1","-1,14,0","-1,14,1","-1,14,2","-1,14,3","-1,14,4","-1,14,5","-1,14,6","-1,14,7","-1,14,8","-1,14,9","-1,14,10","-1,14,11","-1,14,12","-1,14,13","-1,14,14","-1,14,15","-1,14,16","-1,14,17","-1,14,18","-1,14,19","-1,14,20","-1,15,-20","-1,15,-19","-1,15,-18","-1,15,-17","-1,15,-16","-1,15,-15","-1,15,-14","-1,15,-13","-1,15,-12","-1,15,-11","-1,15,-10","-1,15,-9","-1,15,-8","-1,15,-7","-1,15,-6","-1,15,-5","-1,15,-4","-1,15,-3","-1,15,-2","-1,15,-1","-1,15,0","-1,15,1","-1,15,2","-1,15,3","-1,15,4","-1,15,5","-1,15,6","-1,15,7","-1,15,8","-1,15,9","-1,15,10","-1,15,11","-1,15,12","-1,15,13","-1,15,14","-1,15,15","-1,15,16","-1,15,17","-1,15,18","-1,15,19","-1,15,20","0,0,-21","0,0,-20","0,0,-19","0,0,-18","0,0,-17","0,0,-16","0,0,-15","0,0,-14","0,0,-13","0,0,-12","0,0,-11","0,0,-10","0,0,-9","0,0,-8","0,0,-7","0,0,-6","0,0,-5","0,0,-4","0,0,-3","0,0,-2","0,0,-1","0,0,0","0,0,1","0,0,2","0,0,3","0,0,4","0,0,5","0,0,6","0,0,7","0,0,8","0,0,9","0,0,10","0,0,11","0,0,12","0,0,13","0,0,14","0,0,15","0,0,16","0,0,17","0,0,18","0,0,19","0,0,20","0,0,21","0,1,-20","0,1,-19","0,1,-18","0,1,-17","0,1,-16","0,1,-15","0,1,-14","0,1,-13","0,1,-12","0,1,-11","0,1,-10","0,1,-9","0,1,-8","0,1,-7","0,1,-6","0,1,-5","0,1,5","0,1,6","0,1,7","0,1,8","0,1,9","0,1,10","0,1,11","0,1,12","0,1,13","0,1,14","0,1,15","0,1,16","0,1,17","0,1,18","0,1,19","0,1,20","0,2,-20","0,2,-19","0,2,-18","0,2,-17","0,2,-16","0,2,-15","0,2,-14","0,2,-13","0,2,-12","0,2,-11","0,2,-10","0,2,-9","0,2,-8","0,2,-7","0,2,-6","0,2,-5","0,2,5","0,2,6","0,2,7","0,2,8","0,2,9","0,2,10","0,2,11","0,2,12","0,2,13","0,2,14","0,2,15","0,2,16","0,2,17","0,2,18","0,2,19","0,2,20","0,3,-20","0,3,-19","0,3,-18","0,3,-17","0,3,-16","0,3,-15","0,3,-14","0,3,-13","0,3,-12","0,3,-11","0,3,-10","0,3,-9","0,3,-8","0,3,-7","0,3,-6","0,3,-5","0,3,5","0,3,6","0,3,7","0,3,8","0,3,9","0,3,10","0,3,11","0,3,12","0,3,13","0,3,14","0,3,15","0,3,16","0,3,17","0,3,18","0,3,19","0,3,20","0,4,-20","0,4,-19","0,4,-18","0,4,-17","0,4,-16","0,4,-15","0,4,-14","0,4,-13","0,4,-12","0,4,-11","0,4,-10","0,4,-9","0,4,-8","0,4,-7","0,4,-6","0,4,-5","0,4,5","0,4,6","0,4,7","0,4,8","0,4,9","0,4,10","0,4,11","0,4,12","0,4,13","0,4,14","0,4,15","0,4,16","0,4,17","0,4,18","0,4,19","0,4,20","0,5,-20","0,5,-19","0,5,-18","0,5,-17","0,5,-16","0,5,-15","0,5,-14","0,5,-13","0,5,-12","0,5,-11","0,5,-10","0,5,-9","0,5,-8","0,5,-7","0,5,-6","0,5,-5","0,5,5","0,5,6","0,5,7","0,5,8","0,5,9","0,5,10","0,5,11","0,5,12","0,5,13","0,5,14","0,5,15","0,5,16","0,5,17","0,5,18","0,5,19","0,5,20","0,6,-20","0,6,-19","0,6,-18","0,6,-17","0,6,-16","0,6,-15","0,6,-14","0,6,-13","0,6,-12","0,6,-11","0,6,-10","0,6,-9","0,6,-8","0,6,-7","0,6,-6","0,6,-5","0,6,5","0,6,6","0,6,7","0,6,8","0,6,9","0,6,10","0,6,11","0,6,12","0,6,13","0,6,14","0,6,15","0,6,16","0,6,17","0,6,18","0,6,19","0,6,20","0,7,-20","0,7,-19","0,7,-18","0,7,5","0,7,6","0,7,7","0,7,8","0,7,9","0,7,10","0,7,11","0,7,12","0,7,13","0,7,14","0,7,15","0,7,16","0,7,17","0,7,18","0,7,19","0,7,20","0,8,-20","0,8,-19","0,8,-18","0,8,18","0,8,19","0,8,20","0,9,-20","0,9,-19","0,9,-18","0,9,18","0,9,19","0,9,20","0,10,-20","0,10,-19","0,10,-18","0,10,18","0,10,19","0,10,20","0,11,-20","0,11,-19","0,11,-18","0,11,18","0,11,19","0,11,20","0,12,-20","0,12,-19","0,12,-18","0,12,18","0,12,19","0,12,20","0,13,-20","0,13,-19","0,13,-18","0,13,18","0,13,19","0,13,20","0,14,-20","0,14,-19","0,14,-18","0,14,-17","0,14,-16","0,14,-15","0,14,-14","0,14,-13","0,14,-12","0,14,-11","0,14,-10","0,14,-9","0,14,-8","0,14,-7","0,14,-6","0,14,-5","0,14,-4","0,14,-3","0,14,-2","0,14,-1","0,14,0","0,14,1","0,14,2","0,14,3","0,14,4","0,14,5","0,14,6","0,14,7","0,14,8","0,14,9","0,14,10","0,14,11","0,14,12","0,14,13","0,14,14","0,14,15","0,14,16","0,14,17","0,14,18","0,14,19","0,14,20","0,15,-20","0,15,-19","0,15,-18","0,15,-17","0,15,-16","0,15,-15","0,15,-14","0,15,-13","0,15,-12","0,15,-11","0,15,-10","0,15,-9","0,15,-8","0,15,-7","0,15,-6","0,15,-5","0,15,-4","0,15,-3","0,15,-2","0,15,-1","0,15,0","0,15,1","0,15,2","0,15,3","0,15,4","0,15,5","0,15,6","0,15,7","0,15,8","0,15,9","0,15,10","0,15,11","0,15,12","0,15,13","0,15,14","0,15,15","0,15,16","0,15,17","0,15,18","0,15,19","0,15,20","1,0,-21","1,0,-20","1,0,-19","1,0,-18","1,0,-17","1,0,-16","1,0,-15","1,0,-14","1,0,-13","1,0,-12","1,0,-11","1,0,-10","1,0,-9","1,0,-8","1,0,-7","1,0,-6","1,0,-5","1,0,-4","1,0,-3","1,0,-2","1,0,-1","1,0,0","1,0,1","1,0,2","1,0,3","1,0,4","1,0,5","1,0,6","1,0,7","1,0,8","1,0,9","1,0,10","1,0,11","1,0,12","1,0,13","1,0,14","1,0,15","1,0,16","1,0,17","1,0,18","1,0,19","1,0,20","1,0,21","1,1,-20","1,1,-19","1,1,-18","1,1,-17","1,1,-16","1,1,-15","1,1,-14","1,1,-13","1,1,-12","1,1,-11","1,1,-10","1,1,-9","1,1,-8","1,1,-7","1,1,-6","1,1,-5","1,1,5","1,1,6","1,1,7","1,1,8","1,1,9","1,1,10","1,1,11","1,1,12","1,1,13","1,1,14","1,1,15","1,1,16","1,1,17","1,1,18","1,1,19","1,1,20","1,2,-20","1,2,-19","1,2,-18","1,2,-17","1,2,-16","1,2,-15","1,2,-14","1,2,-13","1,2,-12","1,2,-11","1,2,-10","1,2,-9","1,2,-8","1,2,-7","1,2,-6","1,2,-5","1,2,5","1,2,6","1,2,7","1,2,8","1,2,9","1,2,10","1,2,11","1,2,12","1,2,13","1,2,14","1,2,15","1,2,16","1,2,17","1,2,18","1,2,19","1,2,20","1,3,-20","1,3,-19","1,3,-18","1,3,-17","1,3,-16","1,3,-15","1,3,-14","1,3,-13","1,3,-12","1,3,-11","1,3,-10","1,3,-9","1,3,-8","1,3,-7","1,3,-6","1,3,-5","1,3,5","1,3,6","1,3,7","1,3,8","1,3,9","1,3,10","1,3,11","1,3,12","1,3,13","1,3,14","1,3,15","1,3,16","1,3,17","1,3,18","1,3,19","1,3,20","1,4,-20","1,4,-19","1,4,-18","1,4,-17","1,4,-16","1,4,-15","1,4,-14","1,4,-13","1,4,-12","1,4,-11","1,4,-10","1,4,-9","1,4,-8","1,4,-7","1,4,-6","1,4,-5","1,4,5","1,4,6","1,4,7","1,4,8","1,4,9","1,4,10","1,4,11","1,4,12","1,4,13","1,4,14","1,4,15","1,4,16","1,4,17","1,4,18","1,4,19","1,4,20","1,5,-20","1,5,-19","1,5,-18","1,5,-17","1,5,-16","1,5,-15","1,5,-14","1,5,-13","1,5,-12","1,5,-11","1,5,-10","1,5,-9","1,5,-8","1,5,-7","1,5,-6","1,5,-5","1,5,5","1,5,6","1,5,7","1,5,8","1,5,9","1,5,10","1,5,11","1,5,12","1,5,13","1,5,14","1,5,15","1,5,16","1,5,17","1,5,18","1,5,19","1,5,20","1,6,-20","1,6,-19","1,6,-18","1,6,-17","1,6,-16","1,6,-15","1,6,-14","1,6,-13","1,6,-12","1,6,-11","1,6,-10","1,6,-9","1,6,-8","1,6,-7","1,6,-6","1,6,-5","1,6,5","1,6,6","1,6,7","1,6,8","1,6,9","1,6,10","1,6,11","1,6,12","1,6,13","1,6,14","1,6,15","1,6,16","1,6,17","1,6,18","1,6,19","1,6,20","1,7,-20","1,7,-19","1,7,-18","1,7,5","1,7,6","1,7,7","1,7,8","1,7,9","1,7,10","1,7,11","1,7,12","1,7,13","1,7,14","1,7,15","1,7,16","1,7,17","1,7,18","1,7,19","1,7,20","1,8,-20","1,8,-19","1,8,-18","1,8,18","1,8,19","1,8,20","1,9,-20","1,9,-19","1,9,-18","1,9,18","1,9,19","1,9,20","1,10,-20","1,10,-19","1,10,-18","1,10,18","1,10,19","1,10,20","1,11,-20","1,11,-19","1,11,-18","1,11,18","1,11,19","1,11,20","1,12,-20","1,12,-19","1,12,-18","1,12,18","1,12,19","1,12,20","1,13,-20","1,13,-19","1,13,-18","1,13,18","1,13,19","1,13,20","1,14,-20","1,14,-19","1,14,-18","1,14,-17","1,14,-16","1,14,-15","1,14,-14","1,14,-13","1,14,-12","1,14,-11","1,14,-10","1,14,-9","1,14,-8","1,14,-7","1,14,-6","1,14,-5","1,14,-4","1,14,-3","1,14,-2","1,14,-1","1,14,0","1,14,1","1,14,2","1,14,3","1,14,4","1,14,5","1,14,6","1,14,7","1,14,8","1,14,9","1,14,10","1,14,11","1,14,12","1,14,13","1,14,14","1,14,15","1,14,16","1,14,17","1,14,18","1,14,19","1,14,20","1,15,-20","1,15,-19","1,15,-18","1,15,-17","1,15,-16","1,15,-15","1,15,-14","1,15,-13","1,15,-12","1,15,-11","1,15,-10","1,15,-9","1,15,-8","1,15,-7","1,15,-6","1,15,-5","1,15,-4","1,15,-3","1,15,-2","1,15,-1","1,15,0","1,15,1","1,15,2","1,15,3","1,15,4","1,15,5","1,15,6","1,15,7","1,15,8","1,15,9","1,15,10","1,15,11","1,15,12","1,15,13","1,15,14","1,15,15","1,15,16","1,15,17","1,15,18","1,15,19","1,15,20","2,0,-21","2,0,-20","2,0,-19","2,0,-18","2,0,-17","2,0,-16","2,0,-15","2,0,-14","2,0,-13","2,0,-12","2,0,-11","2,0,-10","2,0,-9","2,0,-8","2,0,-7","2,0,-6","2,0,-5","2,0,-4","2,0,-3","2,0,-2","2,0,-1","2,0,0","2,0,1","2,0,2","2,0,3","2,0,4","2,0,5","2,0,6","2,0,7","2,0,8","2,0,9","2,0,10","2,0,11","2,0,12","2,0,13","2,0,14","2,0,15","2,0,16","2,0,17","2,0,18","2,0,19","2,0,20","2,0,21","2,1,-20","2,1,-19","2,1,-18","2,1,-17","2,1,-16","2,1,-15","2,1,-14","2,1,-13","2,1,-12","2,1,-11","2,1,-10","2,1,-9","2,1,-8","2,1,-7","2,1,-6","2,1,-5","2,1,5","2,1,6","2,1,7","2,1,8","2,1,9","2,1,10","2,1,11","2,1,12","2,1,13","2,1,14","2,1,15","2,1,16","2,1,17","2,1,18","2,1,19","2,1,20","2,2,-20","2,2,-19","2,2,-18","2,2,-17","2,2,-16","2,2,-15","2,2,-14","2,2,-13","2,2,-12","2,2,-11","2,2,-10","2,2,-9","2,2,-8","2,2,-7","2,2,-6","2,2,-5","2,2,5","2,2,6","2,2,7","2,2,8","2,2,9","2,2,10","2,2,11","2,2,12","2,2,13","2,2,14","2,2,15","2,2,16","2,2,17","2,2,18","2,2,19","2,2,20","2,3,-20","2,3,-19","2,3,-18","2,3,-17","2,3,-16","2,3,-15","2,3,-14","2,3,-13","2,3,-12","2,3,-11","2,3,-10","2,3,-9","2,3,-8","2,3,-7","2,3,-6","2,3,-5","2,3,5","2,3,6","2,3,7","2,3,8","2,3,9","2,3,10","2,3,11","2,3,12","2,3,13","2,3,14","2,3,15","2,3,16","2,3,17","2,3,18","2,3,19","2,3,20","2,4,-20","2,4,-19","2,4,-18","2,4,-17","2,4,-16","2,4,-15","2,4,-14","2,4,-13","2,4,-12","2,4,-11","2,4,-10","2,4,-9","2,4,-8","2,4,-7","2,4,-6","2,4,-5","2,4,5","2,4,6","2,4,7","2,4,8","2,4,9","2,4,10","2,4,11","2,4,12","2,4,13","2,4,14","2,4,15","2,4,16","2,4,17","2,4,18","2,4,19","2,4,20","2,5,-20","2,5,-19","2,5,-18","2,5,-17","2,5,-16","2,5,-15","2,5,-14","2,5,-13","2,5,-12","2,5,-11","2,5,-10","2,5,-9","2,5,-8","2,5,-7","2,5,-6","2,5,-5","2,5,5","2,5,6","2,5,7","2,5,8","2,5,9","2,5,10","2,5,11","2,5,12","2,5,13","2,5,14","2,5,15","2,5,16","2,5,17","2,5,18","2,5,19","2,5,20","2,6,-20","2,6,-19","2,6,-18","2,6,-17","2,6,-16","2,6,-15","2,6,-14","2,6,-13","2,6,-12","2,6,-11","2,6,-10","2,6,-9","2,6,-8","2,6,-7","2,6,-6","2,6,-5","2,6,5","2,6,6","2,6,7","2,6,8","2,6,9","2,6,10","2,6,11","2,6,12","2,6,13","2,6,14","2,6,15","2,6,16","2,6,17","2,6,18","2,6,19","2,6,20","2,7,-20","2,7,-19","2,7,-18","2,7,5","2,7,6","2,7,7","2,7,8","2,7,9","2,7,10","2,7,11","2,7,12","2,7,13","2,7,14","2,7,15","2,7,16","2,7,17","2,7,18","2,7,19","2,7,20","2,8,-20","2,8,-19","2,8,-18","2,8,18","2,8,19","2,8,20","2,9,-20","2,9,-19","2,9,-18","2,9,18","2,9,19","2,9,20","2,10,-20","2,10,-19","2,10,-18","2,10,18","2,10,19","2,10,20","2,11,-20","2,11,-19","2,11,-18","2,11,18","2,11,19","2,11,20","2,12,-20","2,12,-19","2,12,-18","2,12,18","2,12,19","2,12,20","2,13,-20","2,13,-19","2,13,-18","2,13,18","2,13,19","2,13,20","2,14,-20","2,14,-19","2,14,-18","2,14,-17","2,14,-16","2,14,-15","2,14,-14","2,14,-13","2,14,-12","2,14,-11","2,14,-10","2,14,-9","2,14,-8","2,14,-7","2,14,-6","2,14,-5","2,14,-4","2,14,-3","2,14,-2","2,14,-1","2,14,0","2,14,1","2,14,2","2,14,3","2,14,4","2,14,5","2,14,6","2,14,7","2,14,8","2,14,9","2,14,10","2,14,11","2,14,12","2,14,13","2,14,14","2,14,15","2,14,16","2,14,17","2,14,18","2,14,19","2,14,20","2,15,-20","2,15,-19","2,15,-18","2,15,-17","2,15,-16","2,15,-15","2,15,-14","2,15,-13","2,15,-12","2,15,-11","2,15,-10","2,15,-9","2,15,-8","2,15,-7","2,15,-6","2,15,-5","2,15,-4","2,15,-3","2,15,-2","2,15,-1","2,15,0","2,15,1","2,15,2","2,15,3","2,15,4","2,15,5","2,15,6","2,15,7","2,15,8","2,15,9","2,15,10","2,15,11","2,15,12","2,15,13","2,15,14","2,15,15","2,15,16","2,15,17","2,15,18","2,15,19","2,15,20","3,0,-21","3,0,-20","3,0,-19","3,0,-18","3,0,-17","3,0,-16","3,0,-15","3,0,-14","3,0,-13","3,0,-12","3,0,-11","3,0,-10","3,0,-9","3,0,-8","3,0,-7","3,0,-6","3,0,-5","3,0,-4","3,0,-3","3,0,-2","3,0,-1","3,0,0","3,0,1","3,0,2","3,0,3","3,0,4","3,0,5","3,0,6","3,0,7","3,0,8","3,0,9","3,0,10","3,0,11","3,0,12","3,0,13","3,0,14","3,0,15","3,0,16","3,0,17","3,0,18","3,0,19","3,0,20","3,0,21","3,1,-20","3,1,-19","3,1,-18","3,1,-17","3,1,-16","3,1,-15","3,1,-14","3,1,-13","3,1,-12","3,1,-11","3,1,-10","3,1,-9","3,1,-8","3,1,-7","3,1,-6","3,1,-5","3,1,5","3,1,6","3,1,7","3,1,8","3,1,9","3,1,10","3,1,11","3,1,12","3,1,13","3,1,14","3,1,15","3,1,16","3,1,17","3,1,18","3,1,19","3,1,20","3,2,-20","3,2,-19","3,2,-18","3,2,-17","3,2,-16","3,2,-15","3,2,-14","3,2,-13","3,2,-12","3,2,-11","3,2,-10","3,2,-9","3,2,-8","3,2,-7","3,2,-6","3,2,-5","3,2,5","3,2,6","3,2,7","3,2,8","3,2,9","3,2,10","3,2,11","3,2,12","3,2,13","3,2,14","3,2,15","3,2,16","3,2,17","3,2,18","3,2,19","3,2,20","3,3,-20","3,3,-19","3,3,-18","3,3,-17","3,3,-16","3,3,-15","3,3,-14","3,3,-13","3,3,-12","3,3,-11","3,3,-10","3,3,-9","3,3,-8","3,3,-7","3,3,-6","3,3,-5","3,3,5","3,3,6","3,3,7","3,3,8","3,3,9","3,3,10","3,3,11","3,3,12","3,3,13","3,3,14","3,3,15","3,3,16","3,3,17","3,3,18","3,3,19","3,3,20","3,4,-20","3,4,-19","3,4,-18","3,4,-17","3,4,-16","3,4,-15","3,4,-14","3,4,-13","3,4,-12","3,4,-11","3,4,-10","3,4,-9","3,4,-8","3,4,-7","3,4,-6","3,4,-5","3,4,5","3,4,6","3,4,7","3,4,8","3,4,9","3,4,10","3,4,11","3,4,12","3,4,13","3,4,14","3,4,15","3,4,16","3,4,17","3,4,18","3,4,19","3,4,20","3,5,-20","3,5,-19","3,5,-18","3,5,-17","3,5,-16","3,5,-15","3,5,-14","3,5,-13","3,5,-12","3,5,-11","3,5,-10","3,5,-9","3,5,-8","3,5,-7","3,5,-6","3,5,-5","3,5,5","3,5,6","3,5,7","3,5,8","3,5,9","3,5,10","3,5,11","3,5,12","3,5,13","3,5,14","3,5,15","3,5,16","3,5,17","3,5,18","3,5,19","3,5,20","3,6,-20","3,6,-19","3,6,-18","3,6,-17","3,6,-16","3,6,-15","3,6,-14","3,6,-13","3,6,-12","3,6,-11","3,6,-10","3,6,-9","3,6,-8","3,6,-7","3,6,-6","3,6,-5","3,6,5","3,6,6","3,6,7","3,6,8","3,6,9","3,6,10","3,6,11","3,6,12","3,6,13","3,6,14","3,6,15","3,6,16","3,6,17","3,6,18","3,6,19","3,6,20","3,7,-20","3,7,-19","3,7,-18","3,7,5","3,7,6","3,7,7","3,7,8","3,7,9","3,7,10","3,7,11","3,7,12","3,7,13","3,7,14","3,7,15","3,7,16","3,7,17","3,7,18","3,7,19","3,7,20","3,8,-20","3,8,-19","3,8,-18","3,8,18","3,8,19","3,8,20","3,9,-20","3,9,-19","3,9,-18","3,9,18","3,9,19","3,9,20","3,10,-20","3,10,-19","3,10,-18","3,10,18","3,10,19","3,10,20","3,11,-20","3,11,-19","3,11,-18","3,11,18","3,11,19","3,11,20","3,12,-20","3,12,-19","3,12,-18","3,12,18","3,12,19","3,12,20","3,13,-20","3,13,-19","3,13,-18","3,13,18","3,13,19","3,13,20","3,14,-20","3,14,-19","3,14,-18","3,14,-17","3,14,-16","3,14,-15","3,14,-14","3,14,-13","3,14,-12","3,14,-11","3,14,-10","3,14,-9","3,14,-8","3,14,-7","3,14,-6","3,14,-5","3,14,-4","3,14,-3","3,14,-2","3,14,-1","3,14,0","3,14,1","3,14,2","3,14,3","3,14,4","3,14,5","3,14,6","3,14,7","3,14,8","3,14,9","3,14,10","3,14,11","3,14,12","3,14,13","3,14,14","3,14,15","3,14,16","3,14,17","3,14,18","3,14,19","3,14,20","3,15,-20","3,15,-19","3,15,-18","3,15,-17","3,15,-16","3,15,-15","3,15,-14","3,15,-13","3,15,-12","3,15,-11","3,15,-10","3,15,-9","3,15,-8","3,15,-7","3,15,-6","3,15,-5","3,15,-4","3,15,-3","3,15,-2","3,15,-1","3,15,0","3,15,1","3,15,2","3,15,3","3,15,4","3,15,5","3,15,6","3,15,7","3,15,8","3,15,9","3,15,10","3,15,11","3,15,12","3,15,13","3,15,14","3,15,15","3,15,16","3,15,17","3,15,18","3,15,19","3,15,20","4,0,-21","4,0,-20","4,0,-19","4,0,-18","4,0,-17","4,0,-16","4,0,-15","4,0,-14","4,0,-13","4,0,-12","4,0,-11","4,0,-10","4,0,-9","4,0,-8","4,0,-7","4,0,-6","4,0,-5","4,0,-4","4,0,-3","4,0,-2","4,0,-1","4,0,0","4,0,1","4,0,2","4,0,3","4,0,4","4,0,5","4,0,6","4,0,7","4,0,8","4,0,9","4,0,10","4,0,11","4,0,12","4,0,13","4,0,14","4,0,15","4,0,16","4,0,17","4,0,18","4,0,19","4,0,20","4,0,21","4,1,-20","4,1,-19","4,1,-18","4,1,-17","4,1,-16","4,1,-15","4,1,-14","4,1,-13","4,1,-12","4,1,-11","4,1,-10","4,1,-9","4,1,-8","4,1,-7","4,1,-6","4,1,-5","4,1,5","4,1,6","4,1,7","4,1,8","4,1,9","4,1,10","4,1,11","4,1,12","4,1,13","4,1,14","4,1,15","4,1,16","4,1,17","4,1,18","4,1,19","4,1,20","4,2,-20","4,2,-19","4,2,-18","4,2,-17","4,2,-16","4,2,-15","4,2,-14","4,2,-13","4,2,-12","4,2,-11","4,2,-10","4,2,-9","4,2,-8","4,2,-7","4,2,-6","4,2,-5","4,2,5","4,2,6","4,2,7","4,2,8","4,2,9","4,2,10","4,2,11","4,2,12","4,2,13","4,2,14","4,2,15","4,2,16","4,2,17","4,2,18","4,2,19","4,2,20","4,3,-20","4,3,-19","4,3,-18","4,3,-17","4,3,-16","4,3,-15","4,3,-14","4,3,-13","4,3,-12","4,3,-11","4,3,-10","4,3,-9","4,3,-8","4,3,-7","4,3,-6","4,3,-5","4,3,5","4,3,6","4,3,7","4,3,8","4,3,9","4,3,10","4,3,11","4,3,12","4,3,13","4,3,14","4,3,15","4,3,16","4,3,17","4,3,18","4,3,19","4,3,20","4,4,-20","4,4,-19","4,4,-18","4,4,-17","4,4,-16","4,4,-15","4,4,-14","4,4,-13","4,4,-12","4,4,-11","4,4,-10","4,4,-9","4,4,-8","4,4,-7","4,4,-6","4,4,-5","4,4,5","4,4,6","4,4,7","4,4,8","4,4,9","4,4,10","4,4,11","4,4,12","4,4,13","4,4,14","4,4,15","4,4,16","4,4,17","4,4,18","4,4,19","4,4,20","4,5,-20","4,5,-19","4,5,-18","4,5,-17","4,5,-16","4,5,-15","4,5,-14","4,5,-13","4,5,-12","4,5,-11","4,5,-10","4,5,-9","4,5,-8","4,5,-7","4,5,-6","4,5,-5","4,5,5","4,5,6","4,5,7","4,5,8","4,5,9","4,5,10","4,5,11","4,5,12","4,5,13","4,5,14","4,5,15","4,5,16","4,5,17","4,5,18","4,5,19","4,5,20","4,6,-20","4,6,-19","4,6,-18","4,6,-17","4,6,-16","4,6,-15","4,6,-14","4,6,-13","4,6,-12","4,6,-11","4,6,-10","4,6,-9","4,6,-8","4,6,-7","4,6,-6","4,6,-5","4,6,5","4,6,6","4,6,7","4,6,8","4,6,9","4,6,10","4,6,11","4,6,12","4,6,13","4,6,14","4,6,15","4,6,16","4,6,17","4,6,18","4,6,19","4,6,20","4,7,-20","4,7,-19","4,7,-18","4,7,5","4,7,6","4,7,7","4,7,8","4,7,9","4,7,10","4,7,11","4,7,12","4,7,13","4,7,14","4,7,15","4,7,16","4,7,17","4,7,18","4,7,19","4,7,20","4,8,-20","4,8,-19","4,8,-18","4,8,18","4,8,19","4,8,20","4,9,-20","4,9,-19","4,9,-18","4,9,18","4,9,19","4,9,20","4,10,-20","4,10,-19","4,10,-18","4,10,18","4,10,19","4,10,20","4,11,-20","4,11,-19","4,11,-18","4,11,18","4,11,19","4,11,20","4,12,-20","4,12,-19","4,12,-18","4,12,18","4,12,19","4,12,20","4,13,-20","4,13,-19","4,13,-18","4,13,18","4,13,19","4,13,20","4,14,-20","4,14,-19","4,14,-18","4,14,-17","4,14,-16","4,14,-15","4,14,-14","4,14,-13","4,14,-12","4,14,-11","4,14,-10","4,14,-9","4,14,-8","4,14,-7","4,14,-6","4,14,-5","4,14,-4","4,14,-3","4,14,-2","4,14,-1","4,14,0","4,14,1","4,14,2","4,14,3","4,14,4","4,14,5","4,14,6","4,14,7","4,14,8","4,14,9","4,14,10","4,14,11","4,14,12","4,14,13","4,14,14","4,14,15","4,14,16","4,14,17","4,14,18","4,14,19","4,14,20","4,15,-20","4,15,-19","4,15,-18","4,15,-17","4,15,-16","4,15,-15","4,15,-14","4,15,-13","4,15,-12","4,15,-11","4,15,-10","4,15,-9","4,15,-8","4,15,-7","4,15,-6","4,15,-5","4,15,-4","4,15,-3","4,15,-2","4,15,-1","4,15,0","4,15,1","4,15,2","4,15,3","4,15,4","4,15,5","4,15,6","4,15,7","4,15,8","4,15,9","4,15,10","4,15,11","4,15,12","4,15,13","4,15,14","4,15,15","4,15,16","4,15,17","4,15,18","4,15,19","4,15,20","5,0,-21","5,0,-20","5,0,-19","5,0,-18","5,0,-17","5,0,-16","5,0,-15","5,0,-14","5,0,-13","5,0,-12","5,0,-11","5,0,-10","5,0,-9","5,0,-8","5,0,-7","5,0,-6","5,0,-5","5,0,-4","5,0,-3","5,0,-2","5,0,-1","5,0,0","5,0,1","5,0,2","5,0,3","5,0,4","5,0,5","5,0,6","5,0,7","5,0,8","5,0,9","5,0,10","5,0,11","5,0,12","5,0,13","5,0,14","5,0,15","5,0,16","5,0,17","5,0,18","5,0,19","5,0,20","5,0,21","5,1,-20","5,1,-19","5,1,-18","5,1,-17","5,1,-16","5,1,-15","5,1,-14","5,1,-13","5,1,-12","5,1,-11","5,1,-10","5,1,-9","5,1,-8","5,1,-7","5,1,-6","5,1,-5","5,1,5","5,1,6","5,1,7","5,1,8","5,1,9","5,1,10","5,1,11","5,1,12","5,1,13","5,1,14","5,1,15","5,1,16","5,1,17","5,1,18","5,1,19","5,1,20","5,2,-20","5,2,-19","5,2,-18","5,2,-17","5,2,-16","5,2,-15","5,2,-14","5,2,-13","5,2,-12","5,2,-11","5,2,-10","5,2,-9","5,2,-8","5,2,-7","5,2,-6","5,2,-5","5,2,5","5,2,6","5,2,7","5,2,8","5,2,9","5,2,10","5,2,11","5,2,12","5,2,13","5,2,14","5,2,15","5,2,16","5,2,17","5,2,18","5,2,19","5,2,20","5,3,-20","5,3,-19","5,3,-18","5,3,-17","5,3,-16","5,3,-15","5,3,-14","5,3,-13","5,3,-12","5,3,-11","5,3,-10","5,3,-9","5,3,-8","5,3,-7","5,3,-6","5,3,-5","5,3,5","5,3,6","5,3,7","5,3,8","5,3,9","5,3,10","5,3,11","5,3,12","5,3,13","5,3,14","5,3,15","5,3,16","5,3,17","5,3,18","5,3,19","5,3,20","5,4,-20","5,4,-19","5,4,-18","5,4,-17","5,4,-16","5,4,-15","5,4,-14","5,4,-13","5,4,-12","5,4,-11","5,4,-10","5,4,-9","5,4,-8","5,4,-7","5,4,-6","5,4,-5","5,4,5","5,4,6","5,4,7","5,4,8","5,4,9","5,4,10","5,4,11","5,4,12","5,4,13","5,4,14","5,4,15","5,4,16","5,4,17","5,4,18","5,4,19","5,4,20","5,5,-20","5,5,-19","5,5,-18","5,5,-17","5,5,-16","5,5,-15","5,5,-14","5,5,-13","5,5,-12","5,5,-11","5,5,-10","5,5,-9","5,5,-8","5,5,-7","5,5,-6","5,5,-5","5,5,5","5,5,6","5,5,7","5,5,8","5,5,9","5,5,10","5,5,11","5,5,12","5,5,13","5,5,14","5,5,15","5,5,16","5,5,17","5,5,18","5,5,19","5,5,20","5,6,-20","5,6,-19","5,6,-18","5,6,-17","5,6,-16","5,6,-15","5,6,-14","5,6,-13","5,6,-12","5,6,-11","5,6,-10","5,6,-9","5,6,-8","5,6,-7","5,6,-6","5,6,-5","5,6,5","5,6,6","5,6,7","5,6,8","5,6,9","5,6,10","5,6,11","5,6,12","5,6,13","5,6,14","5,6,15","5,6,16","5,6,17","5,6,18","5,6,19","5,6,20","5,7,-20","5,7,-19","5,7,-18","5,7,5","5,7,6","5,7,7","5,7,8","5,7,9","5,7,10","5,7,11","5,7,12","5,7,13","5,7,14","5,7,15","5,7,16","5,7,17","5,7,18","5,7,19","5,7,20","5,8,-20","5,8,-19","5,8,-18","5,8,18","5,8,19","5,8,20","5,9,-20","5,9,-19","5,9,-18","5,9,18","5,9,19","5,9,20","5,10,-20","5,10,-19","5,10,-18","5,10,18","5,10,19","5,10,20","5,11,-20","5,11,-19","5,11,-18","5,11,18","5,11,19","5,11,20","5,12,-20","5,12,-19","5,12,-18","5,12,18","5,12,19","5,12,20","5,13,-20","5,13,-19","5,13,-18","5,13,18","5,13,19","5,13,20","5,14,-20","5,14,-19","5,14,-18","5,14,-17","5,14,-16","5,14,-15","5,14,-14","5,14,-13","5,14,-12","5,14,-11","5,14,-10","5,14,-9","5,14,-8","5,14,-7","5,14,-6","5,14,-5","5,14,-4","5,14,-3","5,14,-2","5,14,-1","5,14,0","5,14,1","5,14,2","5,14,3","5,14,4","5,14,5","5,14,6","5,14,7","5,14,8","5,14,9","5,14,10","5,14,11","5,14,12","5,14,13","5,14,14","5,14,15","5,14,16","5,14,17","5,14,18","5,14,19","5,14,20","5,15,-20","5,15,-19","5,15,-18","5,15,-17","5,15,-16","5,15,-15","5,15,-14","5,15,-13","5,15,-12","5,15,-11","5,15,-10","5,15,-9","5,15,-8","5,15,-7","5,15,-6","5,15,-5","5,15,-4","5,15,-3","5,15,-2","5,15,-1","5,15,0","5,15,1","5,15,2","5,15,3","5,15,4","5,15,5","5,15,6","5,15,7","5,15,8","5,15,9","5,15,10","5,15,11","5,15,12","5,15,13","5,15,14","5,15,15","5,15,16","5,15,17","5,15,18","5,15,19","5,15,20","6,0,-21","6,0,-20","6,0,-19","6,0,-18","6,0,-17","6,0,-16","6,0,-15","6,0,-14","6,0,-13","6,0,-12","6,0,-11","6,0,-10","6,0,-9","6,0,-8","6,0,-7","6,0,-6","6,0,-5","6,0,-4","6,0,-3","6,0,-2","6,0,-1","6,0,0","6,0,1","6,0,2","6,0,3","6,0,4","6,0,5","6,0,6","6,0,7","6,0,8","6,0,9","6,0,10","6,0,11","6,0,12","6,0,13","6,0,14","6,0,15","6,0,16","6,0,17","6,0,18","6,0,19","6,0,20","6,0,21","6,1,-20","6,1,-19","6,1,-18","6,1,-17","6,1,-16","6,1,-15","6,1,-14","6,1,-13","6,1,-12","6,1,-11","6,1,-10","6,1,-9","6,1,-8","6,1,-7","6,1,-6","6,1,-5","6,1,5","6,1,6","6,1,7","6,1,8","6,1,9","6,1,10","6,1,11","6,1,12","6,1,13","6,1,14","6,1,15","6,1,16","6,1,17","6,1,18","6,1,19","6,1,20","6,2,-20","6,2,-19","6,2,-18","6,2,-17","6,2,-16","6,2,-15","6,2,-14","6,2,-13","6,2,-12","6,2,-11","6,2,-10","6,2,-9","6,2,-8","6,2,-7","6,2,-6","6,2,-5","6,2,5","6,2,6","6,2,7","6,2,8","6,2,9","6,2,10","6,2,11","6,2,12","6,2,13","6,2,14","6,2,15","6,2,16","6,2,17","6,2,18","6,2,19","6,2,20","6,3,-20","6,3,-19","6,3,-18","6,3,-17","6,3,-16","6,3,-15","6,3,-14","6,3,-13","6,3,-12","6,3,-11","6,3,-10","6,3,-9","6,3,-8","6,3,-7","6,3,-6","6,3,-5","6,3,5","6,3,6","6,3,7","6,3,8","6,3,9","6,3,10","6,3,11","6,3,12","6,3,13","6,3,14","6,3,15","6,3,16","6,3,17","6,3,18","6,3,19","6,3,20","6,4,-20","6,4,-19","6,4,-18","6,4,-17","6,4,-16","6,4,-15","6,4,-14","6,4,-13","6,4,-12","6,4,-11","6,4,-10","6,4,-9","6,4,-8","6,4,-7","6,4,-6","6,4,-5","6,4,5","6,4,6","6,4,7","6,4,8","6,4,9","6,4,10","6,4,11","6,4,12","6,4,13","6,4,14","6,4,15","6,4,16","6,4,17","6,4,18","6,4,19","6,4,20","6,5,-20","6,5,-19","6,5,-18","6,5,-17","6,5,-16","6,5,-15","6,5,-14","6,5,-13","6,5,-12","6,5,-11","6,5,-10","6,5,-9","6,5,-8","6,5,-7","6,5,-6","6,5,-5","6,5,5","6,5,6","6,5,7","6,5,8","6,5,9","6,5,10","6,5,11","6,5,12","6,5,13","6,5,14","6,5,15","6,5,16","6,5,17","6,5,18","6,5,19","6,5,20","6,6,-20","6,6,-19","6,6,-18","6,6,-17","6,6,-16","6,6,-15","6,6,-14","6,6,-13","6,6,-12","6,6,-11","6,6,-10","6,6,-9","6,6,-8","6,6,-7","6,6,-6","6,6,-5","6,6,5","6,6,6","6,6,7","6,6,8","6,6,9","6,6,10","6,6,11","6,6,12","6,6,13","6,6,14","6,6,15","6,6,16","6,6,17","6,6,18","6,6,19","6,6,20","6,7,-20","6,7,-19","6,7,-18","6,7,5","6,7,6","6,7,7","6,7,8","6,7,9","6,7,10","6,7,11","6,7,12","6,7,13","6,7,14","6,7,15","6,7,16","6,7,17","6,7,18","6,7,19","6,7,20","6,8,-20","6,8,-19","6,8,-18","6,8,18","6,8,19","6,8,20","6,9,-20","6,9,-19","6,9,-18","6,9,18","6,9,19","6,9,20","6,10,-20","6,10,-19","6,10,-18","6,10,18","6,10,19","6,10,20","6,11,-20","6,11,-19","6,11,-18","6,11,18","6,11,19","6,11,20","6,12,-20","6,12,-19","6,12,-18","6,12,18","6,12,19","6,12,20","6,13,-20","6,13,-19","6,13,-18","6,13,18","6,13,19","6,13,20","6,14,-20","6,14,-19","6,14,-18","6,14,-17","6,14,-16","6,14,-15","6,14,-14","6,14,-13","6,14,-12","6,14,-11","6,14,-10","6,14,-9","6,14,-8","6,14,-7","6,14,-6","6,14,-5","6,14,-4","6,14,-3","6,14,-2","6,14,-1","6,14,0","6,14,1","6,14,2","6,14,3","6,14,4","6,14,5","6,14,6","6,14,7","6,14,8","6,14,9","6,14,10","6,14,11","6,14,12","6,14,13","6,14,14","6,14,15","6,14,16","6,14,17","6,14,18","6,14,19","6,14,20","6,15,-20","6,15,-19","6,15,-18","6,15,-17","6,15,-16","6,15,-15","6,15,-14","6,15,-13","6,15,-12","6,15,-11","6,15,-10","6,15,-9","6,15,-8","6,15,-7","6,15,-6","6,15,-5","6,15,-4","6,15,-3","6,15,-2","6,15,-1","6,15,0","6,15,1","6,15,2","6,15,3","6,15,4","6,15,5","6,15,6","6,15,7","6,15,8","6,15,9","6,15,10","6,15,11","6,15,12","6,15,13","6,15,14","6,15,15","6,15,16","6,15,17","6,15,18","6,15,19","6,15,20","7,0,-21","7,0,-20","7,0,-19","7,0,-18","7,0,-17","7,0,-16","7,0,-15","7,0,-14","7,0,-13","7,0,-12","7,0,-11","7,0,-10","7,0,-9","7,0,-8","7,0,-7","7,0,-6","7,0,-5","7,0,-4","7,0,-3","7,0,-2","7,0,-1","7,0,0","7,0,1","7,0,2","7,0,3","7,0,4","7,0,5","7,0,6","7,0,7","7,0,8","7,0,9","7,0,10","7,0,11","7,0,12","7,0,13","7,0,14","7,0,15","7,0,16","7,0,17","7,0,18","7,0,19","7,0,20","7,0,21","7,1,-20","7,1,-19","7,1,-18","7,1,-17","7,1,-16","7,1,-15","7,1,-14","7,1,-13","7,1,-12","7,1,-11","7,1,-10","7,1,-9","7,1,-8","7,1,-7","7,1,-6","7,1,-5","7,1,5","7,1,6","7,1,7","7,1,8","7,1,9","7,1,10","7,1,11","7,1,12","7,1,13","7,1,14","7,1,15","7,1,16","7,1,17","7,1,18","7,1,19","7,1,20","7,2,-20","7,2,-19","7,2,-18","7,2,-17","7,2,-16","7,2,-15","7,2,-14","7,2,-13","7,2,-12","7,2,-11","7,2,-10","7,2,-9","7,2,-8","7,2,-7","7,2,-6","7,2,-5","7,2,5","7,2,6","7,2,7","7,2,8","7,2,9","7,2,10","7,2,11","7,2,12","7,2,13","7,2,14","7,2,15","7,2,16","7,2,17","7,2,18","7,2,19","7,2,20","7,3,-20","7,3,-19","7,3,-18","7,3,-17","7,3,-16","7,3,-15","7,3,-14","7,3,-13","7,3,-12","7,3,-11","7,3,-10","7,3,-9","7,3,-8","7,3,-7","7,3,-6","7,3,-5","7,3,5","7,3,6","7,3,7","7,3,8","7,3,9","7,3,10","7,3,11","7,3,12","7,3,13","7,3,14","7,3,15","7,3,16","7,3,17","7,3,18","7,3,19","7,3,20","7,4,-20","7,4,-19","7,4,-18","7,4,-17","7,4,-16","7,4,-15","7,4,-14","7,4,-13","7,4,-12","7,4,-11","7,4,-10","7,4,-9","7,4,-8","7,4,-7","7,4,-6","7,4,-5","7,4,5","7,4,6","7,4,7","7,4,8","7,4,9","7,4,10","7,4,11","7,4,12","7,4,13","7,4,14","7,4,15","7,4,16","7,4,17","7,4,18","7,4,19","7,4,20","7,5,-20","7,5,-19","7,5,-18","7,5,-17","7,5,-16","7,5,-15","7,5,-14","7,5,-13","7,5,-12","7,5,-11","7,5,-10","7,5,-9","7,5,-8","7,5,-7","7,5,-6","7,5,-5","7,5,5","7,5,6","7,5,7","7,5,8","7,5,9","7,5,10","7,5,11","7,5,12","7,5,13","7,5,14","7,5,15","7,5,16","7,5,17","7,5,18","7,5,19","7,5,20","7,6,-20","7,6,-19","7,6,-18","7,6,-17","7,6,-16","7,6,-15","7,6,-14","7,6,-13","7,6,-12","7,6,-11","7,6,-10","7,6,-9","7,6,-8","7,6,-7","7,6,-6","7,6,-5","7,6,5","7,6,6","7,6,7","7,6,8","7,6,9","7,6,10","7,6,11","7,6,12","7,6,13","7,6,14","7,6,15","7,6,16","7,6,17","7,6,18","7,6,19","7,6,20","7,7,-20","7,7,-19","7,7,-18","7,7,5","7,7,6","7,7,7","7,7,8","7,7,9","7,7,10","7,7,11","7,7,12","7,7,13","7,7,14","7,7,15","7,7,16","7,7,17","7,7,18","7,7,19","7,7,20","7,8,-20","7,8,-19","7,8,-18","7,8,18","7,8,19","7,8,20","7,9,-20","7,9,-19","7,9,-18","7,9,18","7,9,19","7,9,20","7,10,-20","7,10,-19","7,10,-18","7,10,18","7,10,19","7,10,20","7,11,-20","7,11,-19","7,11,-18","7,11,18","7,11,19","7,11,20","7,12,-20","7,12,-19","7,12,-18","7,12,18","7,12,19","7,12,20","7,13,-20","7,13,-19","7,13,-18","7,13,18","7,13,19","7,13,20","7,14,-20","7,14,-19","7,14,-18","7,14,-17","7,14,-16","7,14,-15","7,14,-14","7,14,-13","7,14,-12","7,14,-11","7,14,-10","7,14,-9","7,14,-8","7,14,-7","7,14,-6","7,14,-5","7,14,-4","7,14,-3","7,14,-2","7,14,-1","7,14,0","7,14,1","7,14,2","7,14,3","7,14,4","7,14,5","7,14,6","7,14,7","7,14,8","7,14,9","7,14,10","7,14,11","7,14,12","7,14,13","7,14,14","7,14,15","7,14,16","7,14,17","7,14,18","7,14,19","7,14,20","7,15,-20","7,15,-19","7,15,-18","7,15,-17","7,15,-16","7,15,-15","7,15,-14","7,15,-13","7,15,-12","7,15,-11","7,15,-10","7,15,-9","7,15,-8","7,15,-7","7,15,-6","7,15,-5","7,15,-4","7,15,-3","7,15,-2","7,15,-1","7,15,0","7,15,1","7,15,2","7,15,3","7,15,4","7,15,5","7,15,6","7,15,7","7,15,8","7,15,9","7,15,10","7,15,11","7,15,12","7,15,13","7,15,14","7,15,15","7,15,16","7,15,17","7,15,18","7,15,19","7,15,20","8,0,-21","8,0,-20","8,0,-19","8,0,-18","8,0,-17","8,0,-16","8,0,-15","8,0,-14","8,0,-13","8,0,-12","8,0,-11","8,0,-10","8,0,-9","8,0,-8","8,0,-7","8,0,-6","8,0,-5","8,0,-4","8,0,-3","8,0,-2","8,0,-1","8,0,0","8,0,1","8,0,2","8,0,3","8,0,4","8,0,5","8,0,6","8,0,7","8,0,8","8,0,9","8,0,10","8,0,11","8,0,12","8,0,13","8,0,14","8,0,15","8,0,16","8,0,17","8,0,18","8,0,19","8,0,20","8,0,21","8,1,-20","8,1,-19","8,1,-18","8,1,-17","8,1,-16","8,1,-15","8,1,-14","8,1,-13","8,1,-12","8,1,-11","8,1,-10","8,1,-9","8,1,-8","8,1,-7","8,1,-6","8,1,-5","8,1,5","8,1,6","8,1,7","8,1,8","8,1,9","8,1,10","8,1,11","8,1,12","8,1,13","8,1,14","8,1,15","8,1,16","8,1,17","8,1,18","8,1,19","8,1,20","8,2,-20","8,2,-19","8,2,-18","8,2,-17","8,2,-16","8,2,-15","8,2,-14","8,2,-13","8,2,-12","8,2,-11","8,2,-10","8,2,-9","8,2,-8","8,2,-7","8,2,-6","8,2,-5","8,2,5","8,2,6","8,2,7","8,2,8","8,2,9","8,2,10","8,2,11","8,2,12","8,2,13","8,2,14","8,2,15","8,2,16","8,2,17","8,2,18","8,2,19","8,2,20","8,3,-20","8,3,-19","8,3,-18","8,3,-17","8,3,-16","8,3,-15","8,3,-14","8,3,-13","8,3,-12","8,3,-11","8,3,-10","8,3,-9","8,3,-8","8,3,-7","8,3,-6","8,3,-5","8,3,5","8,3,6","8,3,7","8,3,8","8,3,9","8,3,10","8,3,11","8,3,12","8,3,13","8,3,14","8,3,15","8,3,16","8,3,17","8,3,18","8,3,19","8,3,20","8,4,-20","8,4,-19","8,4,-18","8,4,-17","8,4,-16","8,4,-15","8,4,-14","8,4,-13","8,4,-12","8,4,-11","8,4,-10","8,4,-9","8,4,-8","8,4,-7","8,4,-6","8,4,-5","8,4,5","8,4,6","8,4,7","8,4,8","8,4,9","8,4,10","8,4,11","8,4,12","8,4,13","8,4,14","8,4,15","8,4,16","8,4,17","8,4,18","8,4,19","8,4,20","8,5,-20","8,5,-19","8,5,-18","8,5,-17","8,5,-16","8,5,-15","8,5,-14","8,5,-13","8,5,-12","8,5,-11","8,5,-10","8,5,-9","8,5,-8","8,5,-7","8,5,-6","8,5,-5","8,5,5","8,5,6","8,5,7","8,5,8","8,5,9","8,5,10","8,5,11","8,5,12","8,5,13","8,5,14","8,5,15","8,5,16","8,5,17","8,5,18","8,5,19","8,5,20","8,6,-20","8,6,-19","8,6,-18","8,6,-17","8,6,-16","8,6,-15","8,6,-14","8,6,-13","8,6,-12","8,6,-11","8,6,-10","8,6,-9","8,6,-8","8,6,-7","8,6,-6","8,6,-5","8,6,5","8,6,6","8,6,7","8,6,8","8,6,9","8,6,10","8,6,11","8,6,12","8,6,13","8,6,14","8,6,15","8,6,16","8,6,17","8,6,18","8,6,19","8,6,20","8,7,-20","8,7,-19","8,7,-18","8,7,5","8,7,6","8,7,7","8,7,8","8,7,9","8,7,10","8,7,11","8,7,12","8,7,13","8,7,14","8,7,15","8,7,16","8,7,17","8,7,18","8,7,19","8,7,20","8,8,-20","8,8,-19","8,8,-18","8,8,18","8,8,19","8,8,20","8,9,-20","8,9,-19","8,9,-18","8,9,18","8,9,19","8,9,20","8,10,-20","8,10,-19","8,10,-18","8,10,18","8,10,19","8,10,20","8,11,-20","8,11,-19","8,11,-18","8,11,18","8,11,19","8,11,20","8,12,-20","8,12,-19","8,12,-18","8,12,18","8,12,19","8,12,20","8,13,-20","8,13,-19","8,13,-18","8,13,18","8,13,19","8,13,20","8,14,-20","8,14,-19","8,14,-18","8,14,-17","8,14,-16","8,14,-15","8,14,-14","8,14,-13","8,14,-12","8,14,-11","8,14,-10","8,14,-9","8,14,-8","8,14,-7","8,14,-6","8,14,-5","8,14,-4","8,14,-3","8,14,-2","8,14,-1","8,14,0","8,14,1","8,14,2","8,14,3","8,14,4","8,14,5","8,14,6","8,14,7","8,14,8","8,14,9","8,14,10","8,14,11","8,14,12","8,14,13","8,14,14","8,14,15","8,14,16","8,14,17","8,14,18","8,14,19","8,14,20","8,15,-20","8,15,-19","8,15,-18","8,15,-17","8,15,-16","8,15,-15","8,15,-14","8,15,-13","8,15,-12","8,15,-11","8,15,-10","8,15,-9","8,15,-8","8,15,-7","8,15,-6","8,15,-5","8,15,-4","8,15,-3","8,15,-2","8,15,-1","8,15,0","8,15,1","8,15,2","8,15,3","8,15,4","8,15,5","8,15,6","8,15,7","8,15,8","8,15,9","8,15,10","8,15,11","8,15,12","8,15,13","8,15,14","8,15,15","8,15,16","8,15,17","8,15,18","8,15,19","8,15,20","9,0,-21","9,0,-20","9,0,-19","9,0,-18","9,0,-17","9,0,-16","9,0,-15","9,0,-14","9,0,-13","9,0,-12","9,0,-11","9,0,-10","9,0,-9","9,0,-8","9,0,-7","9,0,-6","9,0,-5","9,0,-4","9,0,-3","9,0,-2","9,0,-1","9,0,0","9,0,1","9,0,2","9,0,3","9,0,4","9,0,5","9,0,6","9,0,7","9,0,8","9,0,9","9,0,10","9,0,11","9,0,12","9,0,13","9,0,14","9,0,15","9,0,16","9,0,17","9,0,18","9,0,19","9,0,20","9,0,21","9,1,-20","9,1,-19","9,1,-18","9,1,-17","9,1,-16","9,1,-15","9,1,-14","9,1,-13","9,1,-12","9,1,-11","9,1,-10","9,1,-9","9,1,-8","9,1,-7","9,1,-6","9,1,-5","9,1,-4","9,1,-3","9,1,-2","9,1,-1","9,1,0","9,1,1","9,1,2","9,1,3","9,1,4","9,1,5","9,1,6","9,1,7","9,1,8","9,1,9","9,1,10","9,1,11","9,1,12","9,1,13","9,1,14","9,1,15","9,1,16","9,1,17","9,1,18","9,1,19","9,1,20","9,2,-20","9,2,-19","9,2,-18","9,2,-17","9,2,-16","9,2,-15","9,2,-14","9,2,-13","9,2,-12","9,2,-11","9,2,-10","9,2,-9","9,2,-8","9,2,-7","9,2,-6","9,2,-5","9,2,-4","9,2,-3","9,2,-2","9,2,-1","9,2,0","9,2,1","9,2,2","9,2,3","9,2,4","9,2,5","9,2,6","9,2,7","9,2,8","9,2,9","9,2,10","9,2,11","9,2,12","9,2,13","9,2,14","9,2,15","9,2,16","9,2,17","9,2,18","9,2,19","9,2,20","9,3,-20","9,3,-19","9,3,-18","9,3,-17","9,3,-16","9,3,-15","9,3,-14","9,3,-13","9,3,-12","9,3,-11","9,3,-10","9,3,-9","9,3,-8","9,3,-7","9,3,-6","9,3,-5","9,3,-4","9,3,-3","9,3,-2","9,3,-1","9,3,0","9,3,1","9,3,2","9,3,3","9,3,4","9,3,5","9,3,6","9,3,7","9,3,8","9,3,9","9,3,10","9,3,11","9,3,12","9,3,13","9,3,14","9,3,15","9,3,16","9,3,17","9,3,18","9,3,19","9,3,20","9,4,-20","9,4,-19","9,4,-18","9,4,-17","9,4,-16","9,4,-15","9,4,-14","9,4,-13","9,4,-12","9,4,-11","9,4,-10","9,4,-9","9,4,-8","9,4,-7","9,4,-6","9,4,-5","9,4,-4","9,4,-3","9,4,-2","9,4,-1","9,4,0","9,4,1","9,4,2","9,4,3","9,4,4","9,4,5","9,4,6","9,4,7","9,4,8","9,4,9","9,4,10","9,4,11","9,4,12","9,4,13","9,4,14","9,4,15","9,4,16","9,4,17","9,4,18","9,4,19","9,4,20","9,5,-20","9,5,-19","9,5,-18","9,5,-17","9,5,-16","9,5,-15","9,5,-14","9,5,-13","9,5,-12","9,5,-11","9,5,-10","9,5,-9","9,5,-8","9,5,-7","9,5,-6","9,5,-5","9,5,-4","9,5,-3","9,5,-2","9,5,-1","9,5,0","9,5,1","9,5,2","9,5,3","9,5,4","9,5,5","9,5,6","9,5,7","9,5,8","9,5,9","9,5,10","9,5,11","9,5,12","9,5,13","9,5,14","9,5,15","9,5,16","9,5,17","9,5,18","9,5,19","9,5,20","9,6,-20","9,6,-19","9,6,-18","9,6,-17","9,6,-16","9,6,-15","9,6,-14","9,6,-13","9,6,-12","9,6,-11","9,6,-10","9,6,-9","9,6,-8","9,6,-7","9,6,-6","9,6,-5","9,6,-4","9,6,-3","9,6,-2","9,6,-1","9,6,0","9,6,1","9,6,2","9,6,3","9,6,4","9,6,5","9,6,6","9,6,7","9,6,8","9,6,9","9,6,10","9,6,11","9,6,12","9,6,13","9,6,14","9,6,15","9,6,16","9,6,17","9,6,18","9,6,19","9,6,20","9,7,-20","9,7,-19","9,7,-18","9,7,-17","9,7,-16","9,7,-15","9,7,-14","9,7,-13","9,7,-12","9,7,-11","9,7,-10","9,7,-9","9,7,-8","9,7,-7","9,7,-6","9,7,-5","9,7,-4","9,7,-3","9,7,-2","9,7,-1","9,7,0","9,7,1","9,7,2","9,7,3","9,7,4","9,7,5","9,7,6","9,7,7","9,7,8","9,7,9","9,7,10","9,7,11","9,7,12","9,7,13","9,7,14","9,7,15","9,7,16","9,7,17","9,7,18","9,7,19","9,7,20","9,8,-20","9,8,-19","9,8,-18","9,8,-17","9,8,-16","9,8,-15","9,8,-14","9,8,-13","9,8,-12","9,8,-11","9,8,-10","9,8,-9","9,8,-8","9,8,-7","9,8,-6","9,8,-5","9,8,-4","9,8,-3","9,8,-2","9,8,-1","9,8,0","9,8,1","9,8,2","9,8,3","9,8,4","9,8,5","9,8,6","9,8,7","9,8,8","9,8,9","9,8,10","9,8,11","9,8,12","9,8,13","9,8,14","9,8,15","9,8,16","9,8,17","9,8,18","9,8,19","9,8,20","9,9,-20","9,9,-19","9,9,-18","9,9,-17","9,9,-16","9,9,-15","9,9,-14","9,9,-13","9,9,-12","9,9,-11","9,9,-10","9,9,-9","9,9,-8","9,9,-7","9,9,-6","9,9,-5","9,9,-4","9,9,-3","9,9,-2","9,9,-1","9,9,0","9,9,1","9,9,2","9,9,3","9,9,4","9,9,5","9,9,6","9,9,7","9,9,8","9,9,9","9,9,10","9,9,11","9,9,12","9,9,13","9,9,14","9,9,15","9,9,16","9,9,17","9,9,18","9,9,19","9,9,20","9,10,-20","9,10,-19","9,10,-18","9,10,-17","9,10,-16","9,10,-15","9,10,-14","9,10,-13","9,10,-12","9,10,-11","9,10,-10","9,10,-9","9,10,-8","9,10,-7","9,10,-6","9,10,-5","9,10,-4","9,10,-3","9,10,-2","9,10,-1","9,10,0","9,10,1","9,10,2","9,10,3","9,10,4","9,10,5","9,10,6","9,10,7","9,10,8","9,10,9","9,10,10","9,10,11","9,10,12","9,10,13","9,10,14","9,10,15","9,10,16","9,10,17","9,10,18","9,10,19","9,10,20","9,11,-20","9,11,-19","9,11,-18","9,11,-17","9,11,-16","9,11,-15","9,11,-14","9,11,-13","9,11,-12","9,11,-11","9,11,-10","9,11,-9","9,11,-8","9,11,-7","9,11,-6","9,11,-5","9,11,-4","9,11,-3","9,11,-2","9,11,-1","9,11,0","9,11,1","9,11,2","9,11,3","9,11,4","9,11,5","9,11,6","9,11,7","9,11,8","9,11,9","9,11,10","9,11,11","9,11,12","9,11,13","9,11,14","9,11,15","9,11,16","9,11,17","9,11,18","9,11,19","9,11,20","9,12,-20","9,12,-19","9,12,-18","9,12,-17","9,12,-16","9,12,-15","9,12,-14","9,12,-13","9,12,-12","9,12,-11","9,12,-10","9,12,-9","9,12,-8","9,12,-7","9,12,-6","9,12,-5","9,12,-4","9,12,-3","9,12,-2","9,12,-1","9,12,0","9,12,1","9,12,2","9,12,3","9,12,4","9,12,5","9,12,6","9,12,7","9,12,8","9,12,9","9,12,10","9,12,11","9,12,12","9,12,13","9,12,14","9,12,15","9,12,16","9,12,17","9,12,18","9,12,19","9,12,20","9,13,-20","9,13,-19","9,13,-18","9,13,-17","9,13,-16","9,13,-15","9,13,-14","9,13,-13","9,13,-12","9,13,-11","9,13,-10","9,13,-9","9,13,-8","9,13,-7","9,13,-6","9,13,-5","9,13,-4","9,13,-3","9,13,-2","9,13,-1","9,13,0","9,13,1","9,13,2","9,13,3","9,13,4","9,13,5","9,13,6","9,13,7","9,13,8","9,13,9","9,13,10","9,13,11","9,13,12","9,13,13","9,13,14","9,13,15","9,13,16","9,13,17","9,13,18","9,13,19","9,13,20","9,14,-20","9,14,-19","9,14,-18","9,14,-17","9,14,-16","9,14,-15","9,14,-14","9,14,-13","9,14,-12","9,14,-11","9,14,-10","9,14,-9","9,14,-8","9,14,-7","9,14,-6","9,14,-5","9,14,-4","9,14,-3","9,14,-2","9,14,-1","9,14,0","9,14,1","9,14,2","9,14,3","9,14,4","9,14,5","9,14,6","9,14,7","9,14,8","9,14,9","9,14,10","9,14,11","9,14,12","9,14,13","9,14,14","9,14,15","9,14,16","9,14,17","9,14,18","9,14,19","9,14,20","9,15,-20","9,15,-19","9,15,-18","9,15,-17","9,15,-16","9,15,-15","9,15,-14","9,15,-13","9,15,-12","9,15,-11","9,15,-10","9,15,-9","9,15,-8","9,15,-7","9,15,-6","9,15,-5","9,15,-4","9,15,-3","9,15,-2","9,15,-1","9,15,0","9,15,1","9,15,2","9,15,3","9,15,4","9,15,5","9,15,6","9,15,7","9,15,8","9,15,9","9,15,10","9,15,11","9,15,12","9,15,13","9,15,14","9,15,15","9,15,16","9,15,17","9,15,18","9,15,19","9,15,20","10,0,-21","10,0,-20","10,0,-19","10,0,-18","10,0,-17","10,0,-16","10,0,-15","10,0,-14","10,0,-13","10,0,-12","10,0,-11","10,0,-10","10,0,-9","10,0,-8","10,0,-7","10,0,-6","10,0,-5","10,0,-4","10,0,-3","10,0,-2","10,0,-1","10,0,0","10,0,1","10,0,2","10,0,3","10,0,4","10,0,5","10,0,6","10,0,7","10,0,8","10,0,9","10,0,10","10,0,11","10,0,12","10,0,13","10,0,14","10,0,15","10,0,16","10,0,17","10,0,18","10,0,19","10,0,20","10,0,21","10,1,-20","10,1,-19","10,1,-18","10,1,-17","10,1,-16","10,1,-15","10,1,-14","10,1,-13","10,1,-12","10,1,-11","10,1,-10","10,1,-9","10,1,-8","10,1,-7","10,1,-6","10,1,-5","10,1,-4","10,1,-3","10,1,-2","10,1,-1","10,1,0","10,1,1","10,1,2","10,1,3","10,1,4","10,1,5","10,1,6","10,1,7","10,1,8","10,1,9","10,1,10","10,1,11","10,1,12","10,1,13","10,1,14","10,1,15","10,1,16","10,1,17","10,1,18","10,1,19","10,1,20","10,2,-20","10,2,-19","10,2,-18","10,2,-17","10,2,-16","10,2,-15","10,2,-14","10,2,-13","10,2,-12","10,2,-11","10,2,-10","10,2,-9","10,2,-8","10,2,-7","10,2,-6","10,2,-5","10,2,-4","10,2,-3","10,2,-2","10,2,-1","10,2,0","10,2,1","10,2,2","10,2,3","10,2,4","10,2,5","10,2,6","10,2,7","10,2,8","10,2,9","10,2,10","10,2,11","10,2,12","10,2,13","10,2,14","10,2,15","10,2,16","10,2,17","10,2,18","10,2,19","10,2,20","10,3,-20","10,3,-19","10,3,-18","10,3,-17","10,3,-16","10,3,-15","10,3,-14","10,3,-13","10,3,-12","10,3,-11","10,3,-10","10,3,-9","10,3,-8","10,3,-7","10,3,-6","10,3,-5","10,3,-4","10,3,-3","10,3,-2","10,3,-1","10,3,0","10,3,1","10,3,2","10,3,3","10,3,4","10,3,5","10,3,6","10,3,7","10,3,8","10,3,9","10,3,10","10,3,11","10,3,12","10,3,13","10,3,14","10,3,15","10,3,16","10,3,17","10,3,18","10,3,19","10,3,20","10,4,-20","10,4,-19","10,4,-18","10,4,-17","10,4,-16","10,4,-15","10,4,-14","10,4,-13","10,4,-12","10,4,-11","10,4,-10","10,4,-9","10,4,-8","10,4,-7","10,4,-6","10,4,-5","10,4,-4","10,4,-3","10,4,-2","10,4,-1","10,4,0","10,4,1","10,4,2","10,4,3","10,4,4","10,4,5","10,4,6","10,4,7","10,4,8","10,4,9","10,4,10","10,4,11","10,4,12","10,4,13","10,4,14","10,4,15","10,4,16","10,4,17","10,4,18","10,4,19","10,4,20","10,5,-20","10,5,-19","10,5,-18","10,5,-17","10,5,-16","10,5,-15","10,5,-14","10,5,-13","10,5,-12","10,5,-11","10,5,-10","10,5,-9","10,5,-8","10,5,-7","10,5,-6","10,5,-5","10,5,-4","10,5,-3","10,5,-2","10,5,-1","10,5,0","10,5,1","10,5,2","10,5,3","10,5,4","10,5,5","10,5,6","10,5,7","10,5,8","10,5,9","10,5,10","10,5,11","10,5,12","10,5,13","10,5,14","10,5,15","10,5,16","10,5,17","10,5,18","10,5,19","10,5,20","10,6,-20","10,6,-19","10,6,-18","10,6,-17","10,6,-16","10,6,-15","10,6,-14","10,6,-13","10,6,-12","10,6,-11","10,6,-10","10,6,-9","10,6,-8","10,6,-7","10,6,-6","10,6,-5","10,6,-4","10,6,-3","10,6,-2","10,6,-1","10,6,0","10,6,1","10,6,2","10,6,3","10,6,4","10,6,5","10,6,6","10,6,7","10,6,8","10,6,9","10,6,10","10,6,11","10,6,12","10,6,13","10,6,14","10,6,15","10,6,16","10,6,17","10,6,18","10,6,19","10,6,20","10,7,-20","10,7,-19","10,7,-18","10,7,-17","10,7,-16","10,7,-15","10,7,-14","10,7,-13","10,7,-12","10,7,-11","10,7,-10","10,7,-9","10,7,-8","10,7,-7","10,7,-6","10,7,-5","10,7,-4","10,7,-3","10,7,-2","10,7,-1","10,7,0","10,7,1","10,7,2","10,7,3","10,7,4","10,7,5","10,7,6","10,7,7","10,7,8","10,7,9","10,7,10","10,7,11","10,7,12","10,7,13","10,7,14","10,7,15","10,7,16","10,7,17","10,7,18","10,7,19","10,7,20","10,8,-20","10,8,-19","10,8,-18","10,8,-17","10,8,-16","10,8,-15","10,8,-14","10,8,-13","10,8,-12","10,8,-11","10,8,-10","10,8,-9","10,8,-8","10,8,-7","10,8,-6","10,8,-5","10,8,-4","10,8,-3","10,8,-2","10,8,-1","10,8,0","10,8,1","10,8,2","10,8,3","10,8,4","10,8,5","10,8,6","10,8,7","10,8,8","10,8,9","10,8,10","10,8,11","10,8,12","10,8,13","10,8,14","10,8,15","10,8,16","10,8,17","10,8,18","10,8,19","10,8,20","10,9,-20","10,9,-19","10,9,-18","10,9,-17","10,9,-16","10,9,-15","10,9,-14","10,9,-13","10,9,-12","10,9,-11","10,9,-10","10,9,-9","10,9,-8","10,9,-7","10,9,-6","10,9,-5","10,9,-4","10,9,-3","10,9,-2","10,9,-1","10,9,0","10,9,1","10,9,2","10,9,3","10,9,4","10,9,5","10,9,6","10,9,7","10,9,8","10,9,9","10,9,10","10,9,11","10,9,12","10,9,13","10,9,14","10,9,15","10,9,16","10,9,17","10,9,18","10,9,19","10,9,20","10,10,-20","10,10,-19","10,10,-18","10,10,-17","10,10,-16","10,10,-15","10,10,-14","10,10,-13","10,10,-12","10,10,-11","10,10,-10","10,10,-9","10,10,-8","10,10,-7","10,10,-6","10,10,-5","10,10,-4","10,10,-3","10,10,-2","10,10,-1","10,10,0","10,10,1","10,10,2","10,10,3","10,10,4","10,10,5","10,10,6","10,10,7","10,10,8","10,10,9","10,10,10","10,10,11","10,10,12","10,10,13","10,10,14","10,10,15","10,10,16","10,10,17","10,10,18","10,10,19","10,10,20","10,11,-20","10,11,-19","10,11,-18","10,11,-17","10,11,-16","10,11,-15","10,11,-14","10,11,-13","10,11,-12","10,11,-11","10,11,-10","10,11,-9","10,11,-8","10,11,-7","10,11,-6","10,11,-5","10,11,-4","10,11,-3","10,11,-2","10,11,-1","10,11,0","10,11,1","10,11,2","10,11,3","10,11,4","10,11,5","10,11,6","10,11,7","10,11,8","10,11,9","10,11,10","10,11,11","10,11,12","10,11,13","10,11,14","10,11,15","10,11,16","10,11,17","10,11,18","10,11,19","10,11,20","10,12,-20","10,12,-19","10,12,-18","10,12,-17","10,12,-16","10,12,-15","10,12,-14","10,12,-13","10,12,-12","10,12,-11","10,12,-10","10,12,-9","10,12,-8","10,12,-7","10,12,-6","10,12,-5","10,12,-4","10,12,-3","10,12,-2","10,12,-1","10,12,0","10,12,1","10,12,2","10,12,3","10,12,4","10,12,5","10,12,6","10,12,7","10,12,8","10,12,9","10,12,10","10,12,11","10,12,12","10,12,13","10,12,14","10,12,15","10,12,16","10,12,17","10,12,18","10,12,19","10,12,20","10,13,-20","10,13,-19","10,13,-18","10,13,-17","10,13,-16","10,13,-15","10,13,-14","10,13,-13","10,13,-12","10,13,-11","10,13,-10","10,13,-9","10,13,-8","10,13,-7","10,13,-6","10,13,-5","10,13,-4","10,13,-3","10,13,-2","10,13,-1","10,13,0","10,13,1","10,13,2","10,13,3","10,13,4","10,13,5","10,13,6","10,13,7","10,13,8","10,13,9","10,13,10","10,13,11","10,13,12","10,13,13","10,13,14","10,13,15","10,13,16","10,13,17","10,13,18","10,13,19","10,13,20","10,14,-20","10,14,-19","10,14,-18","10,14,-17","10,14,-16","10,14,-15","10,14,-14","10,14,-13","10,14,-12","10,14,-11","10,14,-10","10,14,-9","10,14,-8","10,14,-7","10,14,-6","10,14,-5","10,14,-4","10,14,-3","10,14,-2","10,14,-1","10,14,0","10,14,1","10,14,2","10,14,3","10,14,4","10,14,5","10,14,6","10,14,7","10,14,8","10,14,9","10,14,10","10,14,11","10,14,12","10,14,13","10,14,14","10,14,15","10,14,16","10,14,17","10,14,18","10,14,19","10,14,20","10,15,-20","10,15,-19","10,15,-18","10,15,-17","10,15,-16","10,15,-15","10,15,-14","10,15,-13","10,15,-12","10,15,-11","10,15,-10","10,15,-9","10,15,-8","10,15,-7","10,15,-6","10,15,-5","10,15,-4","10,15,-3","10,15,-2","10,15,-1","10,15,0","10,15,1","10,15,2","10,15,3","10,15,4","10,15,5","10,15,6","10,15,7","10,15,8","10,15,9","10,15,10","10,15,11","10,15,12","10,15,13","10,15,14","10,15,15","10,15,16","10,15,17","10,15,18","10,15,19","10,15,20","11,0,-21","11,0,-20","11,0,-19","11,0,-18","11,0,-17","11,0,-16","11,0,-15","11,0,-14","11,0,-13","11,0,-12","11,0,-11","11,0,-10","11,0,-9","11,0,-8","11,0,-7","11,0,-6","11,0,-5","11,0,-4","11,0,-3","11,0,-2","11,0,-1","11,0,0","11,0,1","11,0,2","11,0,3","11,0,4","11,0,5","11,0,6","11,0,7","11,0,8","11,0,9","11,0,10","11,0,11","11,0,12","11,0,13","11,0,14","11,0,15","11,0,16","11,0,17","11,0,18","11,0,19","11,0,20","11,0,21","-8,8,5","-8,8,6","-7,8,5","-7,8,6","-6,8,5","-6,8,6","-5,8,5","-5,8,6","-4,8,5","-4,8,6","-3,8,5","-3,8,6","-2,8,5","-2,8,6","-1,8,5","-1,8,6","0,8,5","0,8,6","1,8,5","1,8,6","2,8,5","2,8,6","3,8,5","3,8,6","4,8,5","4,8,6","5,8,5","5,8,6","6,8,5","6,8,6","7,8,5","7,8,6","8,8,5","8,8,6"]);
+                        return (x, y, z) => solids.has(x + ',' + y + ',' + z);
+                    })()).build();
 
             case 5: // THE TOWER
                 return builder.setBounds(12, 30, 12).setSpawn(0, 2, -10).setExit(0, 25, 0)
-                    .addHologram("Expansion builds bridges.", 0, 3, -7)
                     .addEntity('red', 0, 2, -4, { startScale: 1.0 })
                     .addCustomLogic((x, y, z) => {
                         const r = Math.sqrt(x*x + z*z);
@@ -3605,7 +3589,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
             case 7: // THE LEDGES
                 return builder.setBounds(6, 20, 10).setSpawn(0, 2, -8).setExit(0, 16, 8)
-                    .addHologram("Combine your tools to reach the summit.", 0, 2.5, -5)
                     .addEntity('red', 0, 2, -2, { startScale: 1.5 }).addEntity('blue', 0, 9, 2)
                     .addCustomLogic((x, y, z) => { 
                         if (roomBox(x, y, z, 5, 20, 9)) return true; 
@@ -3645,201 +3628,24 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         const builder = new LevelBuilder(lvl, LEVEL_NAMES[10 + lvl]); 
         switch (lvl) {
             case 0: // THE SPIRAL
-                return builder.setBounds(12, 20, 12)
-                    .setSpawn(8, 2, 8) // Moved spawn to the far corner
-                    .setExit(0, 2, 0)
-                    .setCutscene('flyover')
-
-                    // --- THE ONLY CUBE ---
-                    .addEntity('gray', 8, 2, 8)
-
-                    // --- DOOR 1 (East Corridor - Ground Level) ---
-                    .addPlate(6, 0, 3, 1)
-                    .addDoor(6, 3, -1, { channel: 1, dir: 'left', width: 6, height: 6, moveDist: 5.8, normal: {x:0, y:0, z:1} })
-
-                    // --- DOOR 2 (North Corridor - Mid Ramp) ---
-                    .addPlate(2, 2, -6, 2)
-                    .addDoor(-3, 7, -6, { channel: 2, dir: 'left', width: 6, height: 6, moveDist: 5.8, normal: {x:1, y:0, z:0} })
-
-                    // --- DOOR 3 (West Corridor - High Balcony) ---
-                    .addPlate(-6, 6, -1, 3)
-                    .addDoor(-6, 9, 4, { channel: 3, dir: 'left', width: 6, height: 6, moveDist: 5.8, normal: {x:0, y:0, z:-1} })
-
-                    // --- THE MASTER PLATE ---
-                    .addPlate(3, 0, 7, 4) 
-                    // Changed y from 3 to 9 so it properly rests on the high balcony (y=6)
-                    .addDoor(0, 9, 3, { channel: 4, dir: 'up', width: 4, height: 6, moveDist: 5.8, normal: {x:0, y:0, z:1} })
-
-                    // --- ATMOSPHERIC LIGHTING ---
-                    .addLight(6, 6, 7, 0xffaa44, 4, 15)        
-                    .addLight(6, 6, -6, 0xffffff, 3, 15)       
-                    .addLight(-6, 11, -6, 0xffffff, 3, 15)     
-                    .addLight(-6, 11, 6, 0x44aaff, 3.5, 15)    
-                    .addLight(0, 6, 8, 0x44ffaa, 4, 12)        
-                    .addLight(0, 5, 0, 0xaaddff, 6, 15)        
-
-                    // --- HIGH DESTRUCTION ZONE ---
-                    // Moved way up to the ceiling at Y=10 to clear the central passage
-                    .addDestructionZone(0, 18, 0, 5, 8)
-
-                    // --- SPACIOUS SPIRAL ARCHITECTURE ---
-                    .addCustomLogic((x, y, z) => {
-                        if (y <= 0 || y >= 11) return true; // Floor and Ceiling
-                        if (x > 9 || x < -9 || z > 9 || z < -9) return true; // Outer Shell
-
-                        // Center Core
-                        if (x >= -3 && x <= 3 && z >= -3 && z <= 3) {
-                            // Clear exit interior and core passage
-                            if (x >= -2 && x <= 2 && z >= -2 && z <= 3 && y <= 9) {
-                                // --- THE SECOND MISSING WALL ---
-                                // Seal the ground floor under the high-balcony door to prevent walking straight into the exit
-                                if (z === 3 && y <= 6) return true; 
-                                return false; 
-                            }
-                            return true;
-                        }
-
-                        // Spiral Ramps
-                        if (z >= -9 && z <= -4) {
-                            let stairY = Math.floor((6 - x) / 2); 
-                            if (y <= Math.max(0, Math.min(6, stairY))) return true;
-                        }
-                        if (x >= -9 && x <= -4 && y <= 6) return true;
-                        if (z >= 4 && z <= 9 && x >= -9 && x <= 0 && y <= 6) return true;
-
-                        // --- THE FIRST MISSING WALL ---
-                        // Seals the East corridor gap above Door 1
-                        if (x >= 3 && x <= 9 && z === -1 && y >= 6) return true;
-
-                        // Seals the East corridor gap above Door 1 
-                        if (x >= 3 && x <= 9 && z === -1 && y >= 6) return true;
-
-                        return false;
-                    }).build();
-
-            case 1: // THE INTERLOCK - TRUE LOGIC EDITION
-                return builder.setBounds(6, 12, 20)
-                    .setSpawn(0, 2, 16)
-                    .setExit(0, 2, -14)
-                    .setCutscene('flyover')
-
-                    // --- DESTRUCTION ZONE (Moved far outside to prevent shattering) ---
-                    .addDestructionZone(100, 100, 100, 1, 1) 
-
-                    // --- THE ONLY TWO BLOCKS ---
-                    .addEntity('gray', -2.5, 2, 14)
-                    .addEntity('green', 2.5, 2, 14)
-
-                    // --- THE AIRLOCK LOGIC SETUP ---
-                    .addPlate(0, 1, 12, 1) // Plate 1 (In Spawn Room)
-                    .addPlate(0, 1, 4, 2)  // Plate 2 (In the Middle Airlock)
-
-                    // Gate 1: Slides LEFT into the wall. Opens if Plate 1 is pressed.
-                    .addDoor(0, 3, 8, { channel: 1, dir: 'left', width: 4.5, height: 6, moveDist: 4.5 })
-
-                    // Gate 2: Slides RIGHT into the wall. Opens if Plate 2 is pressed AND Plate 1 is EMPTY.
-                    .addLogicGate(4, 'NOT', [1])       // Ch 4 = True when Plate 1 is empty
-                    .addLogicGate(5, 'AND', [2, 4])    // Ch 5 = Plate 2 AND (NOT Plate 1)
-                    .addDoor(0, 3, 0, { channel: 5, dir: 'right', width: 4.5, height: 6, moveDist: 4.5 })
-
-                    // --- ARCHITECTURAL LIGHTING ---
-                    .addLight(0, 8, 14, 0xffeedd, 3, 15)  // Warm start room
-                    .addLight(0, 8, 4, 0xaaddff, 2, 12)   // Cool blue airlock
-                    .addLight(0, 8, -10, 0x44ffaa, 3, 15) // Green exit vault
-
-                    .addCustomLogic((x, y, z) => {
-                        const absX = Math.abs(x);
-                        const absZ = Math.abs(z);
-
-                        // 1. The Outer Shell (Brutalist thick walls)
-                        if (absX > 5 || absZ > 18 || y > 10) return true;
-
-                        // 2. The Floor
-                        if (y <= 1) return true;
-
-                        // 3. WALL 1: The First Door Frame (Z = 8)
-                        if (z === 8) {
-                            // Hole is exactly 4 units wide and 6 units high
-                            if (absX <= 2 && y <= 6) return false; 
-                            return true;
-                        }
-
-                        // 4. WALL 2: The Second Door Frame (Z = 0)
-                        if (z === 0) {
-                            if (absX <= 2 && y <= 6) return false; 
-                            return true;
-                        }
-
-                        // 5. Brutalist Ribs (Adds architectural depth to the walls)
-                        if (absX === 5 && (z === 16 || z === 12 || z === 4 || z === -4 || z === -12)) {
-                            return true;
-                        }
-
-                        return y <= 0;
-                    }).build();
-            case 2: // THE TUBE - VERTICAL ARCHITECTURE
-                return builder.setBounds(7, 19, 7)
-                    .setSpawn(0, 1, 5) // Spawns player on the top floor
-                    .setExit(0, 10, -5)  // Exit is on the bottom floor, behind the one-way field
-                    .setCutscene('flyover')
-
-                    .addDestructionZone(100, 100, 100, 1, 1) 
-
-                    // --- THE ONLY CUBE ---
-                    // Push it down the central hole
-                    .addEntity('gray', 0, 10, -4)
-
-                    // --- THE BOTTOM PLATE ---
-                    // Located inside the empty pillar on the ground floor
-                    .addPlate(0, 0, 0, 1) 
-
-                    // --- DOOR ACCESS (Bottom Floor +Z Side) ---
-                    // Method: addDoor(x, y, z, { channel, dir, width, height, moveDist, normal })
-                    .addDoor(0, 4, 2, { 
-                        channel: 1, 
-                        dir: 'up', 
-                        width: 3, 
-                        height: 8, 
-                        moveDist: 7.8, 
-                        normal: {x:0, y:0, z:1} 
-                    })
-
-                    // --- THE ONE-WAY FIELD (Bottom Floor -Z Side) ---
-                    // Method: addOneWayField(x, y, z, channel, inverted, w, h, normal)
-                    // Note: Using channel 9 (dummy) so it's always active, normal {z:1} faces INWARD.
-                    .addOneWayField(0, 4, -2, 9, false, 3, 8, {x:0, y:0, z:1})
-
-                    // --- TUBE ATMOSPHERICS ---
-                    .addLight(0, 14, 0, 0xaaddff, 5, 15)   
-                    .addLight(0, 5, 0, 0xffaa44, 4, 12)    
-                    .addLight(0, 5, 5, 0xffffff, 4, 12)    
-                    .addLight(0, 5, -5, 0x44ffaa, 4, 12)   
-
-                    // --- GEOMETRY ARCHITECTURE ---
-                    .addCustomLogic((x, y, z) => {
-                        const absX = Math.abs(x);
-                        const absZ = Math.abs(z);
-
-                        // 1. Level Bounds & Outer Shell 
-                        if (absX > 6 || absZ > 6 || y >= 18 || y <= 0) return true;
-
-                        // 2. The Mid-Floor Divider 
-                        if (y === 9) {
-                            if (absX <= 1 && absZ <= 1) return false; 
-                            return true;
-                        }
-
-                        // 3. The Central Empty Pillar (Bottom floor only: y 1 to 8)
-                        if (y >= 1 && y <= 8) {
-                            if (absX <= 2 && absZ <= 2) {
-                                if (absX <= 1 && absZ <= 1) return false; // Tube hollow
-                                if (z === 2 && absX <= 1) return false;   // Door slot
-                                if (z === -2 && absX <= 1) return false;  // One-way slot
-                                return true;
-                            }
-                        }
-                        return false;
-                    }).build();
+            return builder.setBounds(18, 12, 22)
+                .setSpawn(0, 2, -5)
+                .setExit(8, 1, 10)
+                .addEntity('green', 5, 1, 2)
+                .addEntity('gray', 0, 1, 10)
+                .addDestructionZone(-2, 11, -5, 4, 7)
+                .addDestructionZone(6, 11, -5, 4, 7)
+                .addDestructionZone(-7, 8, 1, 4, 7)
+                .addLight(1, 2, 6, 0x6699ff, 3, 8)
+                .addLight(-1, 4, 6, 0x6699ff, 3, 8)
+                .addLight(2, 4, 6, 0x6699ff, 3, 8)
+                .addPlate(-5, 1, 2, 1)
+                .addDoor(1, 2, 7, { channel: 1, dir: 'left', width: 5.5, height: 5.5, moveDist: 6 })
+                .addCustomLogic((() => {
+                    // High-performance closure for grid lookups
+                    const solids = new Set(["-17,0,-21","-17,0,-20","-17,0,-19","-17,0,-18","-17,0,-17","-17,0,-16","-17,0,-15","-17,0,-14","-17,0,-13","-17,0,-12","-17,0,-11","-17,0,-10","-17,0,-9","-17,0,-8","-17,0,-7","-17,0,-6","-17,0,-5","-17,0,-4","-17,0,-3","-17,0,-2","-17,0,-1","-17,0,0","-17,0,1","-17,0,2","-17,0,3","-17,0,4","-17,0,5","-17,0,6","-17,0,7","-17,0,8","-17,0,9","-17,0,10","-17,0,11","-17,0,12","-17,0,13","-17,0,14","-17,0,15","-17,0,16","-17,0,17","-17,0,18","-17,0,19","-17,0,20","-17,0,21","-16,0,-21","-16,0,-20","-16,0,-19","-16,0,-18","-16,0,-17","-16,0,-16","-16,0,-15","-16,0,-14","-16,0,-13","-16,0,-12","-16,0,-11","-16,0,-10","-16,0,-9","-16,0,-8","-16,0,-7","-16,0,-6","-16,0,-5","-16,0,-4","-16,0,-3","-16,0,-2","-16,0,-1","-16,0,0","-16,0,1","-16,0,2","-16,0,3","-16,0,4","-16,0,5","-16,0,6","-16,0,7","-16,0,8","-16,0,9","-16,0,10","-16,0,11","-16,0,12","-16,0,13","-16,0,14","-16,0,15","-16,0,16","-16,0,17","-16,0,18","-16,0,19","-16,0,20","-16,0,21","-15,0,-21","-15,0,-20","-15,0,-19","-15,0,-18","-15,0,-17","-15,0,-16","-15,0,-15","-15,0,-14","-15,0,-13","-15,0,-12","-15,0,-11","-15,0,-10","-15,0,-9","-15,0,-8","-15,0,-7","-15,0,-6","-15,0,-5","-15,0,-4","-15,0,-3","-15,0,-2","-15,0,-1","-15,0,0","-15,0,1","-15,0,2","-15,0,3","-15,0,4","-15,0,5","-15,0,6","-15,0,7","-15,0,8","-15,0,9","-15,0,10","-15,0,11","-15,0,12","-15,0,13","-15,0,14","-15,0,15","-15,0,16","-15,0,17","-15,0,18","-15,0,19","-15,0,20","-15,0,21","-14,0,-21","-14,0,-20","-14,0,-19","-14,0,-18","-14,0,-17","-14,0,-16","-14,0,-15","-14,0,-14","-14,0,-13","-14,0,-12","-14,0,-11","-14,0,-10","-14,0,-9","-14,0,-8","-14,0,-7","-14,0,-6","-14,0,-5","-14,0,-4","-14,0,-3","-14,0,-2","-14,0,-1","-14,0,0","-14,0,1","-14,0,2","-14,0,3","-14,0,4","-14,0,5","-14,0,6","-14,0,7","-14,0,8","-14,0,9","-14,0,10","-14,0,11","-14,0,12","-14,0,13","-14,0,14","-14,0,15","-14,0,16","-14,0,17","-14,0,18","-14,0,19","-14,0,20","-14,0,21","-13,0,-21","-13,0,-20","-13,0,-19","-13,0,-18","-13,0,-17","-13,0,-16","-13,0,-15","-13,0,-14","-13,0,-13","-13,0,-12","-13,0,-11","-13,0,-10","-13,0,-9","-13,0,-8","-13,0,-7","-13,0,-6","-13,0,-5","-13,0,-4","-13,0,-3","-13,0,-2","-13,0,-1","-13,0,0","-13,0,1","-13,0,2","-13,0,3","-13,0,4","-13,0,5","-13,0,6","-13,0,7","-13,0,8","-13,0,9","-13,0,10","-13,0,11","-13,0,12","-13,0,13","-13,0,14","-13,0,15","-13,0,16","-13,0,17","-13,0,18","-13,0,19","-13,0,20","-13,0,21","-13,1,5","-12,0,-21","-12,0,-20","-12,0,-19","-12,0,-18","-12,0,-17","-12,0,-16","-12,0,-15","-12,0,-14","-12,0,-13","-12,0,-12","-12,0,-11","-12,0,-10","-12,0,-9","-12,0,-8","-12,0,-7","-12,0,-6","-12,0,-5","-12,0,-4","-12,0,-3","-12,0,-2","-12,0,-1","-12,0,0","-12,0,1","-12,0,2","-12,0,3","-12,0,4","-12,0,5","-12,0,6","-12,0,7","-12,0,8","-12,0,9","-12,0,10","-12,0,11","-12,0,12","-12,0,13","-12,0,14","-12,0,15","-12,0,16","-12,0,17","-12,0,18","-12,0,19","-12,0,20","-12,0,21","-12,1,5","-12,2,-1","-11,0,-21","-11,0,-20","-11,0,-19","-11,0,-18","-11,0,-17","-11,0,-16","-11,0,-15","-11,0,-14","-11,0,-13","-11,0,-12","-11,0,-11","-11,0,-10","-11,0,-9","-11,0,-8","-11,0,-7","-11,0,-6","-11,0,-5","-11,0,-4","-11,0,-3","-11,0,-2","-11,0,-1","-11,0,0","-11,0,1","-11,0,2","-11,0,3","-11,0,4","-11,0,5","-11,0,6","-11,0,7","-11,0,8","-11,0,9","-11,0,10","-11,0,11","-11,0,12","-11,0,13","-11,0,14","-11,0,15","-11,0,16","-11,0,17","-11,0,18","-11,0,19","-11,0,20","-11,0,21","-11,1,4","-11,2,-1","-10,0,-21","-10,0,-20","-10,0,-19","-10,0,-18","-10,0,-17","-10,0,-16","-10,0,-15","-10,0,-14","-10,0,-13","-10,0,-12","-10,0,-11","-10,0,-10","-10,0,-9","-10,0,-8","-10,0,-7","-10,0,-6","-10,0,-5","-10,0,-4","-10,0,-3","-10,0,-2","-10,0,-1","-10,0,0","-10,0,1","-10,0,2","-10,0,3","-10,0,4","-10,0,5","-10,0,6","-10,0,7","-10,0,8","-10,0,9","-10,0,10","-10,0,11","-10,0,12","-10,0,13","-10,0,14","-10,0,15","-10,0,16","-10,0,17","-10,0,18","-10,0,19","-10,0,20","-10,0,21","-10,1,4","-10,2,-1","-10,3,-1","-10,4,-1","-10,4,0","-9,0,-21","-9,0,-20","-9,0,-19","-9,0,-18","-9,0,-17","-9,0,-16","-9,0,-15","-9,0,-14","-9,0,-13","-9,0,-12","-9,0,-11","-9,0,-10","-9,0,-9","-9,0,-8","-9,0,-7","-9,0,-6","-9,0,-5","-9,0,-4","-9,0,-3","-9,0,-2","-9,0,-1","-9,0,0","-9,0,1","-9,0,2","-9,0,3","-9,0,4","-9,0,5","-9,0,6","-9,0,7","-9,0,8","-9,0,9","-9,0,10","-9,0,11","-9,0,12","-9,0,13","-9,0,14","-9,0,15","-9,0,16","-9,0,17","-9,0,18","-9,0,19","-9,0,20","-9,0,21","-9,1,-6","-9,1,-5","-9,1,-4","-9,1,-3","-9,1,-2","-9,1,-1","-9,1,0","-9,1,1","-9,1,2","-9,1,3","-9,1,4","-9,1,5","-9,1,6","-9,2,-6","-9,2,-5","-9,2,-4","-9,2,-3","-9,2,-2","-9,2,1","-9,2,2","-9,2,3","-9,2,4","-9,2,5","-9,2,6","-9,3,-6","-9,3,-4","-9,3,-3","-9,3,-2","-9,3,-1","-9,3,0","-9,3,1","-9,3,2","-9,3,3","-9,3,4","-9,3,5","-9,4,-4","-9,4,-3","-9,4,-2","-9,4,-1","-9,4,0","-9,4,1","-9,4,2","-9,4,3","-9,4,4","-9,5,-4","-9,5,-3","-9,5,-2","-9,5,-1","-9,5,0","-9,5,1","-9,5,2","-9,5,3","-9,5,4","-9,6,-3","-9,6,-2","-9,6,-1","-9,6,0","-9,6,1","-9,6,2","-9,6,3","-9,6,4","-9,7,-3","-9,7,-2","-9,7,0","-9,7,1","-9,7,2","-9,7,3","-9,7,4","-9,8,-3","-9,8,-2","-9,8,0","-9,8,2","-9,8,3","-9,8,4","-9,9,-3","-9,9,-2","-9,9,0","-9,9,1","-9,9,2","-9,9,3","-9,10,0","-9,10,1","-9,10,3","-8,0,-21","-8,0,-20","-8,0,-19","-8,0,-18","-8,0,-17","-8,0,-16","-8,0,-15","-8,0,-14","-8,0,-13","-8,0,-12","-8,0,-11","-8,0,-10","-8,0,-9","-8,0,-8","-8,0,-7","-8,0,-6","-8,0,-5","-8,0,-4","-8,0,-3","-8,0,-2","-8,0,-1","-8,0,0","-8,0,1","-8,0,2","-8,0,3","-8,0,4","-8,0,5","-8,0,6","-8,0,7","-8,0,8","-8,0,9","-8,0,10","-8,0,11","-8,0,12","-8,0,13","-8,0,14","-8,0,15","-8,0,16","-8,0,17","-8,0,18","-8,0,19","-8,0,20","-8,0,21","-8,1,-6","-8,1,-5","-8,1,-4","-8,1,-3","-8,1,-2","-8,1,-1","-8,1,0","-8,1,1","-8,1,2","-8,1,3","-8,1,4","-8,1,5","-8,2,-6","-8,2,-5","-8,2,-4","-8,2,-3","-8,2,-2","-8,2,-1","-8,2,0","-8,2,1","-8,2,2","-8,2,3","-8,2,4","-8,2,5","-8,3,-6","-8,3,-5","-8,3,-4","-8,3,-3","-8,3,-2","-8,3,-1","-8,3,0","-8,3,1","-8,3,2","-8,3,3","-8,3,4","-8,3,5","-8,4,-6","-8,4,-5","-8,4,-3","-8,4,-2","-8,4,-1","-8,4,0","-8,4,1","-8,4,2","-8,4,3","-8,4,4","-8,4,5","-8,5,-6","-8,5,-5","-8,5,-4","-8,5,-2","-8,5,-1","-8,5,0","-8,5,1","-8,5,2","-8,5,3","-8,5,4","-8,6,-5","-8,6,-4","-8,6,-3","-8,6,-1","-8,6,0","-8,6,1","-8,6,2","-8,6,3","-8,6,4","-8,6,5","-8,7,-4","-8,7,-3","-8,7,-2","-8,7,-1","-8,7,0","-8,7,1","-8,7,2","-8,7,3","-8,7,5","-8,8,-6","-8,8,-2","-8,8,-1","-8,8,1","-8,8,5","-7,0,-21","-7,0,-20","-7,0,-19","-7,0,-18","-7,0,-17","-7,0,-16","-7,0,-15","-7,0,-14","-7,0,-13","-7,0,-12","-7,0,-11","-7,0,-10","-7,0,-9","-7,0,-8","-7,0,-7","-7,0,-6","-7,0,-5","-7,0,-4","-7,0,-3","-7,0,-2","-7,0,-1","-7,0,0","-7,0,1","-7,0,2","-7,0,3","-7,0,4","-7,0,5","-7,0,6","-7,0,7","-7,0,8","-7,0,9","-7,0,10","-7,0,11","-7,0,12","-7,0,13","-7,0,14","-7,0,15","-7,0,16","-7,0,17","-7,0,18","-7,0,19","-7,0,20","-7,0,21","-7,1,-6","-7,1,5","-7,2,-6","-7,2,5","-7,3,-6","-7,3,5","-7,4,-6","-7,4,5","-7,5,-6","-7,5,5","-7,6,-6","-7,6,5","-7,7,-6","-7,7,5","-7,8,-6","-6,0,-21","-6,0,-20","-6,0,-19","-6,0,-18","-6,0,-17","-6,0,-16","-6,0,-15","-6,0,-14","-6,0,-13","-6,0,-12","-6,0,-11","-6,0,-10","-6,0,-9","-6,0,-8","-6,0,-7","-6,0,-6","-6,0,-5","-6,0,-4","-6,0,-3","-6,0,-2","-6,0,-1","-6,0,0","-6,0,1","-6,0,2","-6,0,3","-6,0,4","-6,0,5","-6,0,6","-6,0,7","-6,0,8","-6,0,9","-6,0,10","-6,0,11","-6,0,12","-6,0,13","-6,0,14","-6,0,15","-6,0,16","-6,0,17","-6,0,18","-6,0,19","-6,0,20","-6,0,21","-6,1,-6","-6,1,1","-6,1,2","-6,1,3","-6,1,5","-6,2,-6","-6,2,5","-6,3,-6","-6,3,5","-6,4,-6","-6,4,5","-6,5,-6","-6,5,5","-6,6,-6","-6,7,-6","-6,8,-6","-5,0,-21","-5,0,-20","-5,0,-19","-5,0,-18","-5,0,-17","-5,0,-16","-5,0,-15","-5,0,-14","-5,0,-13","-5,0,-12","-5,0,-11","-5,0,-10","-5,0,-9","-5,0,-8","-5,0,-7","-5,0,-6","-5,0,-5","-5,0,-4","-5,0,-3","-5,0,-2","-5,0,-1","-5,0,0","-5,0,1","-5,0,2","-5,0,3","-5,0,4","-5,0,5","-5,0,6","-5,0,7","-5,0,8","-5,0,9","-5,0,10","-5,0,11","-5,0,12","-5,0,13","-5,0,14","-5,0,15","-5,0,16","-5,0,17","-5,0,18","-5,0,19","-5,0,20","-5,0,21","-5,1,-6","-5,1,1","-5,1,3","-5,1,5","-5,2,-6","-5,2,5","-5,3,-6","-5,3,5","-5,4,-6","-5,4,5","-5,5,-6","-5,5,5","-5,6,-6","-5,6,5","-5,7,-6","-5,7,5","-4,0,-21","-4,0,-20","-4,0,-19","-4,0,-18","-4,0,-17","-4,0,-16","-4,0,-15","-4,0,-14","-4,0,-13","-4,0,-12","-4,0,-11","-4,0,-10","-4,0,-9","-4,0,-8","-4,0,-7","-4,0,-6","-4,0,-5","-4,0,-4","-4,0,-3","-4,0,-2","-4,0,-1","-4,0,0","-4,0,1","-4,0,2","-4,0,3","-4,0,4","-4,0,5","-4,0,6","-4,0,7","-4,0,8","-4,0,9","-4,0,10","-4,0,11","-4,0,12","-4,0,13","-4,0,14","-4,0,15","-4,0,16","-4,0,17","-4,0,18","-4,0,19","-4,0,20","-4,0,21","-4,1,-6","-4,1,1","-4,1,2","-4,1,3","-4,1,5","-4,2,-6","-4,2,5","-4,3,-6","-4,3,5","-4,4,-6","-4,4,5","-4,5,-6","-4,5,5","-4,6,5","-4,7,-6","-3,0,-21","-3,0,-20","-3,0,-19","-3,0,-18","-3,0,-17","-3,0,-16","-3,0,-15","-3,0,-14","-3,0,-13","-3,0,-12","-3,0,-11","-3,0,-10","-3,0,-9","-3,0,-8","-3,0,-7","-3,0,-6","-3,0,-5","-3,0,-4","-3,0,-3","-3,0,-2","-3,0,-1","-3,0,0","-3,0,1","-3,0,2","-3,0,3","-3,0,4","-3,0,5","-3,0,6","-3,0,7","-3,0,8","-3,0,9","-3,0,10","-3,0,11","-3,0,12","-3,0,13","-3,0,14","-3,0,15","-3,0,16","-3,0,17","-3,0,18","-3,0,19","-3,0,20","-3,0,21","-3,1,-6","-3,1,5","-3,1,6","-3,2,-6","-3,2,5","-3,2,6","-3,3,-6","-3,4,-6","-3,5,5","-3,6,-6","-3,7,-6","-2,0,-21","-2,0,-20","-2,0,-19","-2,0,-18","-2,0,-17","-2,0,-16","-2,0,-15","-2,0,-14","-2,0,-13","-2,0,-12","-2,0,-11","-2,0,-10","-2,0,-9","-2,0,-8","-2,0,-7","-2,0,-6","-2,0,-5","-2,0,-4","-2,0,-3","-2,0,-2","-2,0,-1","-2,0,0","-2,0,1","-2,0,2","-2,0,3","-2,0,4","-2,0,5","-2,0,6","-2,0,7","-2,0,8","-2,0,9","-2,0,10","-2,0,11","-2,0,12","-2,0,13","-2,0,14","-2,0,15","-2,0,16","-2,0,17","-2,0,18","-2,0,19","-2,0,20","-2,0,21","-2,1,-6","-2,1,5","-2,1,6","-2,1,7","-2,1,8","-2,1,9","-2,1,10","-2,1,11","-2,1,12","-2,2,-6","-2,2,5","-2,2,6","-2,2,7","-2,2,8","-2,2,9","-2,2,10","-2,2,11","-2,2,12","-2,3,-6","-2,3,5","-2,3,6","-2,3,7","-2,3,8","-2,3,9","-2,3,10","-2,3,11","-2,3,12","-2,4,-6","-2,4,5","-2,4,6","-2,4,7","-2,4,8","-2,4,9","-2,4,11","-2,5,-6","-2,5,5","-2,5,6","-2,5,7","-2,5,8","-2,5,9","-2,5,10","-2,5,11","-2,6,-6","-2,6,8","-2,6,10","-2,6,11","-2,7,-6","-1,0,-21","-1,0,-20","-1,0,-19","-1,0,-18","-1,0,-17","-1,0,-16","-1,0,-15","-1,0,-14","-1,0,-13","-1,0,-12","-1,0,-11","-1,0,-10","-1,0,-9","-1,0,-8","-1,0,-7","-1,0,-6","-1,0,-5","-1,0,-4","-1,0,-3","-1,0,-2","-1,0,-1","-1,0,0","-1,0,1","-1,0,2","-1,0,3","-1,0,4","-1,0,5","-1,0,6","-1,0,7","-1,0,8","-1,0,9","-1,0,10","-1,0,11","-1,0,12","-1,0,13","-1,0,14","-1,0,15","-1,0,16","-1,0,17","-1,0,18","-1,0,19","-1,0,20","-1,0,21","-1,1,-6","-1,1,12","-1,2,-6","-1,2,12","-1,3,-6","-1,3,12","-1,4,-6","-1,4,12","-1,5,12","-1,6,-6","-1,8,-6","0,0,-21","0,0,-20","0,0,-19","0,0,-18","0,0,-17","0,0,-16","0,0,-15","0,0,-14","0,0,-13","0,0,-12","0,0,-11","0,0,-10","0,0,-9","0,0,-8","0,0,-7","0,0,-6","0,0,-5","0,0,-4","0,0,-3","0,0,-2","0,0,-1","0,0,0","0,0,1","0,0,2","0,0,3","0,0,4","0,0,5","0,0,6","0,0,7","0,0,8","0,0,9","0,0,10","0,0,11","0,0,12","0,0,13","0,0,14","0,0,15","0,0,16","0,0,17","0,0,18","0,0,19","0,0,20","0,0,21","0,1,-6","0,1,12","0,2,-6","0,2,12","0,3,-6","0,3,12","0,4,-6","0,4,12","0,5,-6","0,5,12","0,6,-6","0,6,12","0,7,-6","0,8,-6","1,0,-21","1,0,-20","1,0,-19","1,0,-18","1,0,-17","1,0,-16","1,0,-15","1,0,-14","1,0,-13","1,0,-12","1,0,-11","1,0,-10","1,0,-9","1,0,-8","1,0,-7","1,0,-6","1,0,-5","1,0,-4","1,0,-3","1,0,-2","1,0,-1","1,0,0","1,0,1","1,0,2","1,0,3","1,0,4","1,0,5","1,0,6","1,0,7","1,0,8","1,0,9","1,0,10","1,0,11","1,0,12","1,0,13","1,0,14","1,0,15","1,0,16","1,0,17","1,0,18","1,0,19","1,0,20","1,0,21","1,1,-6","1,1,12","1,2,-6","1,2,12","1,3,-6","1,3,12","1,4,-6","1,4,12","1,5,-6","1,5,12","1,6,-6","1,6,12","1,7,-6","2,0,-21","2,0,-20","2,0,-19","2,0,-18","2,0,-17","2,0,-16","2,0,-15","2,0,-14","2,0,-13","2,0,-12","2,0,-11","2,0,-10","2,0,-9","2,0,-8","2,0,-7","2,0,-6","2,0,-5","2,0,-4","2,0,-3","2,0,-2","2,0,-1","2,0,0","2,0,1","2,0,2","2,0,3","2,0,4","2,0,5","2,0,6","2,0,7","2,0,8","2,0,9","2,0,10","2,0,11","2,0,12","2,0,13","2,0,14","2,0,15","2,0,16","2,0,17","2,0,18","2,0,19","2,0,20","2,0,21","2,1,-6","2,1,12","2,2,-6","2,2,12","2,3,-6","2,3,12","2,4,-6","2,4,12","2,5,-6","2,5,12","2,6,-6","2,6,12","3,0,-21","3,0,-20","3,0,-19","3,0,-18","3,0,-17","3,0,-16","3,0,-15","3,0,-14","3,0,-13","3,0,-12","3,0,-11","3,0,-10","3,0,-9","3,0,-8","3,0,-7","3,0,-6","3,0,-5","3,0,-4","3,0,-3","3,0,-2","3,0,-1","3,0,0","3,0,1","3,0,2","3,0,3","3,0,4","3,0,5","3,0,6","3,0,7","3,0,8","3,0,9","3,0,10","3,0,11","3,0,12","3,0,13","3,0,14","3,0,15","3,0,16","3,0,17","3,0,18","3,0,19","3,0,20","3,0,21","3,1,-6","3,1,5","3,1,6","3,1,7","3,1,8","3,1,12","3,2,-6","3,2,5","3,2,6","3,2,7","3,2,8","3,2,12","3,3,-6","3,3,5","3,3,6","3,3,7","3,3,8","3,3,12","3,4,-6","3,4,5","3,4,6","3,4,7","3,4,8","3,4,12","3,5,-6","3,5,5","3,5,6","3,5,7","3,5,8","3,5,12","3,6,-6","3,6,12","3,7,-6","3,8,-6","4,0,-21","4,0,-20","4,0,-19","4,0,-18","4,0,-17","4,0,-16","4,0,-15","4,0,-14","4,0,-13","4,0,-12","4,0,-11","4,0,-10","4,0,-9","4,0,-8","4,0,-7","4,0,-6","4,0,-5","4,0,-4","4,0,-3","4,0,-2","4,0,-1","4,0,0","4,0,1","4,0,2","4,0,3","4,0,4","4,0,5","4,0,6","4,0,7","4,0,8","4,0,9","4,0,10","4,0,11","4,0,12","4,0,13","4,0,14","4,0,15","4,0,16","4,0,17","4,0,18","4,0,19","4,0,20","4,0,21","4,1,-6","4,1,5","4,1,8","4,1,12","4,2,-6","4,2,5","4,2,8","4,2,12","4,3,-6","4,3,5","4,3,8","4,3,12","4,4,-6","4,4,5","4,4,8","4,4,12","4,5,-6","4,5,5","4,6,-6","4,6,5","4,6,12","4,7,-6","4,7,12","4,8,12","5,0,-21","5,0,-20","5,0,-19","5,0,-18","5,0,-17","5,0,-16","5,0,-15","5,0,-14","5,0,-13","5,0,-12","5,0,-11","5,0,-10","5,0,-9","5,0,-8","5,0,-7","5,0,-6","5,0,-5","5,0,-4","5,0,-3","5,0,-2","5,0,-1","5,0,0","5,0,1","5,0,2","5,0,3","5,0,4","5,0,5","5,0,6","5,0,7","5,0,8","5,0,9","5,0,10","5,0,11","5,0,12","5,0,13","5,0,14","5,0,15","5,0,16","5,0,17","5,0,18","5,0,19","5,0,20","5,0,21","5,1,-6","5,1,5","5,1,7","5,1,8","5,1,12","5,2,-6","5,2,5","5,2,8","5,2,12","5,3,-6","5,3,5","5,3,8","5,3,12","5,4,-6","5,4,5","5,4,8","5,4,12","5,5,-6","5,5,5","5,5,12","5,6,-6","5,6,12","6,0,-21","6,0,-20","6,0,-19","6,0,-18","6,0,-17","6,0,-16","6,0,-15","6,0,-14","6,0,-13","6,0,-12","6,0,-11","6,0,-10","6,0,-9","6,0,-8","6,0,-7","6,0,-6","6,0,-5","6,0,-4","6,0,-3","6,0,-2","6,0,-1","6,0,0","6,0,1","6,0,2","6,0,3","6,0,4","6,0,5","6,0,6","6,0,7","6,0,8","6,0,9","6,0,10","6,0,11","6,0,12","6,0,13","6,0,14","6,0,15","6,0,16","6,0,17","6,0,18","6,0,19","6,0,20","6,0,21","6,1,-6","6,1,5","6,1,8","6,1,12","6,2,-6","6,2,5","6,2,8","6,2,12","6,3,-6","6,3,5","6,3,8","6,3,12","6,4,-6","6,4,5","6,4,8","6,4,9","6,4,12","6,5,5","6,5,8","6,5,12","6,6,-6","6,6,12","6,8,-6","7,0,-21","7,0,-20","7,0,-19","7,0,-18","7,0,-17","7,0,-16","7,0,-15","7,0,-14","7,0,-13","7,0,-12","7,0,-11","7,0,-10","7,0,-9","7,0,-8","7,0,-7","7,0,-6","7,0,-5","7,0,-4","7,0,-3","7,0,-2","7,0,-1","7,0,0","7,0,1","7,0,2","7,0,3","7,0,4","7,0,5","7,0,6","7,0,7","7,0,8","7,0,9","7,0,10","7,0,11","7,0,12","7,0,13","7,0,14","7,0,15","7,0,16","7,0,17","7,0,18","7,0,19","7,0,20","7,0,21","7,1,-6","7,1,5","7,1,8","7,1,12","7,2,-6","7,2,5","7,2,8","7,2,12","7,3,-6","7,3,5","7,3,8","7,3,12","7,4,-6","7,4,5","7,4,8","7,4,9","7,4,11","7,4,12","7,5,-6","7,5,5","7,5,8","7,5,12","7,6,-6","7,7,-6","7,8,-6","8,0,-21","8,0,-20","8,0,-19","8,0,-18","8,0,-17","8,0,-16","8,0,-15","8,0,-14","8,0,-13","8,0,-12","8,0,-11","8,0,-10","8,0,-9","8,0,-8","8,0,-7","8,0,-6","8,0,-5","8,0,-4","8,0,-3","8,0,-2","8,0,-1","8,0,0","8,0,1","8,0,2","8,0,3","8,0,4","8,0,5","8,0,6","8,0,7","8,0,8","8,0,9","8,0,10","8,0,11","8,0,12","8,0,13","8,0,14","8,0,15","8,0,16","8,0,17","8,0,18","8,0,19","8,0,20","8,0,21","8,1,-6","8,1,-5","8,1,-4","8,1,-3","8,1,-2","8,1,-1","8,1,0","8,1,1","8,1,2","8,1,3","8,1,4","8,1,5","8,1,7","8,1,8","8,1,12","8,2,-6","8,2,-5","8,2,-4","8,2,-3","8,2,-2","8,2,-1","8,2,0","8,2,1","8,2,2","8,2,3","8,2,4","8,2,5","8,2,8","8,2,12","8,3,-6","8,3,-5","8,3,-4","8,3,-3","8,3,-2","8,3,-1","8,3,0","8,3,1","8,3,2","8,3,3","8,3,4","8,3,8","8,3,12","8,4,-6","8,4,-5","8,4,-4","8,4,-3","8,4,-2","8,4,-1","8,4,0","8,4,1","8,4,2","8,4,3","8,4,4","8,4,9","8,4,10","8,4,11","8,4,12","8,5,-6","8,5,-5","8,5,-4","8,5,-3","8,5,-2","8,5,-1","8,5,1","8,5,2","8,5,3","8,5,4","8,5,12","8,6,-6","8,6,-5","8,6,-4","8,6,-3","8,6,-2","8,6,-1","8,6,0","8,6,1","8,6,2","8,6,3","8,7,-5","8,7,0","8,7,2","8,7,3","8,8,0","8,8,2","8,8,3","9,0,-21","9,0,-20","9,0,-19","9,0,-18","9,0,-17","9,0,-16","9,0,-15","9,0,-14","9,0,-13","9,0,-12","9,0,-11","9,0,-10","9,0,-9","9,0,-8","9,0,-7","9,0,-6","9,0,-5","9,0,-4","9,0,-3","9,0,-2","9,0,-1","9,0,0","9,0,1","9,0,2","9,0,3","9,0,4","9,0,5","9,0,6","9,0,7","9,0,8","9,0,9","9,0,10","9,0,11","9,0,12","9,0,13","9,0,14","9,0,15","9,0,16","9,0,17","9,0,18","9,0,19","9,0,20","9,0,21","9,1,9","9,1,10","9,1,11","9,1,12","9,2,8","9,2,9","9,2,10","9,2,11","9,3,9","9,3,10","9,3,11","9,4,9","9,4,10","9,4,11","9,5,9","9,5,11","10,0,-21","10,0,-20","10,0,-19","10,0,-18","10,0,-17","10,0,-16","10,0,-15","10,0,-14","10,0,-13","10,0,-12","10,0,-11","10,0,-10","10,0,-9","10,0,-8","10,0,-7","10,0,-6","10,0,-5","10,0,-4","10,0,-3","10,0,-2","10,0,-1","10,0,0","10,0,1","10,0,2","10,0,3","10,0,4","10,0,5","10,0,6","10,0,7","10,0,8","10,0,9","10,0,10","10,0,11","10,0,12","10,0,13","10,0,14","10,0,15","10,0,16","10,0,17","10,0,18","10,0,19","10,0,20","10,0,21","10,1,4","10,1,7","10,2,7","10,2,8","11,0,-21","11,0,-20","11,0,-19","11,0,-18","11,0,-17","11,0,-16","11,0,-15","11,0,-14","11,0,-13","11,0,-12","11,0,-11","11,0,-10","11,0,-9","11,0,-8","11,0,-7","11,0,-6","11,0,-5","11,0,-4","11,0,-3","11,0,-2","11,0,-1","11,0,0","11,0,1","11,0,2","11,0,3","11,0,4","11,0,5","11,0,6","11,0,7","11,0,8","11,0,9","11,0,10","11,0,11","11,0,12","11,0,13","11,0,14","11,0,15","11,0,16","11,0,17","11,0,18","11,0,19","11,0,20","11,0,21","11,1,4","11,1,6","11,1,7","12,0,-21","12,0,-20","12,0,-19","12,0,-18","12,0,-17","12,0,-16","12,0,-15","12,0,-14","12,0,-13","12,0,-12","12,0,-11","12,0,-10","12,0,-9","12,0,-8","12,0,-7","12,0,-6","12,0,-5","12,0,-4","12,0,-3","12,0,-2","12,0,-1","12,0,0","12,0,1","12,0,2","12,0,3","12,0,4","12,0,5","12,0,6","12,0,7","12,0,8","12,0,9","12,0,10","12,0,11","12,0,12","12,0,13","12,0,14","12,0,15","12,0,16","12,0,17","12,0,18","12,0,19","12,0,20","12,0,21","13,0,-21","13,0,-20","13,0,-19","13,0,-18","13,0,-17","13,0,-16","13,0,-15","13,0,-14","13,0,-13","13,0,-12","13,0,-11","13,0,-10","13,0,-9","13,0,-8","13,0,-7","13,0,-6","13,0,-5","13,0,-4","13,0,-3","13,0,-2","13,0,-1","13,0,0","13,0,1","13,0,2","13,0,3","13,0,4","13,0,5","13,0,6","13,0,7","13,0,8","13,0,9","13,0,10","13,0,11","13,0,12","13,0,13","13,0,14","13,0,15","13,0,16","13,0,17","13,0,18","13,0,19","13,0,20","13,0,21","14,0,-21","14,0,-20","14,0,-19","14,0,-18","14,0,-17","14,0,-16","14,0,-15","14,0,-14","14,0,-13","14,0,-12","14,0,-11","14,0,-10","14,0,-9","14,0,-8","14,0,-7","14,0,-6","14,0,-5","14,0,-4","14,0,-3","14,0,-2","14,0,-1","14,0,0","14,0,1","14,0,2","14,0,3","14,0,4","14,0,5","14,0,6","14,0,7","14,0,8","14,0,9","14,0,10","14,0,11","14,0,12","14,0,13","14,0,14","14,0,15","14,0,16","14,0,17","14,0,18","14,0,19","14,0,20","14,0,21","15,0,-21","15,0,-20","15,0,-19","15,0,-18","15,0,-17","15,0,-16","15,0,-15","15,0,-14","15,0,-13","15,0,-12","15,0,-11","15,0,-10","15,0,-9","15,0,-8","15,0,-7","15,0,-6","15,0,-5","15,0,-4","15,0,-3","15,0,-2","15,0,-1","15,0,0","15,0,1","15,0,2","15,0,3","15,0,4","15,0,5","15,0,6","15,0,7","15,0,8","15,0,9","15,0,10","15,0,11","15,0,12","15,0,13","15,0,14","15,0,15","15,0,16","15,0,17","15,0,18","15,0,19","15,0,20","15,0,21","15,1,9","16,0,-21","16,0,-20","16,0,-19","16,0,-18","16,0,-17","16,0,-16","16,0,-15","16,0,-14","16,0,-13","16,0,-12","16,0,-11","16,0,-10","16,0,-9","16,0,-8","16,0,-7","16,0,-6","16,0,-5","16,0,-4","16,0,-3","16,0,-2","16,0,-1","16,0,0","16,0,1","16,0,2","16,0,3","16,0,4","16,0,5","16,0,6","16,0,7","16,0,8","16,0,9","16,0,10","16,0,11","16,0,12","16,0,13","16,0,14","16,0,15","16,0,16","16,0,17","16,0,18","16,0,19","16,0,20","16,0,21","17,0,-21","17,0,-20","17,0,-19","17,0,-18","17,0,-17","17,0,-16","17,0,-15","17,0,-14","17,0,-13","17,0,-12","17,0,-11","17,0,-10","17,0,-9","17,0,-8","17,0,-7","17,0,-6","17,0,-5","17,0,-4","17,0,-3","17,0,-2","17,0,-1","17,0,0","17,0,1","17,0,2","17,0,3","17,0,4","17,0,5","17,0,6","17,0,7","17,0,8","17,0,9","17,0,10","17,0,11","17,0,12","17,0,13","17,0,14","17,0,15","17,0,16","17,0,17","17,0,18","17,0,19","17,0,20","17,0,21","-3,3,5","-3,3,6","-4,3,6","-3,2,7","-3,1,7","-3,1,9","-3,2,9","2,5,7","1,5,7","0,5,7","-1,5,7","2,5,8","1,5,8","0,5,8","-1,5,8","3,5,9","2,5,9","3,5,10","1,5,9","0,5,9","-1,5,9","2,5,10","1,5,10","0,5,10","-1,5,10","3,5,11","2,5,11","1,5,11","0,5,11","0,6,11","-1,5,11"]);
+                    return (x, y, z) => solids.has(x + ',' + y + ',' + z);
+                })()).build();
             default: return builder.build();
         }
     }
@@ -4046,8 +3852,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             color: 0xffffff,
             flatShading: true,          // keeps facets sharp — critical for the look
             transparent: true,
-            opacity: 0.85,
-            transmission: 0.9,
+            opacity: 0.5,
             ior: 2.2,
             thickness: 15.0,
             clearcoat: 1.0,
@@ -4137,11 +3942,11 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         // Single large InstancedMesh — 70 clusters × 8 crystals = 560 instances
         const megaMesh = createCrystalStructure(
             new THREE.Vector3(0, -65, 0), // anchor deep underground at world origin
-            220,  // scatter radius 80-260 units from centre
+            400,  // scatter radius 80-260 units from centre
             70,   // clusters
             8,    // crystals per cluster
             0.55, // hue centre (cyan-teal)
-            0.45, // wide hue range (cyan → amethyst)
+            0.35, // wide hue range (cyan → amethyst)
             {
                 mainHeightMin: 100, mainHeightMax: 350,
                 sideHeightMin: 30,  sideHeightMax: 100,
@@ -4156,6 +3961,12 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
     }
 
     const waterNormalTex = createWaterNormalTexture();
+
+    // Compress 3D coordinates into a single 30-bit integer.
+    // Safe for coordinates in the range [-512, 511].
+    function getVoxelKey(x, y, z) {
+        return ((x + 512) & 0x3FF) | (((y + 512) & 0x3FF) << 10) | (((z + 512) & 0x3FF) << 20);
+    }
 
     function buildLevel(lvlIndex, isPreview = false, isReset = false, keepPos = false) {            
         const rng = splitmix32(5); 
@@ -4183,7 +3994,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
         // Spawn decoration props for custom levels (not during preview)
         if ((lvlIndex === 'CUSTOM' || (typeof lvlIndex === 'string' && lvlIndex.startsWith('CUSTOM_'))) && !isPreview) {
-            // For CUSTOM_ slots, load decorations from saved data
             if (typeof lvlIndex === 'string' && lvlIndex.startsWith('CUSTOM_')) {
                 const slot = parseInt(lvlIndex.replace('CUSTOM_', ''));
                 const savedData = customLevels[slot];
@@ -4197,6 +4007,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                 spawnCustomDecorations();
             }
         }
+        
         // Reset logic configs before loading level-specific ones
         logicNodes.configs = {}; 
         if (currentParams.logic) {
@@ -4311,39 +4122,57 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         const grid = new Map();
         const bX = currentParams.bounds.x, bY = currentParams.bounds.y, bZ = currentParams.bounds.z;
 
+        // Use integer keys to populate grid
         for (let x = -bX - 1; x <= bX + 1; x++) {
             for (let y = -1; y <= bY + 1; y++) {
                 for (let z = -bZ - 1; z <= bZ + 1; z++) {
-                    if (currentParams.isSolid(x, y, z)) grid.set(`${x},${y},${z}`, { x, y, z, exposed: [] });
+                    if (currentParams.isSolid(x, y, z)) {
+                        grid.set(getVoxelKey(x, y, z), { x, y, z, exposed: [] });
+                    }
                 }
             }
         }
 
-        const neighbors = [ {dx:1,dy:0,dz:0},{dx:-1,dy:0,dz:0},{dx:0,dy:1,dz:0},{dx:0,dy:-1,dz:0},{dx:0,dy:0,dz:1},{dx:0,dy:0,dz:-1} ];
+        const neighbors = [ 
+            {dx:1,dy:0,dz:0}, {dx:-1,dy:0,dz:0},
+            {dx:0,dy:1,dz:0}, {dx:0,dy:-1,dz:0},
+            {dx:0,dy:0,dz:1}, {dx:0,dy:0,dz:-1} 
+        ];
         const finalVisible = []; 
-        // Build destruction zone list: use level params or fall back to single top-center hole
         const destroyZones = (currentParams.destructionZones && currentParams.destructionZones.length > 0)
             ? currentParams.destructionZones
             : [{ cx: 0, cy: bY * 0.82, cz: 0, innerRadius: 8, outerRadius: 11 }];
 
         grid.forEach(blk => {
             let isExp = false;
-            for (let n of neighbors) { 
-                if (!grid.has(`${blk.x+n.dx},${blk.y+n.dy},${blk.z+n.dz}`)) { blk.exposed.push(n); isExp = true; } 
+            for (let i = 0; i < neighbors.length; i++) { 
+                const n = neighbors[i];
+                const nKey = getVoxelKey(blk.x + n.dx, blk.y + n.dy, blk.z + n.dz);
+                if (!grid.has(nKey)) { 
+                    blk.exposed.push(n); 
+                    isExp = true; 
+                } 
             }
             if (isExp) {
-                // Find closest destruction zone
                 let minDist = Infinity;
                 let closestInner = 8, closestOuter = 11;
                 let noise = Math.sin(blk.x * 2.5) * Math.cos(blk.z * 2.5) * 1.5;
-                for (const dz of destroyZones) {
+                for (let j = 0; j < destroyZones.length; j++) {
+                    const dz = destroyZones[j];
                     const dx = blk.x - dz.cx, dy = blk.y - dz.cy, ddzz = blk.z - dz.cz;
                     const d = Math.sqrt(dx*dx + dy*dy + ddzz*ddzz) + noise;
-                    if (d < minDist) { minDist = d; closestInner = dz.innerRadius; closestOuter = dz.outerRadius; }
+                    if (d < minDist) { 
+                        minDist = d; 
+                        closestInner = dz.innerRadius; 
+                        closestOuter = dz.outerRadius; 
+                    }
                 }
 
                 if (minDist < closestInner) { 
-                    if (rng() < 0.65) { grid.delete(`${blk.x},${blk.y},${blk.z}`); return; } 
+                    if (rng() < 0.65) { 
+                        grid.delete(getVoxelKey(blk.x, blk.y, blk.z)); 
+                        return; 
+                    } 
                     blk.isBroken = true; 
                 } else if (minDist < closestOuter) {
                     if (rng() < 0.4) blk.isBroken = true; 
@@ -4353,7 +4182,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         });
 
         const visMap = new Map(); 
-        finalVisible.forEach(b => visMap.set(`${b.x},${b.y},${b.z}`, b));
+        finalVisible.forEach(b => visMap.set(getVoxelKey(b.x, b.y, b.z), b));
         const merged = new Set(); 
         const blocksToRender = [];
         const ceilingAnchors = []; 
@@ -4361,34 +4190,69 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         const topSurfaces = [];
 
         finalVisible.forEach(b => {
-            if (b.y >= 8 && b.exposed.some(n => n.dy === -1)) ceilingAnchors.push(new THREE.Vector3(b.x, b.y - 0.5, b.z).applyQuaternion(globalTiltThree));
-            else if (b.y < 8 && b.y > 2 && b.exposed.some(n => n.dx !== 0 || n.dz !== 0)) wallAnchors.push(new THREE.Vector3(b.x, b.y, b.z).applyQuaternion(globalTiltThree));
-            if (!b.isBroken && b.exposed.some(n => n.dy === 1)) topSurfaces.push(new THREE.Vector3(b.x, b.y + 0.5, b.z).applyQuaternion(globalTiltThree));
+            const bPos = new THREE.Vector3(b.x, b.y, b.z);
+            if (b.y >= 8 && b.exposed.some(n => n.dy === -1)) {
+                ceilingAnchors.push(bPos.clone().set(b.x, b.y - 0.5, b.z).applyQuaternion(globalTiltThree));
+            } else if (b.y < 8 && b.y > 2 && b.exposed.some(n => n.dx !== 0 || n.dz !== 0)) {
+                wallAnchors.push(bPos.clone().applyQuaternion(globalTiltThree));
+            }
+            if (!b.isBroken && b.exposed.some(n => n.dy === 1)) {
+                topSurfaces.push(bPos.clone().set(b.x, b.y + 0.5, b.z).applyQuaternion(globalTiltThree));
+            }
 
-            let key = `${b.x},${b.y},${b.z}`; 
+            const key = getVoxelKey(b.x, b.y, b.z); 
             if (merged.has(key)) return;
 
             let placed2x2 = false;
             if (rng() < 0.5) {
-                let k2 = `${b.x+1},${b.y},${b.z}`, k3 = `${b.x},${b.y},${b.z+1}`, k4 = `${b.x+1},${b.y},${b.z+1}`;
+                const k2 = getVoxelKey(b.x + 1, b.y, b.z);
+                const k3 = getVoxelKey(b.x, b.y, b.z + 1);
+                const k4 = getVoxelKey(b.x + 1, b.y, b.z + 1);
                 if (visMap.has(k2) && !merged.has(k2) && visMap.has(k3) && !merged.has(k3) && visMap.has(k4) && !merged.has(k4)) {
                     merged.add(key).add(k2).add(k3).add(k4);
-                    blocksToRender.push({ type: '2x1x2', x: b.x+0.5, y: b.y, z: b.z+0.5, isBroken: b.isBroken || visMap.get(k2).isBroken || visMap.get(k3).isBroken || visMap.get(k4).isBroken }); placed2x2 = true;
+                    blocksToRender.push({ 
+                        type: '2x1x2', 
+                        x: b.x + 0.5, 
+                        y: b.y, 
+                        z: b.z + 0.5, 
+                        isBroken: b.isBroken || visMap.get(k2).isBroken || visMap.get(k3).isBroken || visMap.get(k4).isBroken 
+                    }); 
+                    placed2x2 = true;
                 } else {
-                    k2 = `${b.x+1},${b.y},${b.z}`; k3 = `${b.x},${b.y+1},${b.z}`; k4 = `${b.x+1},${b.y+1},${b.z}`;
-                    if (visMap.has(k2) && !merged.has(k2) && visMap.has(k3) && !merged.has(k3) && visMap.has(k4) && !merged.has(k4)) {
-                        merged.add(key).add(k2).add(k3).add(k4);
-                        blocksToRender.push({ type: '2x2x1', x: b.x+0.5, y: b.y+0.5, z: b.z, isBroken: b.isBroken || visMap.get(k2).isBroken || visMap.get(k3).isBroken || visMap.get(k4).isBroken }); placed2x2 = true;
+                    const k2_alt = getVoxelKey(b.x + 1, b.y, b.z);
+                    const k3_alt = getVoxelKey(b.x, b.y + 1, b.z);
+                    const k4_alt = getVoxelKey(b.x + 1, b.y + 1, b.z);
+                    if (visMap.has(k2_alt) && !merged.has(k2_alt) && visMap.has(k3_alt) && !merged.has(k3_alt) && visMap.has(k4_alt) && !merged.has(k4_alt)) {
+                        merged.add(key).add(k2_alt).add(k3_alt).add(k4_alt);
+                        blocksToRender.push({ 
+                            type: '2x2x1', 
+                            x: b.x + 0.5, 
+                            y: b.y + 0.5, 
+                            z: b.z, 
+                            isBroken: b.isBroken || visMap.get(k2_alt).isBroken || visMap.get(k3_alt).isBroken || visMap.get(k4_alt).isBroken 
+                        }); 
+                        placed2x2 = true;
                     } else {
-                        k2 = `${b.x},${b.y},${b.z+1}`; k3 = `${b.x},${b.y+1},${b.z}`; k4 = `${b.x},${b.y+1},${b.z+1}`;
-                        if (visMap.has(k2) && !merged.has(k2) && visMap.has(k3) && !merged.has(k3) && visMap.has(k4) && !merged.has(k4)) {
-                            merged.add(key).add(k2).add(k3).add(k4);
-                            blocksToRender.push({ type: '1x2x2', x: b.x, y: b.y+0.5, z: b.z+0.5, isBroken: b.isBroken || visMap.get(k2).isBroken || visMap.get(k3).isBroken || visMap.get(k4).isBroken }); placed2x2 = true;
+                        const k2_alt2 = getVoxelKey(b.x, b.y, b.z + 1);
+                        const k3_alt2 = getVoxelKey(b.x, b.y + 1, b.z);
+                        const k4_alt2 = getVoxelKey(b.x, b.y + 1, b.z + 1);
+                        if (visMap.has(k2_alt2) && !merged.has(k2_alt2) && visMap.has(k3_alt2) && !merged.has(k3_alt2) && visMap.has(k4_alt2) && !merged.has(k4_alt2)) {
+                            merged.add(key).add(k2_alt2).add(k3_alt2).add(k4_alt2);
+                            blocksToRender.push({ 
+                                type: '1x2x2', 
+                                x: b.x, 
+                                y: b.y + 0.5, 
+                                z: b.z + 0.5, 
+                                isBroken: b.isBroken || visMap.get(k2_alt2).isBroken || visMap.get(k3_alt2).isBroken || visMap.get(k4_alt2).isBroken 
+                            }); 
+                            placed2x2 = true;
                         }
                     }
                 }
             }
-            if (!placed2x2) blocksToRender.push({ type: '1x1x1', x: b.x, y: b.y, z: b.z, isBroken: b.isBroken, exposed: b.exposed });
+            if (!placed2x2) {
+                blocksToRender.push({ type: '1x1x1', x: b.x, y: b.y, z: b.z, isBroken: b.isBroken, exposed: b.exposed });
+            }
         });
 
         const staticTileBody = new CANNON.Body({ 
@@ -4711,7 +4575,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                         const geo = new THREE.PlaneGeometry(sz, sz * (0.7 + rng() * 0.6));
 
                         // Change the "0.55 + rng()*0.30" to something lower like "0.20 + rng()*0.20"
-                        placeDecal(geo, mkDecalMat(T[v], 0.20 + rng() * 0.20),
+                        placeDecal(geo, mkDecalMat(T[v], 0.10 + rng() * 0.10),
                             { x: b.x+(rng()-0.5)*0.5, y: b.y+0.502, z: b.z+(rng()-0.5)*0.5 },
                             { dy: 1 }, rng()*Math.PI*2);
 
@@ -4725,7 +4589,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                         const geo = new THREE.PlaneGeometry(w, h);
 
                         // Change the "0.45 + rng()*0.30" to something lower like "0.15 + rng()*0.20"
-                        placeDecal(geo, mkDecalMat(T[v], 0.15 + rng() * 0.20),
+                        placeDecal(geo, mkDecalMat(T[v], 0.08 + rng() * 0.10),
                             {
                                 x: b.x + nx*0.502 + (rng()-0.5)*(nz!==0?0.5:0),
                                 y: b.y + (rng()-0.5)*0.35,
@@ -4800,7 +4664,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     // CHAPTER 3: BLUE OVERCHARGE MECHANIC
                     if (hitBlock && hitBlock.type === 'blue') {
                         if (body.type !== CANNON.Body.KINEMATIC) {
-                            body.velocity.y = hitBlock.overcharged ? 40 : 21;
+                            body.velocity.y = hitBlock.overcharged ? 40 : 20;
 
                             // Massive momentum (heavy red block falling) overcharges the pad
                             if (relVel > 12 && body.mass > 100) {
@@ -4853,10 +4717,10 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         if (currentParams.waterY !== undefined) {
             const wOpts = currentParams.waterOptions || {};
             const WAVES = {
-                A: new THREE.Vector4( 1.0,  0.3, 0.04, 4.0 ),
-                B: new THREE.Vector4( 0.4,  1.0, 0.03, 2.5 ),
-                C: new THREE.Vector4(-0.7,  0.8, 0.02, 1.5 ),
-                D: new THREE.Vector4( 0.2, -0.9, 0.01, 1.0 ),
+                A: new THREE.Vector4( 1.0,  0.3, 0.10, 4.0 ),  // z: 0.04 → 0.10
+                B: new THREE.Vector4( 0.4,  1.0, 0.08, 2.5 ),  // z: 0.03 → 0.08
+                C: new THREE.Vector4(-0.7,  0.8, 0.05, 1.5 ),  // z: 0.02 → 0.05
+                D: new THREE.Vector4( 0.2, -0.9, 0.03, 1.0 ),  // z: 0.01 → 0.03
             };
 
             waveTime = 0; 
@@ -4865,15 +4729,15 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             waterNormalTex.repeat.set(4, 4);
 
             waterMesh = new Water(waterGeometry, {
-                textureWidth:    512, // Higher res reflections
-                textureHeight:   512,
+                textureWidth:    256, // Higher res reflections
+                textureHeight:   256,
                 waterNormals:    waterNormalTex,
                 sunDirection:    sunLight.position.clone().normalize(),
                 sunColor:        0xffffff, // Brighter sun hit
-                waterColor:      wOpts.color || 0x002a4a, // Deeper base color
-                distortionScale: wOpts.distortionScale || 3.5, // More distortion
+                waterColor:      wOpts.color || 0xacb9c4, // Deeper base color
+                distortionScale: wOpts.distortionScale || 6.5, // More distortion
                 fog:             scene.fog !== undefined,
-                alpha:           wOpts.alpha || 0.88,
+                alpha:           wOpts.alpha || 0.68,
             });
 
             waterMesh.rotation.x = -Math.PI / 2;
@@ -4886,6 +4750,10 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                 shader.uniforms.waveC    = { value: WAVES.C };
                 shader.uniforms.waveD    = { value: WAVES.D };
                 shader.uniforms.waveTime = { value: 0 };
+                shader.uniforms.crestBoost   = { value: 1.5 };
+                shader.uniforms.fresnelPower = { value: 3.0 };
+                shader.uniforms.deepColor    = { value: new THREE.Color(0x001622) };
+                shader.uniforms.shallowColor = { value: new THREE.Color(0x1a6f9c) };
                 waterMesh.userData.waveShader = shader;
 
                 shader.vertexShader = `
@@ -4894,13 +4762,37 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     uniform vec4 waveC;
                     uniform vec4 waveD;
                     uniform float waveTime;
+                    varying float vCrest;
+                    varying vec3 vWorldNormal;
+                    varying vec3 vViewDir;
                     vec3 gerstner(vec4 wave, vec3 p) {
-                        float k  = 6.28318 / wave.w;           
-                        float c  = sqrt(9.81 / k);             
+                        float k  = 6.28318 / wave.w;
+                        float c  = sqrt(9.81 / k);
                         vec2  d  = normalize(wave.xy);
                         float f  = k * (dot(d, p.xz) - c * waveTime);
-                        float a  = wave.z / k;                 
+                        float a  = wave.z / k;
                         return vec3(d.x * a * cos(f), a * sin(f), d.y * a * cos(f));
+                    }
+                    // Analytic derivative of the Gerstner sum gives a real slope-based normal
+                    // instead of a flat plane normal — this is what actually breaks up the
+                    // "flat mirror slab" look, since lighting/fresnel now vary across each wave.
+                    vec3 gerstnerNormal(vec3 p) {
+                        vec3 tangentX = vec3(1.0, 0.0, 0.0);
+                        vec3 tangentZ = vec3(0.0, 0.0, 1.0);
+                        vec4 waves[4];
+                        waves[0] = waveA; waves[1] = waveB; waves[2] = waveC; waves[3] = waveD;
+                        for (int i = 0; i < 4; i++) {
+                            vec4 wave = waves[i];
+                            float k  = 6.28318 / wave.w;
+                            float c  = sqrt(9.81 / k);
+                            vec2  d  = normalize(wave.xy);
+                            float f  = k * (dot(d, p.xz) - c * waveTime);
+                            float a  = wave.z / k;
+                            float dY = a * k * cos(f);
+                            tangentX += vec3(-d.x * d.x * a * k * sin(f), d.x * dY, -d.x * d.y * a * k * sin(f));
+                            tangentZ += vec3(-d.x * d.y * a * k * sin(f), d.y * dY, -d.y * d.y * a * k * sin(f));
+                        }
+                        return normalize(cross(tangentZ, tangentX));
                     }
                 ` + shader.vertexShader;
 
@@ -4913,6 +4805,14 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     gDisp += gerstner(waveC, position);
                     gDisp += gerstner(waveD, position);
                     vec3 displacedPos = position + gDisp;
+
+                    float maxAmp = (waveA.z + waveB.z + waveC.z + waveD.z) / 4.0;
+                    vCrest = clamp(gDisp.y / max(maxAmp, 0.0001) * 0.5 + 0.5, 0.0, 1.0);
+
+                    vec3 waveNormal = gerstnerNormal(position);
+                    vWorldNormal = normalize(mat3(modelMatrix) * waveNormal);
+                    vViewDir = normalize(cameraPosition - (modelMatrix * vec4(displacedPos, 1.0)).xyz);
+
                     mirrorCoord = modelMatrix * vec4(displacedPos, 1.0);
                     `
                 );
@@ -4926,6 +4826,37 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     'worldPosition = mirrorCoord.xyzw;',
                     'worldPosition = modelMatrix * vec4(displacedPos, 1.0);'
                 );
+
+                shader.fragmentShader = `
+                    varying float vCrest;
+                    varying vec3 vWorldNormal;
+                    varying vec3 vViewDir;
+                    uniform float crestBoost;
+                    uniform float fresnelPower;
+                    uniform vec3 deepColor;
+                    uniform vec3 shallowColor;
+                ` + shader.fragmentShader;
+
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <dithering_fragment>',
+                    `
+                    // Fresnel: grazing angles look bright/reflective, straight-down looks into
+                    // the deep color — this depth cue alone kills most of the "flat slab" read
+                    float fresnel = pow(1.0 - clamp(dot(vWorldNormal, vViewDir), 0.0, 1.0), fresnelPower);
+                    vec3 depthTint = mix(deepColor, shallowColor, fresnel);
+                    gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb + depthTint, 0.5);
+
+                    // Wave-slope-based rim light: catches light along crest edges even where
+                    // the mirror reflection itself is dark, giving the surface real shape
+                    float rim = pow(1.0 - abs(vWorldNormal.y), 2.0);
+                    gl_FragColor.rgb += vec3(rim * 0.12);
+
+                    // Crest brightening (sparkle/foam-ish highlight on wave peaks)
+                    gl_FragColor.rgb += vec3(pow(vCrest, 3.0) * crestBoost * 0.15);
+
+                    #include <dithering_fragment>
+                    `
+                );
             };
 
             const wm = waterMesh.material;
@@ -4933,8 +4864,8 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             wm.depthWrite  = false;
             wm.side        = THREE.FrontSide;
 
-            if (wm.uniforms.alpha)           wm.uniforms.alpha.value           = 0.88;
-            if (wm.uniforms.distortionScale) wm.uniforms.distortionScale.value = 1.8;
+            if (wm.uniforms.alpha)           wm.uniforms.alpha.value           = 0.68;
+            if (wm.uniforms.distortionScale) wm.uniforms.distortionScale.value = 6.5;
             if (wm.uniforms.size)            wm.uniforms.size.value            = 4.0;
 
             scene.add(waterMesh);
@@ -5384,8 +5315,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         const data = slotIndex >= 0 ? customLevels[slotIndex] : null;
 
         document.getElementById('level-select-overlay').style.display = 'none';
-        document.getElementById('editor-hud').style.display = 'block'; 
-        document.getElementById('editor-hotbar').style.display = 'flex';
+        document.getElementById('editor-hud').style.display = 'flex';
 
         isPreviewMode = false;
         isEditorMode = true;
@@ -5422,13 +5352,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         }
 
         logicNodes.configs = {};
-        // ↓ Guard with if(data) — data is null for new levels
         if (data && data.logic) {
-            logicNodes.configs = JSON.parse(JSON.stringify(data.logic));
-        }
-
-        logicNodes.configs = {}; 
-        if (data.logic) {
             // Deep clone the logic so editing doesn't mess with the original until we save
             logicNodes.configs = JSON.parse(JSON.stringify(data.logic));
         }
@@ -5452,8 +5376,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         // Normal campaign level sampling into scratchpad
         currentCustomSlot = -1;
         document.getElementById('level-select-overlay').style.display = 'none';
-        document.getElementById('editor-hud').style.display = 'block'; 
-        document.getElementById('editor-hotbar').style.display = 'flex';
 
         isPreviewMode = false;
         isEditorMode = true;
@@ -5486,6 +5408,20 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             if (blk.type === 'red' && blk.startScale !== undefined) ent.startScale = blk.startScale;
             customEntities.set(key, ent);
         });
+
+        // Bring over the rest of the level's features too, not just solids/entities
+        (params.destructionZones || []).forEach(z => customDestruction.push({ cx: z.cx, cy: z.cy, cz: z.cz }));
+        (params.lights || []).forEach(l => customLights.push({ x: l.x, y: l.y, z: l.z, color: l.color, intensity: l.intensity, radius: l.radius }));
+        (params.plates || []).forEach(p => customPlates.push({ x: p.x, y: p.y, z: p.z, channel: p.channel }));
+        (params.doors || []).forEach(d => customDoors.push({ ...d }));
+        (params.fields || []).forEach(f => customFields.push({ ...f }));
+        if (params.waterY !== undefined) customWaterY = params.waterY;
+
+        logicNodes.configs = {};
+        (params.logic || []).forEach(l => {
+            logicNodes.configs[l.ch] = { type: l.type, operands: l.operands };
+        });
+
         updateEditorVisuals();
 
         // 3. Setup Physics/Player (Flat Floor Mode)
@@ -5500,52 +5436,10 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
     });
 
     function exportLevelCode() {
-        let bX = 5, bY = 5, bZ = 5;
-
-        // Calculate necessary bounds with a little padding
-        customSolidBlocks.forEach(k => {
-            let [x, y, z] = k.split(',').map(Number);
-            bX = Math.max(bX, Math.abs(x) + 1);
-            bY = Math.max(bY, y + 2);
-            bZ = Math.max(bZ, Math.abs(z) + 1);
-        });
-
-        let out = `return builder.setBounds(${bX}, ${bY}, ${bZ})\n`;
-        out += `    .setSpawn(${customSpawn.x}, ${customSpawn.y}, ${customSpawn.z})\n`;
-        out += `    .setExit(${customExit.x}, ${customExit.y}, ${customExit.z})\n`;
-
-        customEntities.forEach(ent => {
-            if (ent.type === 'red' && ent.startScale !== undefined && ent.startScale !== 1.0) {
-                out += `    .addEntity('${ent.type}', ${ent.x}, ${ent.y}, ${ent.z}, { startScale: ${ent.startScale} })\n`;
-            } else {
-                out += `    .addEntity('${ent.type}', ${ent.x}, ${ent.y}, ${ent.z})\n`;
-            }
-        });
-
-        customDestruction.forEach(bomb => {
-            out += `    .addDestructionZone(${bomb.cx}, ${bomb.cy}, ${bomb.cz}, 4, 7)\n`;
-        });
-
-        customLights.forEach(light => {
-            const hexStr = '0x' + light.color.toString(16).padStart(6, '0');
-            out += `    .addLight(${light.x}, ${light.y}, ${light.z}, ${hexStr}, ${light.intensity}, ${light.radius})\n`;
-        });
-
-        customPlates.forEach(p => {
-            out += `    .addPlate(${p.x}, ${p.y}, ${p.z}, ${p.channel})\n`;
-        });
-        customDoors.forEach(d => {
-            out += `    .addDoor(${d.x}, ${d.y}, ${d.z}, { channel: ${d.channel}, dir: '${d.dir}', width: ${d.width}, height: ${d.height}, moveDist: ${d.moveDist} })\n`;
-        });
-
-        // Convert set of blocks to a JSON array string
-        const arrStr = JSON.stringify(Array.from(customSolidBlocks));
-
-        out += `    .addCustomLogic((() => {\n`;
-        out += `        // High-performance closure for grid lookups\n`;
-        out += `        const solids = new Set(${arrStr});\n`;
-        out += `        return (x, y, z) => solids.has(x + ',' + y + ',' + z);\n`;
-        out += `    })()).build();`;
+        // Same builder that quick-test / full-test uses - export can never drift
+        // from what you actually just played.
+        const builder = buildEditorLevelBuilder("CUSTOM LEVEL");
+        const out = serializeLevelBuilderCode(builder);
 
         // Copy to clipboard and show HUD notification
         navigator.clipboard.writeText(out).then(() => {
@@ -5575,7 +5469,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     isPlayingCustom = true;
                     editorSceneGroup.visible = false;
                     ghostMesh.visible = false;
-                    document.getElementById('editor-hud').style.display = 'none'; document.getElementById('editor-hotbar').style.display = 'none';
+                    document.getElementById('editor-hud').style.display = 'none';
 
                     world.removeBody(editorPhysicsFloor); 
                     world.removeBody(editorStaticBody);
@@ -5630,18 +5524,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
         // TOOL SELECTION
         if (isEditorMode && !isPlayingCustom) {
-            if (e.code === 'Digit1') setEditorTool('wall');
-            if (e.code === 'Digit2') setEditorTool('blue');
-            if (e.code === 'Digit3') setEditorTool('red');
-            if (e.code === 'Digit4') setEditorTool('green');
-            if (e.code === 'Digit5') setEditorTool('yellow');
-            if (e.code === 'Digit6') setEditorTool('bomb');
-            if (e.code === 'Digit7') setEditorTool('spawn');
-            if (e.code === 'Digit8') setEditorTool('exit');
-            if (e.code === 'Digit9') setEditorTool('big_yellow');
-            if (e.code === 'Digit0') setEditorTool('gray');
-            if (e.code === 'KeyL') setEditorTool('logic');
-
             if (e.code === 'Tab') {
                 e.preventDefault();
                 if (!isTabSelectorOpen) openToolSelector();
@@ -5667,10 +5549,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         document.getElementById('editor-tool-display').innerText = "TOOL: " + tool.toUpperCase().replace('_', ' ');
         const toolColor = (tool === 'light') ? lightColor : (TOOL_COLORS[tool] || 0x44ffaa);
         ghostMesh.material.color.setHex(toolColor);
-        // Sync hotbar highlight
-        document.querySelectorAll('.hotbar-slot').forEach(el => {
-            el.classList.toggle('active', el.dataset.tool === tool);
-        });
+
         // Sync tool selector highlight
         document.querySelectorAll('.ts-item').forEach(el => {
             el.classList.toggle('selected', el.dataset.tool === tool);
@@ -5680,7 +5559,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 
     const EDITOR_TOOLS_LIST = [
         { tool: 'wall',       label: 'Wall',      key: '1', category: 'build' },
-        { tool: 'room',       label: 'Hollow Room', key: '-', category: 'build' },
         { tool: 'fill',       label: 'Box Fill',  key: 'B', category: 'build' }, // NEW
         { tool: 'water',      label: 'Water',     key: '-', category: 'build' },
         { tool: 'blue',       label: 'Blue (Bounce)', key: '2', category: 'items' },
@@ -5707,16 +5585,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         { tool: 'decor_wall_2x2',  label: 'Wall Rubble 2x2',key: '-', category: 'decor' },
         { tool: 'decor_rubble',    label: 'Rubble',         key: '-', category: 'decor' },
         { tool: 'decor_shattered', label: 'Shattered Slab', key: '-', category: 'decor' },
-        { tool: 'decor_pipes',     label: 'Industrial Pipe', key: '-', category: 'decor' },
         { tool: 'decor_pillar',    label: 'Broken Pillar',  key: '-', category: 'decor' },
-        // NEW MODULAR PROPS:
-        { tool: 'decor_frame_open',   label: 'Frame (Open)',   key: '-', category: 'decor' },
-        { tool: 'decor_frame_solid',  label: 'Frame (Armor)',  key: '-', category: 'decor' },
-        { tool: 'decor_frame_braced', label: 'Frame (Braced)', key: '-', category: 'decor' },
-        { tool: 'decor_panel_blank',  label: 'Panel (Blank)',  key: '-', category: 'decor' },
-        { tool: 'decor_panel_vent',   label: 'Panel (Vent)',   key: '-', category: 'decor' },
-        { tool: 'decor_panel_core',   label: 'Panel (Core)',   key: '-', category: 'decor' },
-        { tool: 'decor_panel_pipes',  label: 'Panel (Pipes)',  key: '-', category: 'decor' },
     ];
 
     function hexToCSS(hex) {
@@ -5724,7 +5593,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
     }
 
     // ── TOOL PARAMS PANEL LOGIC ──
-    const TOOLS_WITH_PARAMS = new Set(['red', 'light', 'plate', 'door', 'room', 'logic', 'aero', 'oneway']);
+    const TOOLS_WITH_PARAMS = new Set(['red', 'light', 'plate', 'door', 'logic', 'aero', 'oneway']);
     const LIGHT_COLOR_PRESETS = [
         { hex: 0xffffff, label: 'White'    },
         { hex: 0xfff5cc, label: 'Warm'     },
@@ -5921,22 +5790,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         });
     });
 
-    // 7. HOLLOW ROOM TOOL (No object selection, just preview scaling)
-    ['x', 'y', 'z'].forEach(axis => {
-        const el = document.getElementById('tp-room-' + axis);
-        if (el) {
-            el.addEventListener('input', e => {
-                roomDim[axis] = parseInt(e.target.value);
-                document.getElementById(`tp-room-${axis}-val`).textContent = roomDim[axis];
-
-                // Instant visual update for the ghost mesh as you drag
-                if (editorTool === 'room' && ghostMesh.visible) {
-                    ghostMesh.scale.set(roomDim.x, roomDim.y, roomDim.z);
-                }
-            });
-        }
-    });
-    
     let selectedLogicChannel = 1;
 
     // Sync Target Channel
@@ -6008,21 +5861,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         });
     });
 
-    // Hollow Room Dimensions (X, Y, Z)
-    ['x', 'y', 'z'].forEach(axis => {
-        const el = document.getElementById('tp-room-' + axis);
-        if (el) {
-            el.addEventListener('input', e => {
-                roomDim[axis] = parseInt(e.target.value);
-                document.getElementById(`tp-room-${axis}-val`).textContent = roomDim[axis];
 
-                // Instant visual update for the ghost mesh as you drag
-                if (editorTool === 'room' && ghostMesh.visible) {
-                    ghostMesh.scale.set(roomDim.x, roomDim.y, roomDim.z);
-                }
-            });
-        }
-    });
 
     function updateParamsPanel(tool, commit) {
         const panel = document.getElementById('tool-params-panel');
@@ -6074,12 +5913,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             // Sync the orientation button visual
             document.querySelectorAll('#toggle-door-dir .toggle-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.dir === editorDoorDir);
-            });
-        } else if (tool === 'room') {
-            title.textContent = 'HOLLOW ROOM — DIMENSIONS';
-            ['x', 'y', 'z'].forEach(axis => {
-                document.getElementById('tp-room-' + axis).value = roomDim[axis];
-                document.getElementById(`tp-room-${axis}-val`).textContent = roomDim[axis];
             });
         } else if (tool === 'logic') {
             title.textContent = 'CHANNEL LOGIC — WIRING';
@@ -6362,21 +6195,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         return group;
     }
 
-    function buildDecoPipes(rng = _makeRng(88)) {
-        const group = new THREE.Group();
-        const pipeMat = new THREE.MeshStandardMaterial({ color: 0x3d4745, roughness: 0.7, metalness: 0.6 });
-        for (let i = 0; i < 3; i++) {
-            const r = 0.05 + rng() * 0.04;
-            const h = 0.8 + rng() * 1.5;
-            const start = new THREE.Vector3((rng()-0.5), -0.5, (rng()-0.5));
-            const curve = new THREE.QuadraticBezierCurve3(start, new THREE.Vector3(start.x, h*0.5, start.z), new THREE.Vector3(start.x + rng(), h, start.z + rng()));
-            const pipe = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, r, 8), pipeMat);
-            pipe.castShadow = true;
-            group.add(pipe);
-        }
-        return group;
-    }
-
     function buildDecoPillar(rng = _makeRng(19)) {
         const group = new THREE.Group();
         const r = 0.25 + rng() * 0.1, h = 1.0 + rng() * 2.0;
@@ -6390,447 +6208,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         return group;
     }
 
-// ── MODULAR CLEAN ARCHITECTURE BUILDERS ──────────────────────────────────────
-
-    const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a4d52, roughness: 0.5, metalness: 0.7 });
-    const cleanMetalMat = new THREE.MeshStandardMaterial({ color: 0x6c7a89, roughness: 0.3, metalness: 0.9 });
-    const darkPanelMat = new THREE.MeshStandardMaterial({ color: 0x1f2124, roughness: 0.7, metalness: 0.4 });
-    const ledMat = new THREE.MeshStandardMaterial({ color: 0xccffff, emissive: 0x00aaff, emissiveIntensity: 2.0, toneMapped: false });
-    const warnMat = new THREE.MeshStandardMaterial({ color: 0xcc5511, roughness: 0.6, metalness: 0.3 });
-
-    // --- OUTER FRAMEWORKS (1x1x1 Grid Structures) ---
-
-    // 1. Open Scaffolding Frame (Edges only)
-    function buildDecoFrameOpen(rng = _makeRng(101)) {
-        const group = new THREE.Group();
-        const t = 0.12; // thickness of struts
-        const gX = new THREE.BoxGeometry(1, t, t);
-        const gY = new THREE.BoxGeometry(t, 1, t);
-        const gZ = new THREE.BoxGeometry(t, t, 1);
-        const h = 0.5 - t/2;
-
-        const edges = [
-            [gX, 0, h, h], [gX, 0, -h, h], [gX, 0, h, -h], [gX, 0, -h, -h],
-            [gY, h, 0, h], [gY, -h, 0, h], [gY, h, 0, -h], [gY, -h, 0, -h],
-            [gZ, h, h, 0], [gZ, -h, h, 0], [gZ, h, -h, 0], [gZ, -h, -h, 0]
-        ];
-
-        edges.forEach(([geo, x, y, z]) => {
-            const mesh = new THREE.Mesh(geo, frameMat);
-            mesh.position.set(x, y, z);
-            mesh.castShadow = true;
-            group.add(mesh);
-        });
-        return group;
-    }
-
-    // 2. Solid Armor Frame (Thick block with 0.85 cutouts)
-    function buildDecoFrameSolid(rng = _makeRng(102)) {
-        const group = new THREE.Group();
-        const main = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), frameMat);
-        main.castShadow = true;
-        group.add(main);
-
-        const recessGeoX = new THREE.BoxGeometry(1.02, 0.85, 0.85);
-        const recessGeoY = new THREE.BoxGeometry(0.85, 1.02, 0.85);
-        const recessGeoZ = new THREE.BoxGeometry(0.85, 0.85, 1.02);
-        
-        [recessGeoX, recessGeoY, recessGeoZ].forEach(geo => {
-            group.add(new THREE.Mesh(geo, darkPanelMat));
-        });
-
-        return group;
-    }
-
-    // 3. Heavy Truss Cage (X-Bracing on all 6 sides)
-    function buildDecoFrameBraced(rng = _makeRng(103)) {
-        const group = buildDecoFrameOpen(rng); 
-
-        // Helper to build a single braced face
-        function createBraceFace() {
-            const faceGroup = new THREE.Group();
-            
-            // Hub
-            const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.04, 8), frameMat);
-            hub.rotation.x = Math.PI / 2;
-            const innerHub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 8), darkPanelMat);
-            innerHub.rotation.x = Math.PI / 2;
-            faceGroup.add(hub, innerHub);
-            
-            // Diagonal Struts
-            const strutGeo = new THREE.BoxGeometry(0.04, 0.8, 0.04);
-            const strut1 = new THREE.Mesh(strutGeo, frameMat); strut1.rotation.z = Math.PI/4;
-            const strut2 = new THREE.Mesh(strutGeo, frameMat); strut2.rotation.z = -Math.PI/4;
-            faceGroup.add(strut1, strut2);
-            
-            // Corner Reinforcements
-            const gussetGeo = new THREE.BoxGeometry(0.25, 0.02, 0.04);
-            [ 
-                [0.3, 0.3, -Math.PI/4], [-0.3, -0.3, -Math.PI/4], 
-                [-0.3, 0.3, Math.PI/4], [0.3, -0.3, Math.PI/4] 
-            ].forEach(p => {
-                const g = new THREE.Mesh(gussetGeo, darkPanelMat);
-                g.position.set(p[0], p[1], 0); g.rotation.z = p[2];
-                faceGroup.add(g);
-            });
-            return faceGroup;
-        }
-
-        const zOffset = 0.42; // Sits just inside the outer 0.5 bounds
-        const transforms = [
-            [0, 0, zOffset, 0, 0, 0],              // Front
-            [0, 0, -zOffset, 0, Math.PI, 0],       // Back
-            [zOffset, 0, 0, 0, Math.PI/2, 0],      // Right
-            [-zOffset, 0, 0, 0, -Math.PI/2, 0],    // Left
-            [0, zOffset, 0, -Math.PI/2, 0, 0],     // Top
-            [0, -zOffset, 0, Math.PI/2, 0, 0]      // Bottom
-        ];
-
-        transforms.forEach(t => {
-            const face = createBraceFace();
-            face.position.set(t[0], t[1], t[2]);
-            face.rotation.set(t[3], t[4], t[5]);
-            group.add(face);
-        });
-
-        return group;
-    }
-
-    // 4. Unfinished Armor Plating (Randomized exposed chassis)
-    function buildDecoPanelBlank(rng = _makeRng(201)) {
-        const group = new THREE.Group();
-        const s = 0.84;
-        
-        // 1. Internal Chassis (Dark structural core)
-        const chassisGeo = new THREE.BoxGeometry(0.64, 0.64, 0.64);
-        const chassis = new THREE.Mesh(chassisGeo, darkPanelMat);
-        chassis.castShadow = true;
-        group.add(chassis);
-
-        // 2. Exposed Internal Guts (Visible when armor plates are missing)
-        // Hazard pipe running vertically
-        const pipeGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.74, 8);
-        const pipe1 = new THREE.Mesh(pipeGeo, warnMat);
-        pipe1.position.set(-0.15, 0, 0.15);
-        group.add(pipe1);
-        
-        // Metal pipe running horizontally
-        const pipeGeoX = new THREE.CylinderGeometry(0.05, 0.05, 0.74, 8);
-        pipeGeoX.rotateZ(Math.PI / 2);
-        const pipe2 = new THREE.Mesh(pipeGeoX, cleanMetalMat);
-        pipe2.position.set(0, -0.15, -0.18);
-        group.add(pipe2);
-
-        // Horizontal structural ribs
-        const ribGeo = new THREE.BoxGeometry(0.68, 0.03, 0.68);
-        for(let y = -0.25; y <= 0.25; y += 0.1) {
-            const rib = new THREE.Mesh(ribGeo, frameMat);
-            rib.position.y = y;
-            group.add(rib);
-        }
-
-        // 3. Helper to build a single Armor Plate face
-        function createArmorFace(state) {
-            const faceGroup = new THREE.Group();
-            
-            // State 0: Missing entirely (Return empty group, exposing chassis)
-            if (state === 0) return faceGroup;
-
-            const plateThickness = 0.04;
-            const plateSize = 0.80; // Leaves a beautiful 0.02 gap at the edges
-            
-            // State 1: Half-installed plate
-            // State 2: Fully installed plate
-            const isHalf = (state === 1);
-            const pHeight = isHalf ? (plateSize / 2 - 0.02) : plateSize;
-            const yOffset = isHalf ? -(plateSize / 4) : 0; // Shift half-plate to the bottom
-
-            const plateGeo = new THREE.BoxGeometry(plateSize, pHeight, plateThickness);
-            const plate = new THREE.Mesh(plateGeo, frameMat);
-            plate.position.set(0, yOffset, 0);
-            plate.castShadow = true;
-            faceGroup.add(plate);
-
-            // Heavy Industrial Bolts
-            const boltGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.06, 6);
-            boltGeo.rotateX(Math.PI / 2);
-            
-            const bX = 0.32;
-            const bYTop = isHalf ? yOffset + pHeight/2 - 0.06 : 0.32;
-            const bYBot = isHalf ? yOffset - pHeight/2 + 0.06 : -0.32;
-
-            const boltPositions = [
-                [bX, bYTop], [-bX, bYTop], [bX, bYBot], [-bX, bYBot]
-            ];
-
-            boltPositions.forEach(pos => {
-                const bolt = new THREE.Mesh(boltGeo, darkPanelMat);
-                bolt.position.set(pos[0], pos[1], 0);
-                faceGroup.add(bolt);
-            });
-
-            // Mounting struts connecting plate to the chassis
-            const strutGeo = new THREE.BoxGeometry(0.08, pHeight - 0.1, 0.1);
-            const strutL = new THREE.Mesh(strutGeo, darkPanelMat);
-            strutL.position.set(-0.25, yOffset, -0.05);
-            const strutR = new THREE.Mesh(strutGeo, darkPanelMat);
-            strutR.position.set(0.25, yOffset, -0.05);
-            faceGroup.add(strutL, strutR);
-
-            return faceGroup;
-        }
-
-        // 4. Attach randomized armor faces to all 6 sides
-        const offset = s / 2 - 0.02; // Plating sits flush with the 0.84 boundary
-        const transforms = [
-            [0, 0, offset, 0, 0, 0],               // Front (+Z)
-            [0, 0, -offset, 0, Math.PI, 0],        // Back (-Z)
-            [offset, 0, 0, 0, Math.PI/2, 0],       // Right (+X)
-            [-offset, 0, 0, 0, -Math.PI/2, 0],     // Left (-X)
-            [0, offset, 0, -Math.PI/2, 0, 0],      // Top (+Y)
-            [0, -offset, 0, Math.PI/2, 0, 0]       // Bottom (-Y)
-        ];
-
-        transforms.forEach(t => {
-            // Roll the dice for this specific face:
-            // 20% chance missing, 30% chance half-plate, 50% chance full plate
-            const roll = rng();
-            let state = 2; // Full
-            if (roll < 0.20) state = 0;      // Missing
-            else if (roll < 0.50) state = 1; // Half
-
-            const face = createArmorFace(state);
-            face.position.set(t[0], t[1], t[2]);
-            face.rotation.set(t[3], t[4], t[5]);
-            group.add(face);
-        });
-
-        return group;
-    }
-
-    // 5. Heavy HVAC Vent Cube (6-Sided Intake)
-    function buildDecoPanelVent(rng = _makeRng(202)) {
-        const group = new THREE.Group();
-        const s = 0.84;
-        
-        // 1. Solid Dark Core (Prevents seeing through the vents)
-        const core = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.74, 0.74), darkPanelMat);
-        group.add(core);
-
-        // 2. Helper to build exactly one flat vent face
-        function createVentFace() {
-            const faceGroup = new THREE.Group();
-            
-            const thickness = 0.06;
-            const depth = 0.04;
-            
-            // Outer Rim for this specific face
-            const edgeGeoX = new THREE.BoxGeometry(s, thickness, depth);
-            const edgeGeoY = new THREE.BoxGeometry(thickness, s - thickness * 2, depth);
-            
-            const top = new THREE.Mesh(edgeGeoX, frameMat); top.position.y = s/2 - thickness/2;
-            const bot = new THREE.Mesh(edgeGeoX, frameMat); bot.position.y = -s/2 + thickness/2;
-            const left = new THREE.Mesh(edgeGeoY, frameMat); left.position.x = -s/2 + thickness/2;
-            const right = new THREE.Mesh(edgeGeoY, frameMat); right.position.x = s/2 - thickness/2;
-            
-            faceGroup.add(top, bot, left, right);
-
-            // Slanted Louvers
-            const slatGeo = new THREE.BoxGeometry(s - thickness * 2, 0.08, 0.02);
-            for(let y = -0.30; y <= 0.30; y += 0.10) {
-                const slat = new THREE.Mesh(slatGeo, frameMat);
-                slat.position.y = y;
-                slat.rotation.x = Math.PI / 6; // Angled downwards
-                slat.castShadow = true;
-                faceGroup.add(slat);
-            }
-            
-            return faceGroup;
-        }
-
-        // 3. Attach the vent faces to all 6 sides
-        const offset = s / 2 - 0.02; // Position so the face geometry hits exactly 0.84 bounds
-        const transforms = [
-            [0, 0, offset, 0, 0, 0],               // Front (+Z)
-            [0, 0, -offset, 0, Math.PI, 0],        // Back (-Z)
-            [offset, 0, 0, 0, Math.PI/2, 0],       // Right (+X)
-            [-offset, 0, 0, 0, -Math.PI/2, 0],     // Left (-X)
-            [0, offset, 0, -Math.PI/2, 0, 0],      // Top (+Y)
-            [0, -offset, 0, Math.PI/2, 0, 0]       // Bottom (-Y)
-        ];
-
-        transforms.forEach(t => {
-            const face = createVentFace();
-            face.position.set(t[0], t[1], t[2]);
-            face.rotation.set(t[3], t[4], t[5]);
-            group.add(face);
-        });
-
-        // 4. Add solid corner caps to bind the 6 faces cleanly
-        const cornerGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
-        const cOffset = s / 2 - 0.04;
-        const corners = [
-            [1,1,1], [1,1,-1], [1,-1,1], [1,-1,-1],
-            [-1,1,1], [-1,1,-1], [-1,-1,1], [-1,-1,-1]
-        ];
-        
-        corners.forEach(c => {
-            const corner = new THREE.Mesh(cornerGeo, darkPanelMat);
-            corner.position.set(c[0] * cOffset, c[1] * cOffset, c[2] * cOffset);
-            group.add(corner);
-        });
-
-        return group;
-    }
-
-    // 6. Quantum Server Core Cube (Deep-Recessed Mainframe)
-    function buildDecoPanelCore(rng = _makeRng(203)) {
-        const group = new THREE.Group();
-        const s = 0.84;
-        
-        // 1. Dark Inner Containment Chassis
-        const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.68, 0.68), darkPanelMat);
-        chassis.castShadow = true;
-        group.add(chassis);
-
-        // 2. Heavy Corner Nodes (Defines the 0.84 bounds)
-        const cornerSize = 0.12;
-        const cornerGeo = new THREE.BoxGeometry(cornerSize, cornerSize, cornerSize);
-        const cPos = s / 2 - cornerSize / 2;
-        const corners = [
-            [1,1,1], [1,1,-1], [1,-1,1], [1,-1,-1],
-            [-1,1,1], [-1,1,-1], [-1,-1,1], [-1,-1,-1]
-        ];
-        
-        corners.forEach(c => {
-            const node = new THREE.Mesh(cornerGeo, frameMat);
-            node.position.set(c[0] * cPos, c[1] * cPos, c[2] * cPos);
-            node.castShadow = true;
-            group.add(node);
-        });
-
-        // 3. Helper to build a highly detailed Server Face
-        function createServerFace() {
-            const faceGroup = new THREE.Group();
-            
-            // Central Aperture Ring
-            const ringGeo = new THREE.CylinderGeometry(0.20, 0.20, 0.04, 16);
-            ringGeo.rotateX(Math.PI / 2); // Face Z-axis
-            const ring = new THREE.Mesh(ringGeo, frameMat);
-            faceGroup.add(ring);
-
-            // Glowing Quantum Lens
-            const lensGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.05, 16);
-            lensGeo.rotateX(Math.PI / 2);
-            const lens = new THREE.Mesh(lensGeo, ledMat);
-            faceGroup.add(lens);
-
-            // Protective X-Grille over the lens
-            const grilleGeo = new THREE.BoxGeometry(0.42, 0.02, 0.06);
-            const grille1 = new THREE.Mesh(grilleGeo, darkPanelMat);
-            grille1.rotation.z = Math.PI / 4;
-            grille1.position.z = 0.02;
-            const grille2 = new THREE.Mesh(grilleGeo, darkPanelMat);
-            grille2.rotation.z = -Math.PI / 4;
-            grille2.position.z = 0.02;
-            faceGroup.add(grille1, grille2);
-
-            // Server Data Banks (Flanking the lens)
-            const bankGeo = new THREE.BoxGeometry(0.12, 0.55, 0.05);
-            const bankL = new THREE.Mesh(bankGeo, frameMat); bankL.position.x = -0.28;
-            const bankR = new THREE.Mesh(bankGeo, frameMat); bankR.position.x = 0.28;
-            faceGroup.add(bankL, bankR);
-
-            // Tiny LED Status Lights on the Data Banks
-            const ledBoxGeo = new THREE.BoxGeometry(0.04, 0.02, 0.06);
-            const ledColors = [ledMat, warnMat]; // Mix of cyan and orange lights
-            
-            [-0.28, 0.28].forEach(xOffset => {
-                for (let y = -0.2; y <= 0.2; y += 0.1) {
-                    if (rng() > 0.4) { // 60% chance for a light to be populated
-                        const lightMat = ledColors[Math.floor(rng() * ledColors.length)];
-                        const light = new THREE.Mesh(ledBoxGeo, lightMat);
-                        light.position.set(xOffset, y, 0.01);
-                        faceGroup.add(light);
-                    }
-                }
-            });
-
-            return faceGroup;
-        }
-
-        // 4. Attach the Server Faces to all 6 sides
-        const offset = 0.34; // Pushes the face out to sit flush with the 0.68 chassis
-        const transforms = [
-            [0, 0, offset, 0, 0, 0],               // Front (+Z)
-            [0, 0, -offset, 0, Math.PI, 0],        // Back (-Z)
-            [offset, 0, 0, 0, Math.PI/2, 0],       // Right (+X)
-            [-offset, 0, 0, 0, -Math.PI/2, 0],     // Left (-X)
-            [0, offset, 0, -Math.PI/2, 0, 0],      // Top (+Y)
-            [0, -offset, 0, Math.PI/2, 0, 0]       // Bottom (-Y)
-        ];
-
-        transforms.forEach(t => {
-            const face = createServerFace();
-            face.position.set(t[0], t[1], t[2]);
-            face.rotation.set(t[3], t[4], t[5]);
-            group.add(face);
-        });
-
-        return group;
-    }
-
-    // 7. Heavy Cooling / Pipe Pillar (Classic Sci-Fi)
-    function buildDecoPanelPipes(rng = _makeRng(204)) {
-        const group = new THREE.Group();
-        const s = 0.84;
-        
-        // 1. Top and Bottom Caps (Ensures it stacks seamlessly when placed vertically)
-        const capGeo = new THREE.BoxGeometry(s, 0.06, s);
-        const capTop = new THREE.Mesh(capGeo, frameMat); 
-        capTop.position.y = s/2 - 0.03;
-        const capBot = new THREE.Mesh(capGeo, frameMat); 
-        capBot.position.y = -s/2 + 0.03;
-        group.add(capTop, capBot);
-
-        // 2. Central Dark Core (Base for the heatsink)
-        const coreGeo = new THREE.CylinderGeometry(0.20, 0.20, s, 16);
-        const core = new THREE.Mesh(coreGeo, darkPanelMat);
-        group.add(core);
-
-        // 3. Ribbed Cooling Fins (Classic sci-fi heatsink look)
-        const ribGeo = new THREE.CylinderGeometry(0.26, 0.26, 0.02, 16);
-        for(let y = -0.32; y <= 0.32; y += 0.08) {
-            const rib = new THREE.Mesh(ribGeo, frameMat);
-            rib.position.y = y;
-            rib.castShadow = true;
-            group.add(rib);
-        }
-
-        // 4. Heavy Outer Corner Pipes
-        const cornerPipeGeo = new THREE.CylinderGeometry(0.07, 0.07, s, 12);
-        const corners = [
-            [0.28, 0.28], [-0.28, 0.28], [0.28, -0.28], [-0.28, -0.28]
-        ];
-        
-        corners.forEach((pos, idx) => {
-            // Make exactly ONE pipe a hazard orange color for an industrial pop
-            const mat = (idx === 0) ? warnMat : frameMat;
-            const p = new THREE.Mesh(cornerPipeGeo, mat);
-            p.position.set(pos[0], 0, pos[1]);
-            p.castShadow = true;
-            group.add(p);
-        });
-
-        // 5. Central Clamping Bracket (Binds the pipes to the core)
-        const clampGeo = new THREE.BoxGeometry(0.72, 0.08, 0.72);
-        const clamp = new THREE.Mesh(clampGeo, darkPanelMat);
-        clamp.castShadow = true;
-        group.add(clamp);
-
-        return group;
-    }
-
     // Map from type string to builder function
     const DECOR_BUILDERS = {
         decor_debris:    buildDecoDebris,
@@ -6840,16 +6217,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         decor_wall_2x2:  buildDecoWallRubble2x2,
         decor_rubble:    buildDecoRubble,
         decor_shattered: buildDecoShattered,
-        decor_pipes:     buildDecoPipes,
         decor_pillar:    buildDecoPillar,
-        // NEW MODULAR PROPS:
-        decor_frame_open:   buildDecoFrameOpen,
-        decor_frame_solid:  buildDecoFrameSolid,
-        decor_frame_braced: buildDecoFrameBraced,
-        decor_panel_blank:  buildDecoPanelBlank,
-        decor_panel_vent:   buildDecoPanelVent,
-        decor_panel_core:   buildDecoPanelCore,
-        decor_panel_pipes:  buildDecoPanelPipes,
     };
 
     // ── 3-D PREVIEW CANVAS RENDERER ───────────────────────────────────────────
@@ -6882,10 +6250,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             const seeds = { 
                 decor_debris: 111, decor_wall_1x1_a: 222, decor_wall_1x1_b: 333, 
                 decor_wall_1x1_c: 444, decor_wall_2x2: 555,
-                decor_rubble: 77, decor_shattered: 42, decor_pillar: 19, decor_pipes: 88,
-                // NEW:
-                decor_frame_open: 101, decor_frame_solid: 102, decor_frame_braced: 103,
-                decor_panel_blank: 201, decor_panel_vent: 202, decor_panel_core: 203, decor_panel_pipes: 204
+                decor_rubble: 77, decor_shattered: 42, decor_pillar: 19,
             };
             Object.entries(DECOR_BUILDERS).forEach(([type, buildFn]) => {
                 const mesh = buildFn(_makeRng(seeds[type] || 50));
@@ -6934,25 +6299,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             _activeDecorationMeshes.push(mesh);
         });
     }
-
-    // ── BUILD HOTBAR (only shows the 10 number-keyed tools: 1–9 + 0) ──
-    (function buildHotbar() {
-        const hotbar = document.getElementById('editor-hotbar');
-        EDITOR_TOOLS_LIST.filter(({ key }) => key !== '-').forEach(({ tool, label, key }) => {
-            const slot = document.createElement('div');
-            slot.className = 'hotbar-slot' + (tool === editorTool ? ' active' : '');
-            slot.dataset.tool = tool;
-            const swatch = document.createElement('div');
-            swatch.className = 'hotbar-swatch';
-            swatch.style.background = hexToCSS(TOOL_COLORS[tool]);
-            const keyEl = document.createElement('div');
-            keyEl.className = 'hotbar-key';
-            keyEl.textContent = key;
-            slot.appendChild(swatch);
-            slot.appendChild(keyEl);
-            hotbar.appendChild(slot);
-        });
-    })();
 
     // ── REWORKED TABBED TOOL SELECTOR ──
     let activeCategory = 'build'; // Default tab
@@ -7127,7 +6473,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     isPlayingCustom = true;
                     editorSceneGroup.visible = false;
                     ghostMesh.visible = false;
-                    document.getElementById('editor-hud').style.display = 'none'; document.getElementById('editor-hotbar').style.display = 'none';
 
                     world.removeBody(editorPhysicsFloor); 
                     world.removeBody(editorStaticBody);
@@ -7150,7 +6495,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                 world.addBody(editorStaticBody);    
                 editorSceneGroup.visible = true;
                 ghostMesh.visible = true;
-                document.getElementById('editor-hud').style.display = 'block'; document.getElementById('editor-hotbar').style.display = 'flex';
 
                 // Stop momentum and prevent getting trapped under the floor
                 playerBody.velocity.set(0,0,0);
@@ -7189,13 +6533,29 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             }
 
             const hit = validHit;
-            const norm = hit.face.normal; 
+            if (!hit) return; // nothing valid under cursor — bail out
+            const norm = hit.face.normal;
             const rawP = hit.point.clone();
+
+            // Resolve exact block center using Instance Matrix to prevent scale/normal float errors
+            let blockCenterX, blockCenterY, blockCenterZ;
+            if (hit.instanceId !== undefined && hit.object.isInstancedMesh) {
+                const _instMat = new THREE.Matrix4();
+                hit.object.getMatrixAt(hit.instanceId, _instMat);
+                const _instPos = new THREE.Vector3().setFromMatrixPosition(_instMat);
+                blockCenterX = Math.round(_instPos.x);
+                blockCenterY = Math.round(_instPos.y);
+                blockCenterZ = Math.round(_instPos.z);
+            } else {
+                const pFallback = rawP.clone().sub(norm.clone().multiplyScalar(0.5));
+                blockCenterX = Math.round(pFallback.x);
+                blockCenterY = Math.round(pFallback.y);
+                blockCenterZ = Math.round(pFallback.z);
+            }
 
             // --- MIDDLE CLICK: INSPECT & SELECT ---
             if (e.button === 1) { 
-                const p = rawP.clone().sub(norm.clone().multiplyScalar(0.5));
-                const gx = Math.round(p.x), gy = Math.round(p.y), gz = Math.round(p.z);
+                const gx = blockCenterX, gy = blockCenterY, gz = blockCenterZ;
                 
                 selectedEditorObject = null;
                 selectedEditorObjectType = null;
@@ -7256,129 +6616,111 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                         }
                         fillStartCorner = null;
                     }
-                }
-
-                if (e.button === 0) { // Left Click: PLACE
-                    const p = hit.point.clone().add(norm.clone().multiplyScalar(0.5));
-                    const gx = Math.round(p.x), gy = Math.round(p.y), gz = Math.round(p.z);
-                    const key = `${gx},${gy},${gz}`;
-
-                    if (editorTool === 'wall') { customSolidBlocks.add(key); }
-                    else if (editorTool === 'room') {
-                        const hx = Math.floor(roomDim.x / 2), hz = Math.floor(roomDim.z / 2);
-                        for(let rx = -hx; rx <= hx; rx++) {
-                            for(let ry = 0; ry < roomDim.y; ry++) {
-                                for(let rz = -hz; rz <= hz; rz++) {
-                                    if (rx === -hx || rx === hx || rz === -hz || rz === hz || ry === 0 || ry === roomDim.y - 1) {
-                                        customSolidBlocks.add(`${gx + rx},${gy + ry},${gz + rz}`);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else if (editorTool === 'bomb') customDestruction.push({cx: gx, cy: gy, cz: gz});
-                    else if (editorTool === 'spawn') customSpawn = { x: gx, y: gy, z: gz };
-                    else if (editorTool === 'exit') customExit = { x: gx, y: gy, z: gz };
-                    else if (editorTool === 'light') {
-                        customLights = customLights.filter(l => l.x !== gx || l.y !== gy || l.z !== gz);
-                        customLights.push({ x: gx, y: gy, z: gz, color: lightColor, intensity: lightIntensity, radius: lightRadius });
-                    }
-                    else if (editorTool === 'plate') {
-                        customPlates = customPlates.filter(p => p.x !== gx || p.y !== gy || p.z !== gz);
-                        customPlates.push({ x: gx, y: gy, z: gz, channel: editorChannel });
-                    } 
-                    else if (editorTool === 'door') {
-                        // Calculate movement direction based on normal
-                        let travelDir = 'left';
-                        if (Math.abs(norm.y) > 0.5) travelDir = norm.y > 0 ? 'up' : 'down';
-                        else if (Math.abs(norm.x) > 0.5) travelDir = norm.x > 0 ? 'right' : 'left';
-                        else travelDir = norm.z > 0 ? 'right' : 'left';
-
-                        customDoors.push({ 
-                            x: gx, y: gy, z: gz, 
-                            channel: editorChannel, 
-                            dir: travelDir,
-                            width: editorDoorWidth, height: editorDoorHeight, moveDist: editorDoorMoveDist,
-                            normal: {x: norm.x, y: norm.y, z: norm.z} 
-                        });
-                    }
-                    else if (editorTool === 'aero' || editorTool === 'oneway') {
-                        customFields = customFields.filter(f => f.x !== gx || f.y !== gy || f.z !== gz);
-                        customFields.push({ 
-                            type: editorTool, x: gx, y: gy, z: gz, 
-                            channel: editorChannel, w: 3, h: 3, 
-                            inverted: editorFieldInverted,
-                            normal: {x: norm.x, y: norm.y, z: norm.z} 
-                        });
-                    }
-                    else if (editorTool.startsWith('decor_')) {
-                        let isFrame = editorTool.startsWith('decor_frame_');
-                        let isPanel = editorTool.startsWith('decor_panel_');
-                        
-                        // ALlow Stacking: Only delete the old object if it's the SAME type of component
-                        customDecorations = customDecorations.filter(d => {
-                            let isSameCell = (d.x === gx && d.y === gy && d.z === gz);
-                            if (!isSameCell) return true; // Keep props in other cells
-                            
-                            let dIsFrame = d.type.startsWith('decor_frame_');
-                            let dIsPanel = d.type.startsWith('decor_panel_');
-                            
-                            if (isFrame && dIsFrame) return false; // New Frame overwrites old Frame
-                            if (isPanel && dIsPanel) return false; // New Panel overwrites old Panel
-                            if (!isFrame && !isPanel && !dIsFrame && !dIsPanel) return false; // Rubble overwrites Rubble
-                            
-                            return true; // Otherwise, KEEP IT! This allows a Frame and Panel to exist together!
-                        });
-
-                        let rotY = 0;
-                        
-                        // Panels snap cleanly to the wall you click on
-                        if (isFrame || isPanel) {
-                            if (norm.x > 0.5) rotY = Math.PI / 2;
-                            else if (norm.x < -0.5) rotY = -Math.PI / 2;
-                            else if (norm.z < -0.5) rotY = Math.PI;
-                            else rotY = 0;
-                        } 
-                        // Organic rubble stays randomly rotated
-                        else {
-                            rotY = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.6;
-                        }
-
-                        customDecorations.push({ type: editorTool, x: gx, y: gy, z: gz, rotY });
-                    }
-                    else {
-                        const ent = { type: editorTool, x: gx, y: gy, z: gz };
-                        if (editorTool === 'red') ent.startScale = redStartScale;
-                        customEntities.set(key, ent);
-                    }
-                } 
-                else if (e.button === 2 && hit.object.geometry.type !== 'PlaneGeometry') { // Right Click: REMOVE
-                    const p = hit.point.clone().sub(norm.clone().multiplyScalar(0.5));
-                    const gx = Math.round(p.x), gy = Math.round(p.y), gz = Math.round(p.z);
-                    const tKey = `${gx},${gy},${gz}`;
-
-                    customSolidBlocks.delete(tKey);
-                    customEntities.delete(tKey);
-                    customDestruction = customDestruction.filter(b => b.cx !== gx || b.cy !== gy || b.cz !== gz);
+                } else if (editorTool === 'wall') { customSolidBlocks.add(key); }
+                else if (editorTool === 'bomb') customDestruction.push({cx: gx, cy: gy, cz: gz});
+                else if (editorTool === 'spawn') customSpawn = { x: gx, y: gy, z: gz };
+                else if (editorTool === 'exit') customExit = { x: gx, y: gy, z: gz };
+                else if (editorTool === 'light') {
                     customLights = customLights.filter(l => l.x !== gx || l.y !== gy || l.z !== gz);
+                    customLights.push({ x: gx, y: gy, z: gz, color: lightColor, intensity: lightIntensity, radius: lightRadius });
+                }
+                else if (editorTool === 'plate') {
                     customPlates = customPlates.filter(p => p.x !== gx || p.y !== gy || p.z !== gz);
-                    customDoors = customDoors.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
-                    customFields = customFields.filter(f => f.x !== gx || f.y !== gy || f.z !== gz);
-                    // Remove deco props - also clean up live meshes within tolerance
-                    const prevLen = customDecorations.length;
-                    customDecorations = customDecorations.filter(d => {
-                        const match = Math.round(d.x) === gx && Math.round(d.y) === gy && Math.round(d.z) === gz;
-                        return !match;
+                    customPlates.push({ x: gx, y: gy, z: gz, channel: editorChannel });
+                } 
+                else if (editorTool === 'door') {
+                    // Calculate movement direction based on normal
+                    let travelDir = 'left';
+                    if (Math.abs(norm.y) > 0.5) travelDir = norm.y > 0 ? 'up' : 'down';
+                    else if (Math.abs(norm.x) > 0.5) travelDir = norm.x > 0 ? 'right' : 'left';
+                    else travelDir = norm.z > 0 ? 'right' : 'left';
+
+                    customDoors.push({ 
+                        x: gx, y: gy, z: gz, 
+                        channel: editorChannel, 
+                        dir: travelDir,
+                        width: editorDoorWidth, height: editorDoorHeight, moveDist: editorDoorMoveDist,
+                        normal: {x: norm.x, y: norm.y, z: norm.z} 
                     });
-                    if (customDecorations.length !== prevLen) {
-                        // Remove scene meshes near this position
-                        for (let mi = _activeDecorationMeshes.length - 1; mi >= 0; mi--) {
-                            const dm = _activeDecorationMeshes[mi];
-                            if (Math.round(dm.position.x) === gx && Math.round(dm.position.y) === gy && Math.round(dm.position.z) === gz) {
-                                scene.remove(dm);
-                                dm.traverse(c => { if (c.isMesh && c.geometry) c.geometry.dispose(); });
-                                _activeDecorationMeshes.splice(mi, 1);
-                            }
+                }
+                else if (editorTool === 'aero' || editorTool === 'oneway') {
+                    customFields = customFields.filter(f => f.x !== gx || f.y !== gy || f.z !== gz);
+                    customFields.push({ 
+                        type: editorTool, x: gx, y: gy, z: gz, 
+                        channel: editorChannel, w: 3, h: 3, 
+                        inverted: editorFieldInverted,
+                        normal: {x: norm.x, y: norm.y, z: norm.z} 
+                    });
+                }
+                else if (editorTool.startsWith('decor_')) {
+                    let isFrame = editorTool.startsWith('decor_frame_');
+                    let isPanel = editorTool.startsWith('decor_panel_');
+                    
+                    // ALlow Stacking: Only delete the old object if it's the SAME type of component
+                    customDecorations = customDecorations.filter(d => {
+                        let isSameCell = (d.x === gx && d.y === gy && d.z === gz);
+                        if (!isSameCell) return true; // Keep props in other cells
+                        
+                        let dIsFrame = d.type.startsWith('decor_frame_');
+                        let dIsPanel = d.type.startsWith('decor_panel_');
+                        
+                        if (isFrame && dIsFrame) return false; // New Frame overwrites old Frame
+                        if (isPanel && dIsPanel) return false; // New Panel overwrites old Panel
+                        if (!isFrame && !isPanel && !dIsFrame && !dIsPanel) return false; // Rubble overwrites Rubble
+                        
+                        return true; // Otherwise, KEEP IT! This allows a Frame and Panel to exist together!
+                    });
+
+                    let rotY = 0;
+                    
+                    // Panels snap cleanly to the wall you click on
+                    if (isFrame || isPanel) {
+                        if (norm.x > 0.5) rotY = Math.PI / 2;
+                        else if (norm.x < -0.5) rotY = -Math.PI / 2;
+                        else if (norm.z < -0.5) rotY = Math.PI;
+                        else rotY = 0;
+                    } 
+                    // Organic rubble stays randomly rotated
+                    else {
+                        rotY = Math.floor(Math.random() * 4) * (Math.PI / 2) + (Math.random() - 0.5) * 0.6;
+                    }
+
+                    customDecorations.push({ type: editorTool, x: gx, y: gy, z: gz, rotY });
+                }
+                else {
+                    const ent = { type: editorTool, x: gx, y: gy, z: gz };
+                    if (editorTool === 'red') ent.startScale = redStartScale;
+                    customEntities.set(key, ent);
+                }
+                
+                updateEditorVisuals();
+            } 
+            // --- RIGHT CLICK: REMOVE ---
+            else if (e.button === 2 && hit.object.geometry.type !== 'PlaneGeometry') { 
+                const gx = blockCenterX, gy = blockCenterY, gz = blockCenterZ;
+                const tKey = `${gx},${gy},${gz}`;
+
+                customSolidBlocks.delete(tKey);
+                customEntities.delete(tKey);
+                customDestruction = customDestruction.filter(b => b.cx !== gx || b.cy !== gy || b.cz !== gz);
+                customLights = customLights.filter(l => l.x !== gx || l.y !== gy || l.z !== gz);
+                customPlates = customPlates.filter(p => p.x !== gx || p.y !== gy || p.z !== gz);
+                customDoors = customDoors.filter(d => d.x !== gx || d.y !== gy || d.z !== gz);
+                customFields = customFields.filter(f => f.x !== gx || f.y !== gy || f.z !== gz);
+                // Remove deco props - also clean up live meshes within tolerance
+                const prevLen = customDecorations.length;
+                customDecorations = customDecorations.filter(d => {
+                    const match = Math.round(d.x) === gx && Math.round(d.y) === gy && Math.round(d.z) === gz;
+                    return !match;
+                });
+                if (customDecorations.length !== prevLen) {
+                    // Remove scene meshes near this position
+                    for (let mi = _activeDecorationMeshes.length - 1; mi >= 0; mi--) {
+                        const dm = _activeDecorationMeshes[mi];
+                        if (Math.round(dm.position.x) === gx && Math.round(dm.position.y) === gy && Math.round(dm.position.z) === gz) {
+                            scene.remove(dm);
+                            dm.traverse(c => { if (c.isMesh && c.geometry) c.geometry.dispose(); });
+                            _activeDecorationMeshes.splice(mi, 1);
                         }
                     }
                 }
@@ -7853,7 +7195,6 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                 if(currentGoal.userData.shell) { currentGoal.userData.shell.rotation.x -= 0.015; currentGoal.userData.shell.rotation.y -= 0.01; }
                 currentGoal.userData.core.position.y = 1.0 + Math.sin(elapsedTime * 3 * 0.2) * 0.2; 
             }
-            skyMesh.rotation.y += 0.0004;
 
         } else if (!isPaused || isCutscene) {
             if (isRKeyDown && controls.isLocked && !isTransitioning && !isCutscene && !isPaused) {
@@ -7867,7 +7208,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             }
 
             world.step(1 / 60, delta, 2);
-            skyMesh.rotation.y += 0.0004; const activeTime = elapsedTime * 3;
+            const activeTime = elapsedTime * 3;
             // Hoist shared sin values — avoids N Math.sin calls per block per frame
             const _redEmissive  = 0.55 + Math.sin(activeTime * 4) * 0.25;
             const _cyanEmissive = 1.0  + Math.sin(activeTime * 3) * 0.5;
@@ -7882,8 +7223,8 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             if (pendingBounce) {
                 // Base bounce is 20. Add 20% of the fall impact speed for momentum
                 // We cap the maximum at 40 so the player doesn't clip through ceilings.
-                let bounceForce = Math.max(20, 20 + (pendingBounceVelocity * 0.32));
-                playerBody.velocity.y = Math.min(40, bounceForce);
+                let bounceForce = Math.max(10, 15 + (pendingBounceVelocity * 0.32));
+                playerBody.velocity.y = Math.min(27, bounceForce);
 
                 // Nudge player above the pad so the next world.step() doesn't see an
                 // active contact and fight the upward velocity with a corrective impulse.
@@ -8227,7 +7568,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
                     let speedSq = playerBody.velocity.x * playerBody.velocity.x + playerBody.velocity.z * playerBody.velocity.z;
 
                     if (keys.space && coyoteTimer > 0) { 
-                        let jumpTarget = 11;
+                        let jumpTarget = 10;
                         let requiredImpulse = jumpTarget - playerBody.velocity.y;
                         if (requiredImpulse > 0) {
                             playerBody.applyImpulse(_cannonImpulse2.set(0, requiredImpulse * playerBody.mass, 0), playerBody.position);
@@ -8477,9 +7818,13 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
             renderer.setRenderTarget(depthCaptureTarget);
             renderer.render(scene, activeCamera);
             renderer.setRenderTarget(null);
+
             const volU = volumetricPass.material.uniforms;
-            volU.cameraProjectionMatrixInverse.value.copy(activeCamera.projectionMatrixInverse);
-            volU.cameraMatrixWorld.value.copy(activeCamera.matrixWorld);
+            volU.invProjMatrix.value.copy(activeCamera.projectionMatrixInverse);
+            volU.invViewMatrix.value.copy(activeCamera.matrixWorld);
+            volU.cameraNear.value = activeCamera.near;
+            volU.cameraFar.value = activeCamera.far;
+            volU.time.value = elapsedTime;
         }
 
         composer.render();
@@ -8489,7 +7834,18 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
         camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
         cutsceneCamera.aspect = window.innerWidth / window.innerHeight; cutsceneCamera.updateProjectionMatrix();
         applyGraphics();
-    });
+    })
+
+    window._debug = { 
+        volumetricPass, 
+        gfx, 
+        levelLights, 
+        volAdv, 
+        camera, 
+        renderer, 
+        depthCaptureTarget,
+        THREE 
+    };
 
     SaveSystem.load(); // <--- LOAD SAVES
     applyGraphics(); animate();

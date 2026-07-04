@@ -17,9 +17,9 @@ const CHAPTERS = [
         chip: '#a0c8ff', chipBorder: 'rgba(160,200,255,0.4)', chipShadow: '0 0 8px rgba(160,200,255,0.5)',
         env: {
             fog: 0xcadbf0, density: 0.0014, // slightly brighter fog to match lights
-            hemi: 0x8b9cc2, ground: 0x4c5468, // lifted ambient bounce
+            hemi:0xf5bf9f, ground: 0x684c56, // lifted ambient bounce
             sun: 0xffd0b0, sunInt: 8.5, sunPos: [20, 35, -40], // sunInt increased from 6.5 -> 8.5
-            fill: 0xa0b8d0, fillInt: 1.8, sky: 0xffffff, // fillInt increased from 1.2 -> 1.8
+            fill: 0xd0baa0, fillInt: 1.8, sky: 0xffffff, // fillInt increased from 1.2 -> 1.8
             skyStops: ['#040810', '#15243d', '#6c566a', '#d68962', '#e9ceb3', '#8da4b8']
         }
     },
@@ -93,6 +93,8 @@ class LevelBuilder {
         this.flyCamLook = new THREE.Vector3(0, 5, 0);
 
         this.additives = []; this.subtractives = []; this.customRules = [];
+        // Explicit per-voxel solid blocks (e.g. editor-placed walls), keyed "x,y,z"
+        this.solids = new Set();
         // Destruction zones: array of { cx, cy, cz, innerRadius, outerRadius }
         this.destructionZones = [];
         // Water: { y, color, distortionScale, alpha }
@@ -145,6 +147,22 @@ class LevelBuilder {
         return this;
     }
 
+    // Mark a single voxel as solid (the standard way editor "wall" placement works)
+    addSolid(x, y, z) {
+        this.solids.add(`${x},${y},${z}`);
+        return this;
+    }
+
+    // Unmark a voxel as solid
+    removeSolid(x, y, z) {
+        this.solids.delete(`${x},${y},${z}`);
+        return this;
+    }
+
+    hasSolid(x, y, z) {
+        return this.solids.has(`${x},${y},${z}`);
+    }
+
     // Add a physics rope
     addRope(x1, y1, z1, x2, y2, z2, segments = 10) {
         this.ropes.push({ p1: {x:x1, y:y1, z:z1}, p2: {x:x2, y:y2, z:z2}, segments });
@@ -193,6 +211,7 @@ class LevelBuilder {
 
     evaluateSolid(x, y, z) {
         for (let carve of this.subtractives) { if (carve(x, y, z)) return false; }
+        if (this.solids.size && this.solids.has(`${x},${y},${z}`)) return true;
         for (let shape of this.additives) { if (shape(x, y, z)) return true; }
         for (let rule of this.customRules) { if (rule(x, y, z)) return true; }
         return y <= 0; // Default floor
@@ -201,6 +220,7 @@ class LevelBuilder {
         return { 
             name: this.name, bounds: this.bounds, spawn: this.spawn, exit: this.exit, 
             blocks: this.blocks, holograms: this.holograms, winds: this.winds, 
+            solids: this.solids,
             lights: this.lights || [], cutscene: this.cutscene, 
             flyCamStart: this.flyCamStart, flyCamLook: this.flyCamLook, 
             destructionZones: this.destructionZones, waterY: this.waterY, 
