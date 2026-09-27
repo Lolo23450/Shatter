@@ -152,6 +152,7 @@ const blurFragmentShader = `
     uniform sampler2D tSSR;
     uniform sampler2D tDepth;
     uniform vec2 resolution;
+    uniform vec2 depthResolution;
     uniform float blurRadius;
     uniform float depthWeightSoftness;
 
@@ -162,17 +163,21 @@ const blurFragmentShader = `
             return;
         }
 
+        // tSSR lives at the (resolutionScale'd) trace resolution; tDepth is a
+        // full-resolution texture from the G-buffer pass. They need separate
+        // texel sizes or the depth comparisons sample the wrong neighborhood.
         vec2 texelSize = 1.0 / resolution;
+        vec2 depthTexelSize = 1.0 / depthResolution;
         vec4 ssrSum = vec4(0.0);
         float weightSum = 0.0;
 
         // 9-tap horizontal separable blur
         for (int i = -4; i <= 4; i++) {
-            vec2 offset = vec2(1.0, 0.0) * float(i) * texelSize * blurRadius;
-            vec2 sampleUv = vUv + offset;
-            
+            vec2 sampleUv = vUv + vec2(1.0, 0.0) * float(i) * texelSize * blurRadius;
+            vec2 depthSampleUv = vUv + vec2(1.0, 0.0) * float(i) * depthTexelSize * blurRadius;
+
             vec4 sampleSSR = texture2D(tSSR, sampleUv);
-            float sampleDepth = texture2D(tDepth, sampleUv).r;
+            float sampleDepth = texture2D(tDepth, depthSampleUv).r;
 
             float depthWeight = 1.0 / (0.001 + abs(centerDepth - sampleDepth) * depthWeightSoftness);
             float spatialWeight = 1.0 - abs(float(i)) / 5.0;
@@ -195,6 +200,7 @@ const compositeFragmentShader = `
     uniform sampler2D tNormal;
     uniform mat4 invProjMatrix;
     uniform vec2 resolution;
+    uniform vec2 depthResolution;
     uniform float opacity;
     uniform float fresnelPower;
     uniform float blurRadius;
@@ -215,17 +221,20 @@ const compositeFragmentShader = `
             return;
         }
 
+        // Same fix as the horizontal pass: tSSR is at trace resolution, tDepth
+        // is full-resolution, so each needs its own texel size.
         vec2 texelSize = 1.0 / resolution;
+        vec2 depthTexelSize = 1.0 / depthResolution;
         vec4 ssrSum = vec4(0.0);
         float weightSum = 0.0;
 
         // 9-tap vertical separable blur
         for (int i = -4; i <= 4; i++) {
-            vec2 offset = vec2(0.0, 1.0) * float(i) * texelSize * blurRadius;
-            vec2 sampleUv = vUv + offset;
-            
+            vec2 sampleUv = vUv + vec2(0.0, 1.0) * float(i) * texelSize * blurRadius;
+            vec2 depthSampleUv = vUv + vec2(0.0, 1.0) * float(i) * depthTexelSize * blurRadius;
+
             vec4 sampleSSR = texture2D(tSSR, sampleUv);
-            float sampleDepth = texture2D(tDepth, sampleUv).r;
+            float sampleDepth = texture2D(tDepth, depthSampleUv).r;
 
             float depthWeight = 1.0 / (0.001 + abs(centerDepth - sampleDepth) * depthWeightSoftness);
             float spatialWeight = 1.0 - abs(float(i)) / 5.0;
@@ -332,6 +341,7 @@ export class OptimizedSSRPass extends Pass {
                 tSSR: { value: this.ssrTarget.texture },
                 tDepth: { value: depthTexture },
                 resolution: { value: new THREE.Vector2(traceWidth, traceHeight) },
+                depthResolution: { value: new THREE.Vector2(width, height) },
                 blurRadius: { value: this.params.blurRadius },
                 depthWeightSoftness: { value: this.params.depthWeightSoftness }
             }
@@ -347,6 +357,7 @@ export class OptimizedSSRPass extends Pass {
                 tNormal: { value: this.gBufferTarget.texture }, // Needed for fresnel
                 invProjMatrix: { value: new THREE.Matrix4() }, // Needed for fresnel
                 resolution: { value: new THREE.Vector2(traceWidth, traceHeight) },
+                depthResolution: { value: new THREE.Vector2(width, height) },
                 opacity: { value: this.params.opacity },
                 fresnelPower: { value: this.params.fresnelPower },
                 blurRadius: { value: this.params.blurRadius },
@@ -376,6 +387,10 @@ export class OptimizedSSRPass extends Pass {
         this.ssrMaterial.uniforms.resolution.value.set(traceWidth, traceHeight);
         this.blurMaterial.uniforms.resolution.value.set(traceWidth, traceHeight);
         this.compositeMaterial.uniforms.resolution.value.set(traceWidth, traceHeight);
+
+        // tDepth (from gBufferTarget) is always full resolution, not trace resolution
+        this.blurMaterial.uniforms.depthResolution.value.set(width, height);
+        this.compositeMaterial.uniforms.depthResolution.value.set(width, height);
     }
 
     updateResolutionScale() {

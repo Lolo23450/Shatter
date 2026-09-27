@@ -186,12 +186,6 @@ class LevelBuilder {
         return this;
     }
 
-    // Add a default top-center destruction hole (backwards compat helper)
-    addTopHole(radiusMult = 1.0) {
-        const cy = this.bounds.y * 0.82;
-        return this.addDestructionZone(0, cy, 0, 8 * radiusMult, 14 * radiusMult);
-    }
-
     // Add water at a given world Y level
     setWater(y, options = {}) {
         this.waterY = y;
