@@ -8253,6 +8253,7 @@ function buildLevel(lvlIndex, isPreview = false, isReset = false, keepPos = fals
         });
 
         // Run secondary ruin debris placement
+        autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destroyZones, currentParams, vegRng);
         spawnCustomDecorations();
     }
 
