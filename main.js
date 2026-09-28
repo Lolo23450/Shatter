@@ -5376,76 +5376,133 @@ const vegUniforms = {
     uWindStrength: { value: 0.15 },
     uPlayerPos: { value: new THREE.Vector3() },
     uPlayerVelocity: { value: new THREE.Vector3() },
-    // Harmonized palette calibrated to wet peat turf (#18120c), moss (#2f691b), and stone
-    uGrassBaseColor: { value: new THREE.Color(0x12170d) }, // Deep moist humus root
-    uGrassMidColor:  { value: new THREE.Color(0x2f631d) }, // Velvety bryophyte emerald
-    uGrassTipColor:  { value: new THREE.Color(0x649832) }, // Sunlit chartreuse tender shoot
-    uGrassDryColor:  { value: new THREE.Color(0x8a8442) }, // Sun-cured golden prairie tip
+
+    // Darker, warm-olive botanical palette
+    uGrassBaseColor: { value: new THREE.Color(0x0a0804) }, // Deep warm loam / peat
+    uGrassMidColor:  { value: new THREE.Color(0x1c360e) }, // Earthy warm olive-forest green
+    uGrassTipColor:  { value: new THREE.Color(0x4a6e18) }, // Golden-olive apex (low blue)
+    uGrassDryColor:  { value: new THREE.Color(0x735c24) }, // Sun-cured golden thatch
     uSunDirection:   { value: new THREE.Vector3(0.3, 0.8, -0.5).normalize() },
-    uHemiSky:        { value: new THREE.Color(0x384a32) }, // Ambient forest dome
-    uHemiGround:     { value: new THREE.Color(0x11160e) }  // Soil bounce
+    uHemiSky:        { value: new THREE.Color(0x343a24) }, // Warm olive ambient sky dome
+    uHemiGround:     { value: new THREE.Color(0x120c06) }  // Warm dark peat bounce
 };
 
 // =============================================================================
-// 1. DENSE GROUND GRASS BLADE SYSTEM (KEELED 3D BOTANICAL GEOMETRY)
+// 1. PROCEDURAL BOTANICAL GRASS CLUMP GEOMETRY (4-BLADE KEEL & TWIST TUFT)
 // =============================================================================
 
 function buildGrassBladeGeometry() {
-    // 6-segment tapered, dihedral keeled blade (V-shaped cross section)
-    // 3 vertices per segment (left wing, central midrib spine, right wing)
-    // Base is rigidly centered at (0, 0, 0)
+    // 4-blade clump: tall center shoot, two fanned lateral blades, and a curled basal shoot.
+    // Each blade features a V-shaped dihedral keel and progressive helical axial twist.
     const geom = new THREE.BufferGeometry();
-    const segments = 6;
+    const segments = 5;
     const positions = [];
     const normals = [];
     const uvs = [];
     const indices = [];
 
-    const baseWidth = 0.082;
-    const height = 0.38;
-    const foldDepth = 0.016; // Dihedral spine protrusion
+    const bladeConfigs = [
+        // 1. Tall Dominant Spire (Upright with subtle forward arc & gentle twist)
+        { rotY: 0.0,             scaleY: 1.05, width: 0.095, arch: 0.08, twist:  0.22, fold: 0.018, lean:  0.01 },
+        // 2. Arching Lateral Blade (Fanned 105°, outward bow, graceful curve)
+        { rotY: Math.PI * 0.58,  scaleY: 0.90, width: 0.088, arch: 0.14, twist: -0.35, fold: 0.016, lean:  0.04 },
+        // 3. Counter-Leaning Blade (Fanned 220°, broad midriff, wind-tilted)
+        { rotY: Math.PI * 1.22,  scaleY: 0.95, width: 0.092, arch: 0.12, twist:  0.28, fold: 0.017, lean: -0.03 },
+        // 4. Low Basal Seedling Shoot (Fanned 300°, short, flared base, ground filler)
+        { rotY: Math.PI * 1.68,  scaleY: 0.68, width: 0.082, arch: 0.16, twist: -0.15, fold: 0.014, lean:  0.05 }
+    ];
 
-    for (let i = 0; i <= segments; i++) {
-        const v = i / segments;
-        // Non-linear vertical elevation: progressive natural bow
-        const y = Math.pow(v, 1.12) * height;
+    const baseHeight = 0.42;
 
-        // Parabolic width envelope: flares slightly off root, then tapers to crisp needle tip
-        const taper = Math.max(0.0, 1.0 - Math.pow(v, 1.45));
-        const currentWidth = baseWidth * (v < 0.15 ? (0.7 + v * 2.0) : taper);
-        const currentSpineDepth = foldDepth * (1.0 - v * 0.85);
+    bladeConfigs.forEach(cfg => {
+        const bladeHeight = baseHeight * cfg.scaleY;
+        const cosBase = Math.cos(cfg.rotY);
+        const sinBase = Math.sin(cfg.rotY);
+        const bladeVertexOffset = positions.length / 3;
 
-        // Pre-curvature forward arch along local +Z
-        const forwardArch = Math.pow(v, 2.1) * 0.09;
+        for (let i = 0; i <= segments; i++) {
+            const v = i / segments;
 
-        // Vertex 0: Left Wing Edge (-X)
-        positions.push(-currentWidth * 0.5, y, forwardArch);
-        uvs.push(0.0, v);
-        normals.push(-0.45, 0.2, 0.87);
+            // Non-linear elevation with natural cantilever bow
+            const y = Math.pow(v, 1.08) * bladeHeight;
 
-        // Vertex 1: Central Midrib Spine (Folded forward along +Z)
-        positions.push(0.0, y, forwardArch + currentSpineDepth);
-        uvs.push(0.5, v);
-        normals.push(0.0, 0.15, 0.99);
+            // Botanical width envelope: flared collar at root, wide midblade, acuminated needle tip
+            const taper = Math.max(0.0, 1.0 - Math.pow(v, 1.35));
+            const currentWidth = cfg.width * (v < 0.12 ? (0.75 + v * 2.1) : taper);
+            const spineProtrusion = cfg.fold * (1.0 - v * 0.85);
 
-        // Vertex 2: Right Wing Edge (+X)
-        positions.push(currentWidth * 0.5, y, forwardArch);
-        uvs.push(1.0, v);
-        normals.push(0.45, 0.2, 0.87);
+            // Forward arch and progressive axial twist angle
+            const forwardArch = Math.pow(v, 1.85) * cfg.arch;
+            const lateralLean = Math.pow(v, 1.45) * cfg.lean;
+            const twistAngle = cfg.rotY + (v * cfg.twist);
 
-        if (i < segments) {
-            const baseIdx = i * 3;
-            const nextIdx = (i + 1) * 3;
+            const cosT = Math.cos(twistAngle);
+            const sinT = Math.sin(twistAngle);
 
-            // Left wing face
-            indices.push(baseIdx + 0, baseIdx + 1, nextIdx + 0);
-            indices.push(baseIdx + 1, nextIdx + 1, nextIdx + 0);
+            // Compute blade-local coordinates:
+            // Left wing (-X)
+            const lx = -currentWidth * 0.5 + lateralLean;
+            const lz = forwardArch;
+            positions.push(
+                lx * cosT - lz * sinT,
+                y,
+                lx * sinT + lz * cosT
+            );
+            // uv.x: 0.0 (left margin), uv.y: vertical height [0..1]
+            uvs.push(0.0, v);
+            normals.push(
+                -0.48 * cosT - 0.87 * sinT,
+                0.22,
+                -0.48 * sinT + 0.87 * cosT
+            );
 
-            // Right wing face
-            indices.push(baseIdx + 1, baseIdx + 2, nextIdx + 1);
-            indices.push(baseIdx + 2, nextIdx + 2, nextIdx + 1);
+            // Central midrib spine (folded outward along +Z)
+            const sx = lateralLean;
+            const sz = forwardArch + spineProtrusion;
+            positions.push(
+                sx * cosT - sz * sinT,
+                y,
+                sx * sinT + sz * cosT
+            );
+            // uv.x: 0.5 (structural midrib spine)
+            uvs.push(0.5, v);
+            normals.push(
+                -0.98 * sinT,
+                0.16,
+                0.98 * cosT
+            );
+
+            // Right wing (+X)
+            const rx = currentWidth * 0.5 + lateralLean;
+            const rz = forwardArch;
+            positions.push(
+                rx * cosT - rz * sinT,
+                y,
+                rx * sinT + rz * cosT
+            );
+            // uv.x: 1.0 (right margin)
+            uvs.push(1.0, v);
+            normals.push(
+                0.48 * cosT - 0.87 * sinT,
+                0.22,
+                0.48 * sinT + 0.87 * cosT
+            );
+
+            // Build quad strip per segment (4 triangles)
+            if (i < segments) {
+                const b = bladeVertexOffset + i * 3;
+                const n = bladeVertexOffset + (i + 1) * 3;
+
+                // Left wing quad
+                indices.push(b + 0, b + 1, n + 0);
+                indices.push(b + 1, n + 1, n + 0);
+
+                // Right wing quad
+                indices.push(b + 1, b + 2, n + 1);
+                indices.push(b + 2, n + 2, n + 1);
+            }
         }
-    }
+    });
 
     geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
@@ -5456,11 +5513,9 @@ function buildGrassBladeGeometry() {
 }
 
 const grassBladeGeometry = buildGrassBladeGeometry();
-
 // =============================================================================
-// HIGH-FIDELITY BOTANICAL SHADERS
+// BOTANICAL PBR SHADERS WITH ANISOTROPIC WAX SHEEN & PEAT ROOT INTEGRATION
 // =============================================================================
-
 const grassVertexShader = `
     precision highp float;
 
@@ -5469,6 +5524,7 @@ const grassVertexShader = `
     varying vec3 vNormalVec;
     varying float vInstanceSeed;
     varying float vMacroCluster;
+    varying float vWingFactor;
 
     uniform float uTime;
     uniform vec3 uWindDir;
@@ -5478,9 +5534,8 @@ const grassVertexShader = `
     attribute vec4 aInstanceTransform0;
     attribute vec4 aInstanceTransform1;
     attribute vec4 aInstanceTransform2;
-    attribute vec4 aInstanceParams; // x: seed, y: heightScale, z: trampleStiffness, w: tintOffset
+    attribute vec4 aInstanceParams;
 
-    // Coherent analytical hash
     float hash21(vec2 p) {
         p = fract(p * vec2(233.34, 851.73));
         p += dot(p, p + 23.45);
@@ -5501,8 +5556,8 @@ const grassVertexShader = `
     void main() {
         vUv = uv;
         vInstanceSeed = aInstanceParams.x;
+        vWingFactor = abs(uv.x - 0.5) * 2.0;
 
-        // Reconstruct local instance 4x4 matrix
         mat4 instMatrix = mat4(
             vec4(aInstanceTransform0.xyz, 0.0),
             vec4(aInstanceTransform1.xyz, 0.0),
@@ -5510,71 +5565,50 @@ const grassVertexShader = `
             vec4(aInstanceTransform0.w, aInstanceTransform1.w, aInstanceTransform2.w, 1.0)
         );
 
-        // Instance scale variation
         vec3 transformed = position;
         transformed.y *= aInstanceParams.y;
-        transformed.xz *= (0.78 + aInstanceParams.x * 0.44);
+        transformed.xz *= (0.85 + aInstanceParams.x * 0.45);
 
-        // World anchor coordinates for spatial noise evaluation
         vec4 bladeOriginWorld = modelMatrix * instMatrix * vec4(0.0, 0.0, 0.0, 1.0);
         vec3 worldBase = bladeOriginWorld.xyz;
 
-        // Macro ecological clustering: generates wet hollows vs sunny knolls
-        float macro = smoothNoise2D(worldBase.xz * 0.18);
-        vMacroCluster = macro;
+        vMacroCluster = smoothNoise2D(worldBase.xz * 0.16);
 
-        // 1. FLUID MULTI-OCTAVE WIND HARMONICS
-        float windSpeed = uTime * 0.3;
-        vec2 windCoord = worldBase.xz * 0.42;
+        // Wind deflection
+        float windSpeed = uTime * 0.32;
+        vec2 windCoord = worldBase.xz * 0.38;
+        float wave1 = sin(dot(windCoord, uWindDir.xz) - windSpeed);
+        float wave2 = cos(dot(windCoord, vec2(-uWindDir.z, uWindDir.x) * 1.25) - windSpeed * 1.55) * 0.40;
+        float combinedWind = (wave1 + wave2) * uWindStrength;
 
-        // Primary gust front
-        float gustWave1 = sin(dot(windCoord, uWindDir.xz) - windSpeed);
-        // Secondary cross-shear turbulence
-        float gustWave2 = cos(dot(windCoord, vec2(-uWindDir.z, uWindDir.x) * 1.3) - windSpeed * 1.6) * 0.45;
-        // High-frequency capillary ripples
-        float gustWave3 = sin(dot(worldBase.xz, uWindDir.xz * 1.8) - windSpeed * 3.2 + aInstanceParams.x * 6.28) * 0.22;
-
-        float combinedWind = (gustWave1 + gustWave2 + gustWave3) * uWindStrength;
-
-        // Cantilever beam deflection curve: stems bend via power curve (base stays planted)
-        float heightFactor = pow(uv.y, 2.0);
-        float deflectionMagnitude = (combinedWind * 0.38 + 0.12) * heightFactor;
-
-        // Tip flutter chatter on the top 35% of the blade
-        float tipFlutter = sin(uTime * 11.0 + aInstanceParams.x * 37.1) * 0.045 * pow(uv.y, 3.0) * uWindStrength;
-
-        vec3 windOffset = (uWindDir + vec3(tipFlutter, -deflectionMagnitude * 0.25, tipFlutter)) * deflectionMagnitude;
+        float heightFactor = pow(uv.y, 2.1);
+        float deflection = (combinedWind * 0.32 + 0.08) * heightFactor;
+        vec3 windOffset = uWindDir * deflection;
         transformed.xyz += windOffset;
 
-        // 2. INTERACTIVE PLAYER TRAMPLE / PHYSICAL REPULSION
+        // Player trample
         vec4 currentWorldVtx = modelMatrix * instMatrix * vec4(transformed, 1.0);
         vec3 toPlayer = currentWorldVtx.xyz - uPlayerPos;
         float horizDist = length(toPlayer.xz);
-        float trampleRadius = 1.25;
+        float trampleRadius = 1.30;
 
-        // Check if player's feet are within vertical range of this tile
-        if (horizDist < trampleRadius && toPlayer.y > -0.65 && toPlayer.y < 1.95) {
-            float trampleFalloff = smoothstep(trampleRadius, 0.08, horizDist);
-            // Height-progressive push: only upper stem yields completely
+        if (horizDist < trampleRadius && toPlayer.y > -0.60 && toPlayer.y < 1.90) {
+            float trampleFalloff = smoothstep(trampleRadius, 0.06, horizDist);
             float yieldT = pow(uv.y, 1.25);
             vec2 pushDir = normalize(toPlayer.xz + vec2(0.0001));
-
-            transformed.xz += pushDir * (trampleFalloff * 0.72 * yieldT);
-            transformed.y  -= (trampleFalloff * 0.32 * yieldT);
+            transformed.xz += pushDir * (trampleFalloff * 0.70 * yieldT);
+            transformed.y  -= (trampleFalloff * 0.30 * yieldT);
         }
 
         vec4 worldPosition = modelMatrix * instMatrix * vec4(transformed, 1.0);
         vWorldPos = worldPosition.xyz;
 
-        // Blend vertex normal toward sky (+Y) to prevent harsh dark underside rendering
-        vec3 instNormal = normalize(mat3(modelMatrix * instMatrix) * normal);
-        vNormalVec = normalize(mix(instNormal, vec3(0.0, 1.0, 0.0), 0.35 + uv.y * 0.25));
+        // Keep the true 3D dihedral normal so blades actually self-shadow when facing away from light
+        vNormalVec = normalize(mat3(modelMatrix * instMatrix) * normal);
 
         gl_Position = projectionMatrix * viewMatrix * worldPosition;
     }
-`;
-
-const grassFragmentShader = `
+`;const grassFragmentShader = `
     precision highp float;
 
     varying vec2 vUv;
@@ -5582,6 +5616,7 @@ const grassFragmentShader = `
     varying vec3 vNormalVec;
     varying float vInstanceSeed;
     varying float vMacroCluster;
+    varying float vWingFactor;
 
     uniform vec3 uGrassBaseColor;
     uniform vec3 uGrassMidColor;
@@ -5592,44 +5627,50 @@ const grassFragmentShader = `
     uniform vec3 uHemiGround;
 
     void main() {
-        // 1. THREE-TIER BOTANICAL CHLOROPHYLL GRADIENT
-        // Root peat sheath -> Lush middle blade -> Sun-kissed apex
-        vec3 bladeCol = mix(uGrassBaseColor, uGrassMidColor, smoothstep(0.02, 0.42, vUv.y));
-        bladeCol = mix(bladeCol, uGrassTipColor, smoothstep(0.40, 0.96, vUv.y));
+        // 1. Base Pigment Ramp (Root Peat -> Olive Body -> Sunlit Tip)
+        vec3 bladeCol = mix(uGrassBaseColor, uGrassMidColor, smoothstep(0.00, 0.40, vUv.y));
+        bladeCol = mix(bladeCol, uGrassTipColor, smoothstep(0.35, 0.95, vUv.y));
 
-        // Macro-cluster color shift (some patches are sun-baked dry savanna, others deep spring emerald)
-        float dryMix = smoothstep(0.55, 0.95, vMacroCluster + (vInstanceSeed - 0.5) * 0.35);
-        vec3 dryVariant = mix(bladeCol, uGrassDryColor, 0.65);
-        bladeCol = mix(bladeCol, dryVariant, dryMix * smoothstep(0.35, 1.0, vUv.y));
+        // Dry grass thatch variance on sun-baked knolls
+        float dryMix = smoothstep(0.55, 0.95, vMacroCluster + (vInstanceSeed - 0.5) * 0.30);
+        bladeCol = mix(bladeCol, uGrassDryColor, dryMix * smoothstep(0.40, 1.0, vUv.y) * 0.60);
 
-        // 2. HEMISPHERICAL SKY / SOIL AMBIENT LIGHTING
-        float hemiFactor = vNormalVec.y * 0.5 + 0.5;
-        vec3 ambientFill = mix(uHemiGround, uHemiSky, hemiFactor);
+        // 2. Realistic Canopy Self-Shadowing / Ambient Occlusion
+        // Grass density blocks sunlight from penetrating to the ground.
+        // The bottom 40% sits in deep self-shadow (matching the dark peat bedding),
+        // and only the top 35% catches full direct sun.
+        float canopyAO = mix(0.12, 1.0, smoothstep(0.02, 0.75, vUv.y));
 
-        // 3. WRAP DIFFUSE (HALF-LAMBERT) DIRECT SOLAR LIGHTING
-        // Eliminates harsh pitch-black cutoffs on back-facing thin leaf geometry
+        // 3. Directional Lighting with Soft Falloff
+        // Back-facing blades enter shadow instead of glowing uniformly
         float nDotL = dot(vNormalVec, uSunDirection);
-        float wrappedDiffuse = clamp((nDotL + 0.35) / 1.35, 0.0, 1.0);
+        float directLight = clamp(nDotL, 0.0, 1.0) * 0.70;
+        float wrapLight   = clamp((nDotL + 0.20) / 1.20, 0.0, 1.0) * 0.15; // Soft bounce fill
 
-        // 4. BI-DIRECTIONAL SUBSURFACE SCATTERING (FORWARD TRANSMISSION)
-        // Thin chloroplast structures glow brilliantly when viewed against direct light
+        // 4. Ambient Fill (Grounded to match the bedding's ambient intensity)
+        float hemiFactor = clamp(vNormalVec.y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 ambient = mix(uHemiGround, uHemiSky, hemiFactor) * 0.35;
+
+        // 5. Attenuated Subsurface Backlight
+        // Only active when the blade is backlit AND on the upper translucent part of the blade
         vec3 viewDir = normalize(cameraPosition - vWorldPos);
         float sssCos = clamp(dot(viewDir, -uSunDirection), 0.0, 1.0);
-        float sssIntensity = pow(sssCos, 2.8) * 0.75 * smoothstep(0.15, 1.0, vUv.y);
-        vec3 sssGlow = vec3(0.42, 0.78, 0.20) * sssIntensity;
+        float sssMask = smoothstep(0.45, 1.0, vUv.y) * (0.4 + vWingFactor * 0.6);
+        vec3 sssGlow = uGrassTipColor * pow(sssCos, 3.0) * 0.30 * sssMask;
 
-        // 5. GROUND CONTACT AMBIENT OCCLUSION
-        // Sinks grass roots naturally into turf pillows with zero harsh intersection lines
-        float contactAO = smoothstep(0.0, 0.32, vUv.y);
+        // 6. Subdued Waxy Cuticle Glint
+        vec3 halfVec = normalize(uSunDirection + viewDir);
+        float nDotH = max(dot(vNormalVec, halfVec), 0.0);
+        float spec = pow(nDotH, 24.0) * 0.14 * smoothstep(0.40, 1.0, vUv.y) * directLight;
 
-        // Final Composite Shading
-        vec3 finalColor = bladeCol * (ambientFill + vec3(wrappedDiffuse * 0.90)) * contactAO;
-        finalColor += sssGlow * contactAO;
+        // Composite: Blade color scaled by canopy shadow and incident light
+        vec3 finalColor = bladeCol * (ambient + vec3(directLight + wrapLight)) * canopyAO;
+        finalColor += sssGlow * canopyAO;
+        finalColor += vec3(0.50, 0.55, 0.30) * spec;
 
         gl_FragColor = vec4(finalColor, 1.0);
     }
 `;
-
 const grassMaterial = new THREE.ShaderMaterial({
     vertexShader: grassVertexShader,
     fragmentShader: grassFragmentShader,
@@ -5647,18 +5688,20 @@ const grassMaterial = new THREE.ShaderMaterial({
         uHemiGround:     vegUniforms.uHemiGround
     },
     side: THREE.DoubleSide,
-    toneMapped: false
+    toneMapped: true
 });
 
 // =============================================================================
-// PROCEDURAL BOTANICAL TURF & LIVING MOSS BEDDING SUBSYSTEM
+// PROCEDURAL BOTANICAL TURF & LIVING MOSS BEDDING SUBSYSTEM (OVERHAULED)
 // =============================================================================
 
 function createHighDefTurfTextures() {
     const S = 512;
     const H = S * 0.5;
+
     const noise2D = _createNoise2D(909);
     const detailNoise = _createNoise2D(1313);
+    const fiberNoise = _createNoise2D(2048);
 
     const makeCtx = () => {
         const c = document.createElement('canvas');
@@ -5675,25 +5718,56 @@ function createHighDefTurfTextures() {
     const rData = r.createImageData(S, S);
     const heightArr = new Float32Array(S * S);
 
+    // Fast cellular/Voronoi noise for cushion moss clusters
+    const getCellular = (u, v, freq) => {
+        const px = u * freq;
+        const py = v * freq;
+        const ix = Math.floor(px);
+        const iy = Math.floor(py);
+        let d1 = 1.0;
+        let d2 = 1.0;
+
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const cx = ix + dx;
+                const cy = iy + dy;
+                const h1 = Math.sin(cx * 127.1 + cy * 311.7) * 43758.5453;
+                const h2 = Math.sin(cx * 269.5 + cy * 183.3) * 43758.5453;
+                const fx = cx + (h1 - Math.floor(h1));
+                const fy = cy + (h2 - Math.floor(h2));
+                const dist = Math.hypot(px - fx, py - fy);
+                if (dist < d1) {
+                    d2 = d1;
+                    d1 = dist;
+                } else if (dist < d2) {
+                    d2 = dist;
+                }
+            }
+        }
+        return { d1, d2, edge: d2 - d1 };
+    };
+
     for (let y = 0; y < S; y++) {
+        const normY = (y - H) / H;
         for (let x = 0; x < S; x++) {
             const idx = (y * S + x) * 4;
             const pIdx = y * S + x;
+            const normX = (x - H) / H;
 
-            // Normalized radial coordinates from center [-1, 1]
-            const dx = (x - H) / H;
-            const dy = (y - H) / H;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+            // Normalized radial coordinate from center
+            const radDist = Math.sqrt(normX * normX + normY * normY);
 
-            // 1. Organic Cellular Boundary Distortion (Breaks square tiles into natural islands)
-            const fbmEdge = _fbm(noise2D, x * 0.016, y * 0.016, 4, 2.0, 0.5);
-            const microPerturb = detailNoise(x * 0.08, y * 0.08) * 0.15;
-            
-            // Organic boundary threshold with ragged creeping lobes
-            const distortedDist = dist + (fbmEdge - 0.45) * 0.55 + microPerturb;
-            const patchMask = _smoothstep(0.85, 0.35, distortedDist);
+            // 1. Organic perimeter domain warping: finger tendrils that crawl into stone joints
+            const warpX = noise2D(x * 0.015, y * 0.015) * 0.35;
+            const warpY = detailNoise(x * 0.015 + 30.0, y * 0.015 + 30.0) * 0.35;
+            const distortedDist = radDist + warpX + warpY;
 
-            if (patchMask <= 0.005) {
+            // Multi-octave edge raggedness
+            const fbmEdge = _fbm(noise2D, (x + warpX * 40.0) * 0.022, (y + warpY * 40.0) * 0.022, 4, 2.0, 0.5);
+            const patchThreshold = 0.88 + (fbmEdge - 0.5) * 0.45;
+            const patchMask = _smoothstep(patchThreshold, patchThreshold - 0.22, distortedDist);
+
+            if (patchMask <= 0.002) {
                 aData.data[idx + 3] = 0;
                 nData.data[idx + 0] = 128;
                 nData.data[idx + 1] = 128;
@@ -5707,57 +5781,98 @@ function createHighDefTurfTextures() {
                 continue;
             }
 
-            // 2. Multi-Tier Micro-Topography (Mounded Center with Spongy Nodules)
-            const moundElevation = Math.pow(Math.max(0.0, 1.0 - dist * 1.15), 1.6);
-            const microNodules = Math.abs(detailNoise(x * 0.14, y * 0.14)) * 0.35;
-            const fineStipple = detailNoise(x * 0.35, y * 0.35) * 0.12;
+            // 2. Multi-scale micro-topography
+            // A. Broad central turf mound
+            const broadMound = Math.pow(Math.max(0.0, 1.0 - radDist * 1.12), 1.7);
 
-            const finalHeight = _clamp((moundElevation * 0.65 + microNodules + fineStipple) * patchMask, 0.0, 1.0);
+            // B. Cellular bryophyte cushion heads
+            const cell = getCellular(x / S, y / S, 18.0);
+            const cushionNodule = Math.sin(Math.min(1.0, cell.d1 * 1.5) * Math.PI * 0.5);
+
+            // C. Root thatch, soil crumbs & micro-grain
+            const thatchFibril = Math.abs(fiberNoise(x * 0.09, y * 0.09)) * 0.18;
+            const microGrain = detailNoise(x * 0.32, y * 0.32) * 0.08;
+
+            const finalHeight = _clamp(
+                (broadMound * 0.55 + (1.0 - cushionNodule) * 0.32 + thatchFibril + microGrain) * patchMask,
+                0.0,
+                1.0
+            );
             heightArr[pIdx] = finalHeight;
 
-            // 3. Multi-Spectrum Botanical Palette
-            // Core: Moist rich peat humus & root cluster
-            // Mid: Deep velvety bryophyte emerald cushion
-            // Fringe: Chartreuse rhizoid tendrils & creeping spores
-            const soilCore = _smoothstep(0.65, 0.95, moundElevation);
-            const sporeSpot = _smoothstep(0.68, 0.98, microNodules * patchMask);
+            // 3. 5-Tier Photorealistic Botanical Palette
+            // Layer 1: Moist rich peat loam / humus root base (#100c08 - #1c150e)
+            // Layer 2: Decayed golden-brown thatch / pine litter (#3a2d18)
+            // Layer 3: Deep bryophyte forest green cushion body (#214418)
+            // Layer 4: Luminous tender velvet crests (#487d26)
+            // Layer 5: Spore-pod golden highlights & lime margin tendrils (#8dbb34 - #b8c445)
 
-            // Soil humus base: #18120c to #281e14
-            const soilR = 28.0 + fbmEdge * 18.0;
-            const soilG = 22.0 + fbmEdge * 14.0;
-            const soilB = 14.0 + fbmEdge * 8.0;
+            const coreSoilFactor = _smoothstep(0.70, 0.98, broadMound);
+            const creviceShadow = _smoothstep(0.08, 0.45, cell.edge);
+            const crestHighlight = _smoothstep(0.55, 0.95, finalHeight);
+            const sporeSpot = _smoothstep(0.75, 0.98, microGrain * 3.5 + (1.0 - cushionNodule));
 
-            // Emerald moss: #2f691b
-            const mossR = 45.0 + microNodules * 40.0;
-            const mossG = 105.0 + microNodules * 75.0;
-            const mossB = 26.0 + microNodules * 20.0;
+            // Deep organic loam
+            const loamR = 18.0 + fbmEdge * 12.0;
+            const loamG = 14.0 + fbmEdge * 8.0;
+            const loamB = 9.0  + fbmEdge * 5.0;
 
-            // Tender sunlit lime fringe: #7ecb32
-            const limeR = 120.0 + fineStipple * 30.0;
-            const limeG = 195.0 + fineStipple * 40.0;
-            const limeB = 45.0 + fineStipple * 15.0;
+            // Thatch/decayed matter
+            const thatchR = 52.0 + thatchFibril * 40.0;
+            const thatchG = 42.0 + thatchFibril * 30.0;
+            const thatchB = 22.0 + thatchFibril * 15.0;
 
-            let colR = _mix(limeR, mossR, _smoothstep(0.2, 0.6, finalHeight));
-            let colG = _mix(limeG, mossG, _smoothstep(0.2, 0.6, finalHeight));
-            let colB = _mix(limeB, mossB, _smoothstep(0.2, 0.6, finalHeight));
+            // Deep forest moss
+            const forestR = 28.0 + cell.edge * 20.0;
+            const forestG = 65.0 + cell.edge * 45.0;
+            const forestB = 20.0 + cell.edge * 15.0;
 
-            // Deep peat humus in the densest core where stems anchor
-            colR = _mix(colR, soilR, soilCore * 0.72);
-            colG = _mix(colG, soilG, soilCore * 0.72);
-            colB = _mix(colB, soilB, soilCore * 0.72);
+            // Sunlit emerald velvet
+            const velvetR = 68.0  + microGrain * 40.0;
+            const velvetG = 128.0 + microGrain * 60.0;
+            const velvetB = 34.0  + microGrain * 20.0;
 
-            // Subtle golden spore caps
-            colR = _mix(colR, 205.0, sporeSpot * 0.35);
-            colG = _mix(colG, 220.0, sporeSpot * 0.35);
-            colB = _mix(colB, 60.0,  sporeSpot * 0.35);
+            // Chartreuse / gold tips
+            const goldR = 155.0;
+            const goldG = 195.0;
+            const goldB = 48.0;
 
-            aData.data[idx + 0] = Math.round(colR);
-            aData.data[idx + 1] = Math.round(colG);
-            aData.data[idx + 2] = Math.round(colB);
+            // Interpolate botanical layers
+            let colR = _mix(loamR, thatchR, _smoothstep(0.12, 0.35, finalHeight));
+            let colG = _mix(loamG, thatchG, _smoothstep(0.12, 0.35, finalHeight));
+            let colB = _mix(loamB, thatchB, _smoothstep(0.12, 0.35, finalHeight));
+
+            colR = _mix(colR, forestR, _smoothstep(0.25, 0.55, finalHeight));
+            colG = _mix(colG, forestG, _smoothstep(0.25, 0.55, finalHeight));
+            colB = _mix(colB, forestB, _smoothstep(0.25, 0.55, finalHeight));
+
+            colR = _mix(colR, velvetR, crestHighlight);
+            colG = _mix(colG, velvetG, crestHighlight);
+            colB = _mix(colB, velvetB, crestHighlight);
+
+            // Golden spore-pod caps & dry margin thatch
+            colR = _mix(colR, goldR, sporeSpot * 0.38);
+            colG = _mix(colG, goldG, sporeSpot * 0.38);
+            colB = _mix(colB, goldB, sporeSpot * 0.38);
+
+            // Soil core anchoring in deepest root beds
+            colR = _mix(colR, loamR, coreSoilFactor * 0.60);
+            colG = _mix(colG, loamG, coreSoilFactor * 0.60);
+            colB = _mix(colB, loamB, coreSoilFactor * 0.60);
+
+            // Crevice ambient occlusion modulation
+            const creviceMult = _mix(0.55, 1.0, creviceShadow);
+            colR *= creviceMult;
+            colG *= creviceMult;
+            colB *= creviceMult;
+
+            aData.data[idx + 0] = Math.round(_clamp(colR, 0, 255));
+            aData.data[idx + 1] = Math.round(_clamp(colG, 0, 255));
+            aData.data[idx + 2] = Math.round(_clamp(colB, 0, 255));
             aData.data[idx + 3] = Math.round(patchMask * 255);
 
-            // 4. Velvet Matte Roughness (Soft, light-absorbing moss)
-            const rough = Math.round(_mix(250.0, 225.0, soilCore));
+            // 4. Physical Roughness: damp loam is slightly reflective (~165), velvet moss is light-scattering matte (~250)
+            const rough = Math.round(_mix(165.0, 250.0, _smoothstep(0.2, 0.7, finalHeight)));
             rData.data[idx + 0] = rough;
             rData.data[idx + 1] = rough;
             rData.data[idx + 2] = rough;
@@ -5768,8 +5883,8 @@ function createHighDefTurfTextures() {
     a.putImageData(aData, 0, 0);
     r.putImageData(rData, 0, 0);
 
-    // Compute sharp 3D normals and ambient occlusion crevices
-    const { normalData, aoData } = _computeNormalsAndAOFromHeight(heightArr, S, 4.8);
+    // Compute high-definition surface normals with crisp nodule relief
+    const { normalData, aoData } = _computeNormalsAndAOFromHeight(heightArr, S, 5.2);
 
     const normalCanvas = document.createElement('canvas');
     normalCanvas.width = normalCanvas.height = S;
@@ -5799,25 +5914,100 @@ function createHighDefTurfTextures() {
 
 const turfTextures = createHighDefTurfTextures();
 
-// Mounded 3D relief geometry for turf pillows (gives real physical height mounding)
-function buildMoundedTurfGeometry() {
-    const geo = new THREE.PlaneGeometry(1.35, 1.35, 12, 12);
-    geo.rotateX(-Math.PI / 2);
+// =============================================================================
+// CONCENTRIC VOLUMETRIC CUSHION DOME GEOMETRY
+// =============================================================================
 
-    const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i);
-        const z = pos.getZ(i);
-        const r = Math.sqrt(x * x + z * z) / 0.675;
-        // Parabolic mound up to 2.4cm thick at the center, tapering flush to stone at edges
-        const mound = Math.max(0.0, 1.0 - r * r) * 0.024;
-        pos.setY(i, mound);
+function buildMoundedTurfGeometry() {
+    // 3D Concentric Cushion Dome with curved perimeter skirt that slopes flush into the floor
+    const geom = new THREE.BufferGeometry();
+    const rings = 6;
+    const segments = 24;
+    const maxRadius = 0.72; // Generous 1.44m footprint
+    const peakElevation = 0.038; // 3.8 cm physical mound elevation
+
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const indices = [];
+
+    // Center vertex (Apex of mound)
+    positions.push(0, peakElevation, 0);
+    normals.push(0, 1, 0);
+    uvs.push(0.5, 0.5);
+
+    // Generate concentric rings from apex to outer skirt
+    for (let r = 1; r <= rings; r++) {
+        const rFrac = r / rings;
+        // Parabolic mound profile that drops to 0 at the skirt perimeter
+        const heightFactor = Math.pow(1.0 - rFrac, 1.8);
+        const yBase = heightFactor * peakElevation;
+        const currentRadius = rFrac * maxRadius;
+
+        for (let s = 0; s < segments; s++) {
+            const theta = (s / segments) * Math.PI * 2.0;
+
+            // Organic perimeter scalloping to prevent mechanical circular symmetry
+            const scallop = 1.0 + Math.sin(theta * 3.0) * 0.06 + Math.cos(theta * 5.0) * 0.03;
+            const rScaled = currentRadius * (r === rings ? scallop : 1.0);
+
+            const x = Math.cos(theta) * rScaled;
+            const z = Math.sin(theta) * rScaled;
+
+            // At the final perimeter ring, clamp exactly to 0 so the mesh kisses the stone face
+            const y = (r === rings) ? 0.0 : (yBase + Math.sin(theta * 4.0) * 0.003 * heightFactor);
+
+            positions.push(x, y, z);
+
+            // Outward-radiating normal calculation for smooth hemispherical lighting
+            const normX = (r === rings) ? Math.cos(theta) * 0.8 : (x / maxRadius) * 0.6;
+            const normZ = (r === rings) ? Math.sin(theta) * 0.8 : (z / maxRadius) * 0.6;
+            const normY = Math.sqrt(Math.max(0.01, 1.0 - (normX * normX + normZ * normZ)));
+            normals.push(normX, normY, normZ);
+
+            // Normalized radial UV coordinates matching texture canvas
+            const u = 0.5 + (x / (maxRadius * 2.0));
+            const v = 0.5 + (z / (maxRadius * 2.0));
+            uvs.push(u, v);
+        }
     }
-    geo.computeVertexNormals();
-    return geo;
+
+    // Connect Center Point to First Ring
+    for (let s = 0; s < segments; s++) {
+        const next = (s + 1) % segments;
+        indices.push(0, 1 + s, 1 + next);
+    }
+
+    // Connect Concentric Rings into Quad Strips
+    for (let r = 1; r < rings; r++) {
+        const innerRingOffset = 1 + (r - 1) * segments;
+        const outerRingOffset = 1 + r * segments;
+
+        for (let s = 0; s < segments; s++) {
+            const next = (s + 1) % segments;
+            const i1 = innerRingOffset + s;
+            const i2 = innerRingOffset + next;
+            const o1 = outerRingOffset + s;
+            const o2 = outerRingOffset + next;
+
+            indices.push(i1, o1, i2);
+            indices.push(i2, o1, o2);
+        }
+    }
+
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geom.setIndex(indices);
+    geom.computeVertexNormals();
+    return geom;
 }
 
 const moundedTurfGeometry = buildMoundedTurfGeometry();
+
+// =============================================================================
+// BOTANICAL VELVET & SUBSURFACE SHADER INTEGRATION
+// =============================================================================
 
 function createGrassBeddingMaterial() {
     const mat = new THREE.MeshStandardMaterial({
@@ -5825,52 +6015,89 @@ function createGrassBeddingMaterial() {
         normalMap: turfTextures.normal,
         roughnessMap: turfTextures.roughness,
         aoMap: turfTextures.ao,
-        roughness: 0.95,
-        metalness: 0.0,
-        envMapIntensity: 0.08,
-        transparent: true,
-        alphaTest: 0.02,
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -4.0,
-        polygonOffsetUnits: -4.0,
+        roughness: 0.85,
+        metalness: 0.02,
+        envMapIntensity: 0.15,
+        transparent: false,
+        alphaTest: 0.18,
+        depthWrite: true, // Enables full depth-writing so SSAO grounds grass blades onto the mounds
         side: THREE.DoubleSide
     });
 
     mat.onBeforeCompile = (shader) => {
-        // 1. Pass explicit UV from vertex shader
+        shader.uniforms.uSunDirection = vegUniforms.uSunDirection;
+        shader.uniforms.uVelvetColor  = { value: new THREE.Color(0x76b834) };
+        shader.uniforms.uSoilDeepAO   = { value: new THREE.Color(0x0e0a06) };
+
         shader.vertexShader = shader.vertexShader.replace(
             '#include <common>',
             `#include <common>
-            varying vec2 vTurfUv;`
+            varying vec3 vWorldNormalVec;
+            varying vec3 vWorldPositionVec;
+            varying vec2 vTurfUV;`
         );
+
         shader.vertexShader = shader.vertexShader.replace(
             '#include <begin_vertex>',
             `#include <begin_vertex>
-            vTurfUv = uv;`
+            vTurfUV = uv;`
         );
 
-        // 2. Receive in fragment shader and apply edge contact shadow
+        shader.vertexShader = shader.vertexShader.replace(
+            '#include <worldpos_vertex>',
+            `#include <worldpos_vertex>
+            vWorldPositionVec = worldPosition.xyz;
+            vWorldNormalVec = normalize(mat3(modelMatrix) * normal);`
+        );
+
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <common>',
             `#include <common>
-            varying vec2 vTurfUv;`
+            varying vec3 vWorldNormalVec;
+            varying vec3 vWorldPositionVec;
+            varying vec2 vTurfUV;
+            uniform vec3 uSunDirection;
+            uniform vec3 uVelvetColor;
+            uniform vec3 uSoilDeepAO;`
         );
+
         shader.fragmentShader = shader.fragmentShader.replace(
             '#include <map_fragment>',
             `#include <map_fragment>
-            float edgeDist = length(vTurfUv - 0.5) * 2.0;
-            float contactShadow = mix(1.0, 0.72, smoothstep(0.4, 0.9, edgeDist));
-            diffuseColor.rgb *= contactShadow;`
+
+            // 1. Half-Lambert Soft Lighting Wrap (prevents harsh black cutoffs on moss mounds)
+            float nDotL = dot(vWorldNormalVec, uSunDirection);
+            float wrapDiffuse = clamp((nDotL + 0.35) / 1.35, 0.0, 1.0);
+
+            // 2. Micro-Velvet Fresnel Rim (Simulates backscattering phyllid hairs on bryophyte cushions)
+            vec3 viewDir = normalize(cameraPosition - vWorldPositionVec);
+            float fresnelRim = pow(1.0 - max(dot(viewDir, vWorldNormalVec), 0.0), 3.2);
+            vec3 velvetGlow = uVelvetColor * fresnelRim * 0.42;
+
+            // 3. Subsurface Chlorophyll Translucency (backlit sunlight transmission)
+            float sssCos = clamp(dot(viewDir, -uSunDirection), 0.0, 1.0);
+            float sssIntensity = pow(sssCos, 2.8) * 0.35;
+            vec3 sssGlow = vec3(0.40, 0.72, 0.18) * sssIntensity;
+
+            // 4. Ground Contact Edge Shadow (anchors mound skirt naturally against stone)
+            float edgeDist = length(vTurfUV - 0.5) * 2.0;
+            float contactShadow = mix(1.0, 0.70, smoothstep(0.45, 0.95, edgeDist));
+
+            diffuseColor.rgb *= contactShadow;
+            diffuseColor.rgb = (diffuseColor.rgb * (wrapDiffuse * 0.75 + 0.25)) + velvetGlow + sssGlow;`
         );
     };
 
     return mat;
 }
 
+// =============================================================================
+// TURF BEDDING MANAGER & CREEPING CLUSTER PLACEMENT
+// =============================================================================
+
 class GrassBeddingManager {
     constructor() {
-        this.maxInstances = 4500;
+        this.maxInstances = 6000;
         this.mesh = null;
         this.count = 0;
         this.init();
@@ -5888,7 +6115,7 @@ class GrassBeddingManager {
         this.mesh.count = 0;
         this.mesh.receiveShadow = true;
         this.mesh.castShadow = false;
-        this.mesh.layers.set(1); // Decal layer (renders normally, bypassed by SSAO depth artifact passes)
+        this.mesh.layers.set(1); // Set to Layer 1 (Decals/Ground overlays)
         vegetationSceneGroup.add(this.mesh);
     }
 
@@ -5900,36 +6127,51 @@ class GrassBeddingManager {
         }
     }
 
-    addLobe(x, y, z, scaleX, scaleZ, rotY) {
+    addLobe(x, y, z, scaleX, scaleZ, rotY, heightMultiplier = 1.0) {
         if (this.count >= this.maxInstances) return;
 
         const dummy = new THREE.Object3D();
-        // Lift 6mm off the face so the physical 2.4cm mound clears the stone cleanly
-        dummy.position.set(x, y + 0.006, z).applyQuaternion(globalTiltThree);
+        // Lift slightly off the block surface so the curved skirt kisses the stone face without z-fighting
+        dummy.position.set(x, y + 0.003, z).applyQuaternion(globalTiltThree);
         dummy.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY);
         dummy.quaternion.premultiply(globalTiltThree);
-        dummy.scale.set(scaleX, 1.0, scaleZ);
+        dummy.scale.set(scaleX, heightMultiplier, scaleZ);
         dummy.updateMatrix();
 
         this.mesh.setMatrixAt(this.count++, dummy.matrix);
     }
 
-    // Spawns a cohesive organic turf cluster with 2-3 overlapping lobes
+    // Spawns a cohesive organic turf cluster with 2-4 staggered, undulating lobes
     addTileBed(centerX, surfaceY, centerZ, rngFn) {
-        // 1. Primary Central Mounded Bed
-        const mainScale = 0.90 + rngFn() * 0.25;
-        this.addLobe(centerX, surfaceY, centerZ, mainScale, mainScale, rngFn() * Math.PI * 2);
+        // 1. Dominant Central Mound
+        const mainScale = 0.95 + rngFn() * 0.30;
+        const mainHeight = 0.85 + rngFn() * 0.35;
+        const mainJitterX = (rngFn() - 0.5) * 0.12;
+        const mainJitterZ = (rngFn() - 0.5) * 0.12;
 
-        // 2. Off-Center Satellite Lobes (Breaks square symmetry & creeps across stone crevices)
-        const satellites = 1 + Math.floor(rngFn() * 2);
-        for (let i = 0; i < satellites; i++) {
-            const angle = rngFn() * Math.PI * 2;
-            const dist = 0.18 + rngFn() * 0.22;
+        this.addLobe(
+            centerX + mainJitterX,
+            surfaceY,
+            centerZ + mainJitterZ,
+            mainScale,
+            mainScale * (0.85 + rngFn() * 0.25), // Slight elliptical stretch
+            rngFn() * Math.PI * 2,
+            mainHeight
+        );
+
+        // 2. Creeping Satellite Lobes (Breaks cubic block symmetry and spills into stone cracks)
+        const satelliteCount = 2 + Math.floor(rngFn() * 2);
+        for (let i = 0; i < satelliteCount; i++) {
+            const angle = (i / satelliteCount) * Math.PI * 2.0 + (rngFn() - 0.5) * 0.55;
+            const dist = 0.22 + rngFn() * 0.24;
             const sx = centerX + Math.cos(angle) * dist;
             const sz = centerZ + Math.sin(angle) * dist;
-            const subScaleX = 0.45 + rngFn() * 0.35;
-            const subScaleZ = 0.45 + rngFn() * 0.35;
-            this.addLobe(sx, surfaceY, sz, subScaleX, subScaleZ, rngFn() * Math.PI * 2);
+
+            const subScaleX = 0.50 + rngFn() * 0.35;
+            const subScaleZ = subScaleX * (0.80 + rngFn() * 0.35);
+            const subHeight = 0.70 + rngFn() * 0.30;
+
+            this.addLobe(sx, surfaceY, sz, subScaleX, subScaleZ, rngFn() * Math.PI * 2, subHeight);
         }
     }
 
@@ -5944,7 +6186,7 @@ const grassBedding = new GrassBeddingManager();
 
 class GrassFieldManager {
     constructor() {
-        this.maxInstances = 35000;
+        this.maxInstances = 75000;
         this.instancedMesh = null;
         this.instanceCount = 0;
         this.init();
@@ -6508,7 +6750,6 @@ function spawnFernEntity(x, y, z, scale = 1.0) {
 // =============================================================================
 // 3. HIGH-FIDELITY PROCEDURAL VOLUMETRIC BUSH & CANOPY SUBSYSTEM
 // =============================================================================
-
 function createBushTextures() {
     const S = 256;
     const c = document.createElement('canvas');
@@ -6516,7 +6757,6 @@ function createBushTextures() {
     const ctx = c.getContext('2d');
     ctx.clearRect(0, 0, S, S);
 
-    // 1. Draw Dense Overlapping Botanical Foliage Spray
     const numLeaves = 18;
     const rng = _makeRng(404);
 
@@ -6533,24 +6773,23 @@ function createBushTextures() {
         ctx.translate(lx, ly);
         ctx.rotate(rot);
 
-        // Serrated / Curved Leaf Blade
         ctx.beginPath();
         ctx.moveTo(0, -leafL * 0.5);
         ctx.bezierCurveTo(-leafW * 0.6, -leafL * 0.2, -leafW * 0.5, leafL * 0.35, 0, leafL * 0.5);
         ctx.bezierCurveTo(leafW * 0.5, leafL * 0.35, leafW * 0.6, -leafL * 0.2, 0, -leafL * 0.5);
         ctx.closePath();
 
-        // Two-tone leaf gradient (dark forest base -> luminous lime highlight)
+        // Darker, warm-olive leaf gradient (no neon mint/lime)
         const lGrad = ctx.createLinearGradient(0, -leafL * 0.5, 0, leafL * 0.5);
-        lGrad.addColorStop(0.0, '#58a832'); // Bright tip
-        lGrad.addColorStop(0.5, '#2b6e1a'); // Rich chlorophyll body
-        lGrad.addColorStop(1.0, '#133e0a'); // Deep shadow base
+        lGrad.addColorStop(0.0, '#3a5e18'); // Warm golden-olive tip
+        lGrad.addColorStop(0.5, '#1e380f'); // Deep earthy chlorophyll body
+        lGrad.addColorStop(1.0, '#0c1a06'); // Dark peat shadow base
         ctx.fillStyle = lGrad;
         ctx.fill();
 
-        // Leaf Midrib Vein
-        ctx.strokeStyle = 'rgba(180, 240, 140, 0.45)';
-        ctx.lineWidth = 1.8;
+        // Subdued warm vein
+        ctx.strokeStyle = 'rgba(170, 205, 110, 0.30)';
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.moveTo(0, -leafL * 0.45);
         ctx.lineTo(0, leafL * 0.45);
@@ -6559,17 +6798,16 @@ function createBushTextures() {
         ctx.restore();
     }
 
-    // 2. Sprinkle Subtle Floral Buds / Wild Berries Among Leaves
+    // Wild berries (darker crimson-amber)
     for (let b = 0; b < 10; b++) {
         const bx = S * 0.5 + (rng() - 0.5) * 110;
         const by = S * 0.5 + (rng() - 0.5) * 110;
-        const br = 4 + rng() * 3.5;
+        const br = 3.5 + rng() * 3.0;
 
-        // Berry gradient
         const bGrad = ctx.createRadialGradient(bx - 1, by - 1, 1, bx, by, br);
-        bGrad.addColorStop(0.0, '#fca5a5'); // Sun highlight
-        bGrad.addColorStop(0.6, '#dc2626'); // Ripe scarlet berry
-        bGrad.addColorStop(1.0, '#7f1d1d'); // Deep rim
+        bGrad.addColorStop(0.0, '#f87171');
+        bGrad.addColorStop(0.6, '#991b1b');
+        bGrad.addColorStop(1.0, '#450a0a');
         ctx.fillStyle = bGrad;
         ctx.beginPath();
         ctx.arc(bx, by, br, 0, Math.PI * 2);
@@ -6689,29 +6927,43 @@ const bushFoliageFragmentShader = `
     uniform vec3 uBaseFoliageColor;
     uniform vec3 uHighlightFoliageColor;
     uniform vec3 uInteriorShadowColor;
+    uniform vec3 uHemiSky;
+    uniform vec3 uHemiGround;
 
     void main() {
-        // Sample procedural leaf card spray with crisp alpha cutout
         vec4 texColor = texture2D(uLeafMap, vUv);
         if (texColor.a < 0.45) discard;
 
-        // 1. Volumetric Light Model
-        float diff = max(dot(vNormalVec, uSunDirection), 0.0);
+        // 1. Directional Sun Lighting with proper shadow falloff
+        float nDotL = dot(vNormalVec, uSunDirection);
+        float directLight = clamp(nDotL, 0.0, 1.0) * 0.65;
+        float wrapLight   = clamp((nDotL + 0.20) / 1.20, 0.0, 1.0) * 0.15;
 
-        // 2. Subsurface Scattering (Leaves glow when looking into the sun)
+        // 2. Canopy Ambient Lighting (Ambient fill tied to scene environment)
+        float hemiFactor = clamp(vNormalVec.y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 ambientFill = mix(uHemiGround, uHemiSky, hemiFactor) * 0.35;
+
+        // 3. Deep Volumetric Canopy Self-Occlusion
+        // Interior/lower leaf cards sink deeply into shadow (down to 15% brightness)
+        float canopyAO = mix(0.15, 1.0, smoothstep(0.10, 0.90, vHeightGradient));
+
+        // 4. Subtle Subsurface Backlight Transmission
+        // Only active on outer/upper leaves facing away from the sun
         vec3 viewDir = normalize(cameraPosition - vWorldPos);
-        float sss = pow(clamp(dot(viewDir, -uSunDirection), 0.0, 1.0), 3.0) * 0.65;
+        float sssCos = clamp(dot(viewDir, -uSunDirection), 0.0, 1.0);
+        float sssIntensity = pow(sssCos, 2.8) * 0.30 * smoothstep(0.40, 1.0, vHeightGradient);
+        vec3 sssColor = vec3(0.32, 0.45, 0.08) * sssIntensity;
 
-        // 3. Multi-tier Chlorophyll Palette
-        vec3 leafColor = mix(uBaseFoliageColor, uHighlightFoliageColor, vHeightGradient * 0.6 + diff * 0.4);
-        leafColor = mix(leafColor, texColor.rgb, 0.45); // Blend with procedural leaf details
+        // 5. Harmonized Leaf Color Composite
+        vec3 leafColor = mix(uBaseFoliageColor, uHighlightFoliageColor, smoothstep(0.20, 0.85, vHeightGradient) * 0.7 + directLight * 0.3);
+        leafColor = mix(leafColor, texColor.rgb, 0.40);
 
-        // 4. Core Ambient Occlusion (dark interior depths)
-        float coreAO = smoothstep(0.05, 0.85, vHeightGradient);
-        vec3 finalColor = mix(uInteriorShadowColor, leafColor, coreAO * 0.7 + 0.3);
+        // Blend interior core darkness with leaf color
+        vec3 finalColor = mix(uInteriorShadowColor, leafColor, canopyAO);
 
-        // Add soft diffuse lighting & glowing SSS transmission
-        finalColor = (finalColor * (diff * 0.6 + 0.4)) + vec3(0.18, 0.45, 0.08) * sss;
+        // Apply lighting without blowing out highlights
+        finalColor = finalColor * (ambientFill + vec3(directLight + wrapLight)) * canopyAO;
+        finalColor += sssColor * canopyAO;
 
         gl_FragColor = vec4(finalColor, 1.0);
     }
@@ -6727,12 +6979,18 @@ function createProceduralBushMaterial() {
             uWindStrength: vegUniforms.uWindStrength,
             uSunDirection: vegUniforms.uSunDirection,
             uLeafMap: { value: bushLeafTexture },
-            uBaseFoliageColor: { value: new THREE.Color(0x235e16) },      // Rich botanical emerald
-            uHighlightFoliageColor: { value: new THREE.Color(0x72c238) }, // Sunlit golden-lime tips
-            uInteriorShadowColor: { value: new THREE.Color(0x061804) }    // Deep core shadow
+
+            // Warmer, darker botanical palette matching the grass & sod bedding
+            uBaseFoliageColor:      { value: new THREE.Color(0x192e0e) }, // Deep warm forest green
+            uHighlightFoliageColor: { value: new THREE.Color(0x3e5e18) }, // Subdued warm golden-olive tips
+            uInteriorShadowColor:   { value: new THREE.Color(0x080c04) }, // Deep canopy cavity shadow
+
+            // Connect ambient sky and ground bounces to global environment
+            uHemiSky:    vegUniforms.uHemiSky,
+            uHemiGround: vegUniforms.uHemiGround
         },
         side: THREE.DoubleSide,
-        toneMapped: false
+        toneMapped: true // CRITICAL: Subject bushes to ACES filmic tonemapping
     });
 }
 
@@ -8649,20 +8907,18 @@ function buildLevel(lvlIndex, isPreview = false, isReset = false, keepPos = fals
 
         // 1. DENSE GRASS BLADES & PROCEDURAL MOUNDED TURF BEDDING
         topSurfaces.forEach(pos => {
-            // Keep spawn and exit clear from grass obstruction
             if (pos.distanceTo(spawnPt) < 2.0 || pos.distanceTo(exitPt) < 2.0) return;
-            // Skip sub-water surfaces
             if (pos.y < waterLevel - 0.2) return;
 
-            // A. Spawn Botanical Multi-Lobe Turf Bedding with Organic Creeping Margins
+            // A. Spawn Concentric Turf Bedding
             grassBedding.addTileBed(pos.x, pos.y, pos.z, vegRng);
 
-            // B. Plant Swaying Grass Blades Anchored into the Turf Core
-            const bladesPerTile = 20 + Math.floor(vegRng() * 10);
-            grassField.addCluster(pos.x, pos.y, pos.z, 0.46, bladesPerTile, vegRng);
+            // B. Plant Grass Clumps Clustered Denser Toward Mound Apex
+            const clumpsPerTile = 32 + Math.floor(vegRng() * 12);
+            grassField.addCluster(pos.x, pos.y, pos.z, 0.50, clumpsPerTile, vegRng);
         });
 
-        grassBedding.commit(); // Push instanced matrices to GPU
+        grassBedding.commit();
         grassField.commit();
 
         // 2. FERN ROSETTES IN SHADED CORNERS & NEAR WATER
@@ -8733,33 +8989,7 @@ function buildLevel(lvlIndex, isPreview = false, isReset = false, keepPos = fals
             }
         });
 
-        // ── SPAWN HANGING CEILING VINES (Clamped to avoid touching the floor) ───
-        ceilingAnchors.forEach(pos => {
-            if (pos.distanceTo(spawnPt) < 3.0 || pos.distanceTo(exitPt) < 3.0) return;
-            if (vegRng() < 0.28) {
-                const vx = Math.round(pos.x);
-                const vy = Math.round(pos.y + 0.5);
-                const vz = Math.round(pos.z);
-
-                // Measure exact distance to whatever surface lies below
-                let openDrop = 0;
-                for (let dy = 1; dy <= 6; dy++) {
-                    if (!currentParams.isSolid(vx, vy - dy, vz)) openDrop++;
-                    else break;
-                }
-
-                if (openDrop >= 3) {
-                    // Ensure a safe 0.8m gap above the floor below
-                    const safeMaxLen = Math.max(0.6, openDrop - 0.8);
-                    const vineProp = buildDecoVineHanging(_makeRng(Math.floor(vegRng() * 10000)), safeMaxLen);
-                    vineProp.position.copy(pos);
-                    vegetationSceneGroup.add(vineProp);
-                    levelMeshes.push(vineProp);
-                }
-            }
-        });
-
-        // Run secondary ruin debris placement
+        // Run context-aware placement (wall climbers, ceiling vines, puddles, rubble)
         autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destroyZones, currentParams, vegRng);
         spawnCustomDecorations();
     }
@@ -9216,70 +9446,38 @@ function safeMergeGeometries(geos) {
 // =============================================================================
 // PROCEDURAL BOTANICAL VINE & IVY SUBSYSTEM (FIXED MATERIAL & LEAF PIPELINE)
 // =============================================================================
-
 function createHighDefVineTextures() {
     const S = 512;
 
-    // 1. Hedera Helix 5-Lobed Leaf Canvas
     const lc = document.createElement('canvas');
     lc.width = lc.height = S;
     const lctx = lc.getContext('2d');
-    lctx.clearRect(0, 0, S, S);
 
-    lctx.save();
-    lctx.translate(256, 256);
+    // Fill entire canvas with rich base foliage gradient so 3D leaf geometry never samples blank pixels
+    const bgGrad = lctx.createRadialGradient(256, 256, 20, 256, 256, 250);
+    bgGrad.addColorStop(0.0, '#4da828');
+    bgGrad.addColorStop(0.6, '#2d701a');
+    bgGrad.addColorStop(1.0, '#1a4e10');
+    lctx.fillStyle = bgGrad;
+    lctx.fillRect(0, 0, S, S);
 
-    // Anatomical 5-lobed ivy leaf contour centered at (256, 256)
+    // Primary and secondary leaf veins
+    lctx.strokeStyle = 'rgba(205, 255, 175, 0.7)';
+    lctx.lineWidth = 6;
+    lctx.lineCap = 'round';
     lctx.beginPath();
-    lctx.moveTo(0, 210); // Basal stem connection
-    lctx.bezierCurveTo(-75, 190, -190, 160, -180, 60);
-    lctx.bezierCurveTo(-230, 20, -220, -80, -110, -110);
-    lctx.bezierCurveTo(-90, -145, -50, -195, 0, -235); // Apex
-    lctx.bezierCurveTo(50, -195, 90, -145, 110, -110);
-    lctx.bezierCurveTo(220, -80, 230, 20, 180, 60);
-    lctx.bezierCurveTo(190, 160, 75, 190, 0, 210);
-    lctx.closePath();
+    lctx.moveTo(256, 480);
+    lctx.lineTo(256, 30);
+    lctx.moveTo(256, 300);
+    lctx.lineTo(60, 140);
+    lctx.moveTo(256, 300);
+    lctx.lineTo(452, 140);
+    lctx.moveTo(256, 390);
+    lctx.lineTo(100, 310);
+    lctx.moveTo(256, 390);
+    lctx.lineTo(412, 310);
+    lctx.stroke();
 
-    // Vibrant chlorophyll gradient
-    const leafGrad = lctx.createRadialGradient(0, -20, 10, 0, -20, 220);
-    leafGrad.addColorStop(0.00, '#529e32');
-    leafGrad.addColorStop(0.50, '#317320');
-    leafGrad.addColorStop(0.85, '#1e4f13');
-    leafGrad.addColorStop(1.00, '#2c6b1b');
-    lctx.fillStyle = leafGrad;
-    lctx.fill();
-
-    // Bold primary veins
-    const drawVein = (toX, toY, width) => {
-        lctx.strokeStyle = 'rgba(215, 255, 185, 0.95)';
-        lctx.lineWidth = width;
-        lctx.lineCap = 'round';
-        lctx.beginPath();
-        lctx.moveTo(0, 205);
-        lctx.quadraticCurveTo(toX * 0.3, toY * 0.5 + 50, toX, toY);
-        lctx.stroke();
-    };
-
-    drawVein(0, -225, 8.0);
-    drawVein(-105, -100, 5.5);
-    drawVein(105, -100, 5.5);
-    drawVein(-165, 50, 4.5);
-    drawVein(165, 50, 4.5);
-
-    lctx.strokeStyle = 'rgba(205, 250, 180, 0.5)';
-    lctx.lineWidth = 2.6;
-    for (let i = 0; i < 9; i++) {
-        const yP = 150 - i * 40;
-        lctx.beginPath();
-        lctx.moveTo(0, yP);
-        lctx.lineTo(-50 - (i % 2) * 20, yP - 25);
-        lctx.moveTo(0, yP);
-        lctx.lineTo(50 + (i % 2) * 20, yP - 25);
-        lctx.stroke();
-    }
-    lctx.restore();
-
-    // 2. Star blossom
     const fc = document.createElement('canvas');
     fc.width = fc.height = 256;
     const fctx = fc.getContext('2d');
@@ -9290,22 +9488,14 @@ function createHighDefVineTextures() {
     for (let i = 0; i < 5; i++) {
         fctx.save();
         fctx.rotate((i / 5) * Math.PI * 2);
-        const pGrad = fctx.createRadialGradient(0, -55, 2, 0, -55, 45);
-        pGrad.addColorStop(0.0, '#ffffff');
-        pGrad.addColorStop(0.65, '#e4eae2');
-        pGrad.addColorStop(1.0, '#bcc6b8');
-        fctx.fillStyle = pGrad;
+        fctx.fillStyle = '#f8fafc';
         fctx.beginPath();
         fctx.ellipse(0, -50, 15, 38, 0, 0, Math.PI * 2);
         fctx.fill();
         fctx.restore();
     }
 
-    const cGrad = fctx.createRadialGradient(0, 0, 1, 0, 0, 16);
-    cGrad.addColorStop(0.0, '#fef08a');
-    cGrad.addColorStop(0.6, '#d97706');
-    cGrad.addColorStop(1.0, 'rgba(180, 83, 9, 0)');
-    fctx.fillStyle = cGrad;
+    fctx.fillStyle = '#f59e0b';
     fctx.beginPath();
     fctx.arc(0, 0, 16, 0, Math.PI * 2);
     fctx.fill();
@@ -9366,17 +9556,13 @@ function _createFoldedIvyLeafGeometry(width, height) {
     return geom;
 }
 
-// --- STANDARD HIGH-PERFORMANCE THREE.JS NATIVE MATERIALS ---
-// Using MeshStandardMaterial guarantees 100% compatibility with InstancedMesh, shadow maps, and deferred buffers
+// Materials: Modeled 3D leaves use vertex colors directly without alphaTest clipping
 const vineLeafStandardMaterial = new THREE.MeshStandardMaterial({
     map: vineLeafTex,
-    alphaTest: 0.25,
-    transparent: false,
-    roughness: 0.35,
-    metalness: 0.02,
+    roughness: 0.40,
+    metalness: 0.05,
     vertexColors: true,
-    side: THREE.DoubleSide,
-    shadowSide: THREE.DoubleSide
+    side: THREE.DoubleSide
 });
 
 const vineWoodMat = new THREE.MeshStandardMaterial({
@@ -10191,22 +10377,21 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
         return false;
     };
 
-// ── 2. WALL VINES, CEILING CORNICE FRAMING & ACCENT DECALS ───────────────
+// ── 2. WALL VINES: CLIMB UPWARDS FROM LOWER WALLS & PILLARS ───────────────
     const placedWall = [];
     let spawnedWallVineCount = 0;
-    const MAX_WALL_VINES_PER_LEVEL = 5;
+    const MAX_WALL_VINES_PER_LEVEL = 6;
 
-    // Sort wall anchors so higher wall blocks (closer to ceiling) are evaluated first!
-    const sortedWallAnchors = [...wallAnchors].sort((a, b) => (b.rawY || b.pos.y) - (a.rawY || a.pos.y));
+    // Prioritize lower anchors (wy <= 3) so vines climb UP from floor level
+    const sortedWallAnchors = [...wallAnchors].sort((a, b) => (a.rawY || a.pos.y) - (b.rawY || b.pos.y));
 
     sortedWallAnchors.forEach(anchor => {
         const pos = anchor.pos;
 
-        // Keep player spawn, goal, and puzzle elements clear
-        if (pos.distanceTo(spawn) < 4.0 || pos.distanceTo(exit) < 4.0) return;
-        if (isNearGameplayObject(pos, 3.0)) return;
+        if (pos.distanceTo(spawn) < 3.5 || pos.distanceTo(exit) < 3.5) return;
+        if (isNearGameplayObject(pos, 2.5)) return;
         if (isInPrimarySightline(pos)) return;
-        if (tooClose(placedWall, pos, 4.5)) return;
+        if (tooClose(placedWall, pos, 3.8)) return;
         if (pos.y < waterLevel - 0.2) return;
 
         const n = anchor.normal;
@@ -10220,45 +10405,30 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
         if (!params.isSolid(wx, wy, wz)) return;
         if (params.isSolid(wx + nx, wy, wz + nz)) return;
 
-        // Find how close this block is to the ceiling above
-        let distToCeiling = 0;
-        for (let dy = 1; dy <= 8; dy++) {
-            if (params.isSolid(wx, wy + dy, wz) || params.isSolid(wx + nx, wy + dy, wz + nz)) {
-                distToCeiling = dy;
-                break;
-            }
+        // Verify there is a solid wall behind and open room space in front for 3+ vertical blocks
+        let clearUpwardHeight = 0;
+        for (let dy = 0; dy <= 4; dy++) {
+            const hasWallBehind = params.isSolid(wx, wy + dy, wz);
+            const hasRoomAirInFront = !params.isSolid(wx + nx, wy + dy, wz + nz);
+            if (hasWallBehind && hasRoomAirInFront) clearUpwardHeight++;
+            else break;
         }
 
-        // Measure downward vertical wall drop
-        let wallDown = 0;
-        for (let dy = 1; dy <= 6; dy++) {
-            if (params.isSolid(wx, wy - dy, wz) && !params.isSolid(wx + nx, wy - dy, wz + nz)) {
-                wallDown++;
-            } else break;
-        }
-
-        const tx = -nz;
-        const tz = nx;
-        const isCorner = params.isSolid(wx - tx, wy, wz - tz) || params.isSolid(wx + tx, wy, wz + tz);
-
-        // Stand-off past stone bevel: 0.56m off center
-        const wallSurfacePos = pos.clone().addScaledVector(n, 0.56);
-
-        // ── A. HIGH-WALL CORNICE CLIMBERS (NEAR CEILING) ─────────────────────
-        // Target blocks that are 1 to 4 blocks below the ceiling, or high in the room (Y >= 6)
-        const isNearCeiling = (distToCeiling > 0 && distToCeiling <= 4) || (wy >= 6);
-
-        if (spawnedWallVineCount < MAX_WALL_VINES_PER_LEVEL && isNearCeiling && (isCorner || distToCeiling <= 2) && rngFn() < 0.45) {
-            const finalScale = 1.0 + rngFn() * 0.25;
+        // Only spawn where the vine has room to climb in plain sight
+        if (spawnedWallVineCount < MAX_WALL_VINES_PER_LEVEL && clearUpwardHeight >= 3 && wy <= 4 && rngFn() < 0.65) {
+            const finalScale = 0.85 + (clearUpwardHeight / 5.0) * 0.35;
             const isFlowering = rngFn() < 0.35;
             const vineType = isFlowering ? 'decor_vine_wall_flowering' : 'decor_vine_wall';
 
-            // Anchor slightly higher up so the foliage crowns under the ceiling seam
+            // Anchor at the base of the wall block so it climbs up from the floor/ledge
+            const wallBasePos = pos.clone().addScaledVector(n, 0.52);
+            wallBasePos.y -= 0.50; // Align root flush with floor/ledge level
+
             autoDecorations.push({
                 type: vineType,
-                x: wallSurfacePos.x,
-                y: wallSurfacePos.y + 0.40,
-                z: wallSurfacePos.z,
+                x: wallBasePos.x,
+                y: wallBasePos.y,
+                z: wallBasePos.z,
                 normal: { x: n.x, y: n.y, z: n.z },
                 scale: finalScale
             });
@@ -10267,15 +10437,16 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
             return;
         }
 
-        // ── B. WALL VERTICAL MOSS ACCENTS (SUBDUED SCALE) ────────────────────
+        // ── B. WALL VERTICAL MOSS ACCENTS ─────────────────────────────────────
         const isNearMoisture = hasWater && Math.abs(pos.y - waterLevel) < 3.5;
-        const wallMossChance = isNearMoisture ? 0.35 : (isCorner ? 0.20 : 0.08);
+        const wallMossChance = isNearMoisture ? 0.35 : 0.12;
         if (typeof placeDecal === 'function' && rngFn() < wallMossChance) {
             const isSeep = rngFn() > 0.45;
             const dType = isSeep ? 'wall_moss' : 'moss';
             const dVariant = Math.floor(rngFn() * 3);
             const dScale = 1.3 + rngFn() * 0.5;
-            placeDecal(dType, dVariant, wallSurfacePos, n, dScale, 0, true);
+            const decalSurfacePos = pos.clone().addScaledVector(n, 0.52);
+            placeDecal(dType, dVariant, decalSurfacePos, n, dScale, 0, true);
             placedWall.push(pos);
             return;
         }
@@ -10300,12 +10471,11 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
     const placedFloor = [];
 
     topSurfaces.forEach(pos => {
-        // Broad protection around player navigation, puzzle interaction, and goal lines
         if (pos.distanceTo(spawn) < 3.5 || pos.distanceTo(exit) < 3.5) return;
         if (isNearGameplayObject(pos, 2.4)) return;
         if (isInPrimarySightline(pos)) return;
         if (pos.y < waterLevel - 0.2) return;
-        if (tooClose(placedFloor, pos, 2.6)) return; // Generous 2.6m spacing prevents clutter
+        if (tooClose(placedFloor, pos, 2.6)) return;
 
         const fx = Math.round(pos.x);
         const fy = Math.round(pos.y);
@@ -10314,8 +10484,6 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
         if (!params.isSolid(fx, fy - 1, fz)) return;
         if (params.isSolid(fx, fy, fz)) return;
 
-        // Check if this surface tile is a high platform or narrow jumping ledge
-        // If narrow (exposed on 2+ sides), KEEP IT CLEAN of obstacles
         let openSides = 0;
         if (!params.isSolid(fx + 1, fy - 1, fz)) openSides++;
         if (!params.isSolid(fx - 1, fy - 1, fz)) openSides++;
@@ -10323,16 +10491,13 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
         if (!params.isSolid(fx, fy - 1, fz - 1)) openSides++;
         const isNarrowLedge = (openSides >= 2) || (pos.y >= 3.0);
 
-        // Check perimeter junction: adjacent to a wall block
         const isAgainstWall = params.isSolid(fx + 1, fy, fz) || params.isSolid(fx - 1, fy, fz) ||
                               params.isSolid(fx, fy, fz + 1) || params.isSolid(fx, fy, fz - 1);
 
         const t = zoneFalloff(pos);
         const isDamp = hasWater && Math.abs(pos.y - waterLevel) < 3.0;
 
-        // ── A. ACCENT PUDDLES & DAMP FLOOR MOSS (NON-OBSTRUCTIVE) ─────────────
         if (typeof placeDecal === 'function') {
-            // Keep jumping ledges clean; only puddle lower basins
             if (!isNarrowLedge) {
                 const puddleChance = isDamp ? 0.60 : (t <= 0.8 ? 0.25 : 0.12);
                 if (rngFn() < puddleChance) {
@@ -10347,7 +10512,6 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
                 }
             }
 
-            // Floor moss frames edges and wall junctions
             if (isAgainstWall || isDamp) {
                 const floorMossChance = isDamp ? 0.55 : 0.32;
                 if (rngFn() < floorMossChance) {
@@ -10363,11 +10527,8 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
             }
         }
 
-        // ── B. PHYSICAL 3D BOULDERS & PILLARS (NEVER ON JUMPING PLATFORMS) ────
-        // Never spawn blocking 3D props on jumping ledges or middle-of-room floors
         if (isNarrowLedge || !isAgainstWall) return;
 
-        // Only place 3D rocks if inside a destruction zone or deep against a back corner
         const rubbleChance = (t <= 0) ? 0.50 : (t < 1.0 ? 0.25 : 0.08);
         if (rngFn() >= rubbleChance) return;
 
@@ -10394,36 +10555,30 @@ function autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destr
         placedFloor.push(pos);
     });
 
-    // ── 4. CEILING HANGING VINES (HIGH-CLEARANCE ANCHORING ONLY) ──────────────
+    // ── 4. CEILING HANGING VINES (RELAXED CLEARANCE: >= 2 BLOCKS) ─────────────
     if (ceilingAnchors && ceilingAnchors.length > 0) {
         const placedCeiling = [];
 
         ceilingAnchors.forEach(pos => {
-            // Keep central room volumes and puzzles clear of overhead visual obstruction
-            if (pos.distanceTo(spawn) < 4.0 || pos.distanceTo(exit) < 4.0) return;
-            if (isNearGameplayObject(pos, 2.5)) return;
+            if (pos.distanceTo(spawn) < 3.5 || pos.distanceTo(exit) < 3.5) return;
+            if (isNearGameplayObject(pos, 2.0)) return;
             if (isInPrimarySightline(pos)) return;
-            if (tooClose(placedCeiling, pos, 3.2)) return; // Generous 3.2m spacing
+            if (tooClose(placedCeiling, pos, 2.5)) return;
 
             const vx = Math.round(pos.x);
             const vy = Math.round(pos.y + 0.5);
             const vz = Math.round(pos.z);
 
-            // Check if hanging vine is anchored near a wall/ceiling seam (more natural look)
-            const isNearWallCeiling = params.isSolid(vx + 1, vy, vz) || params.isSolid(vx - 1, vy, vz) ||
-                                      params.isSolid(vx, vy, vz + 1) || params.isSolid(vx, vy, vz - 1);
-
-            // Measure vertical drop
+            // Measure vertical open drop beneath the anchor
             let openDrop = 0;
             for (let dy = 1; dy <= 8; dy++) {
                 if (!params.isSolid(vx, vy - dy, vz)) openDrop++;
                 else break;
             }
 
-            // Only drape ceiling vines if there is at least 4m of clearance
-            if (openDrop >= 4 && isNearWallCeiling && rngFn() < 0.35) {
-                // Ensure a safe 1.4m clearance above whatever platform is below
-                const safeMaxLen = Math.max(0.8, openDrop - 1.4);
+            // Lowered from >= 4 to >= 2 so vines spawn under normal ceiling heights (6–9m)
+            if (openDrop >= 2 && rngFn() < 0.40) {
+                const safeMaxLen = Math.max(0.7, Math.min(2.8, openDrop - 0.6));
                 const vineProp = buildDecoVineHanging(_makeRng(Math.floor(rngFn() * 10000)), safeMaxLen);
                 vineProp.position.copy(pos);
                 vegetationSceneGroup.add(vineProp);
