@@ -8990,7 +8990,7 @@ function buildLevel(lvlIndex, isPreview = false, isReset = false, keepPos = fals
         });
 
         // Run context-aware placement (wall climbers, ceiling vines, puddles, rubble)
-        autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destroyZones, currentParams, vegRng);
+        // autoPopulateDecorations(topSurfaces, wallAnchors, ceilingAnchors, destroyZones, currentParams, vegRng);
         spawnCustomDecorations();
     }
 
