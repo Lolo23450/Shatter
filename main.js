@@ -165,7 +165,9 @@ const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
 });
 const cubeCamera = new THREE.CubeCamera(0.1, 200, cubeRenderTarget);
 
-const controls = new PointerLockControls(camera, document.body);
+// Lock the pointer to the renderer's canvas. The canvas is the actual game
+// surface and remains connected to the same document as the controls.
+const controls = new PointerLockControls(camera, renderer.domElement);
 controls.addEventListener('lock', () => {
     isPaused = false;
     const blocker = document.getElementById('blocker');
@@ -182,6 +184,7 @@ controls.addEventListener('unlock', () => {
 
 function requestPointerLockSafe() {
     if (document.pointerLockElement === controls.domElement) return;
+    if (!controls.domElement.isConnected || controls.domElement.ownerDocument !== document) return;
     let armed = false;
     const armClickRetry = () => {
         if (armed) return;
@@ -11209,7 +11212,7 @@ function getAvailableSpace(block) {
 
 document.addEventListener('pointerdown', e => {
     isMouseDown = true;
-    if (isPaused || isCutscene || document.pointerLockElement !== document.body) return;
+    if (isPaused || isCutscene || document.pointerLockElement !== controls.domElement) return;
     if (e.target !== document.body && e.target.tagName !== 'CANVAS') return;
 
     raycaster.setFromCamera(screenCenter, camera);
@@ -11422,7 +11425,7 @@ let _lastEditorPlaceTime = 0;
 
 document.addEventListener('pointermove', e => {
     if (!isEditorMode || isPlayingCustom || !isMouseDown || editorTool !== 'wall') return;
-    if (isPaused || document.pointerLockElement !== document.body) return;
+    if (isPaused || document.pointerLockElement !== controls.domElement) return;
 
     const _now = performance.now();
     if (_now - _lastEditorPlaceTime < EDITOR_PLACE_INTERVAL_MS) return;
