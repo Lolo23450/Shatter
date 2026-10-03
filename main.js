@@ -185,6 +185,12 @@ controls.addEventListener('unlock', () => {
 function requestPointerLockSafe() {
     if (document.pointerLockElement === controls.domElement) return;
     if (!controls.domElement.isConnected || controls.domElement.ownerDocument !== document) return;
+    const continueWithoutPointerLock = () => {
+        // Keep keyboard play available when a browser rejects an automated lock request.
+        isPaused = false;
+        const blocker = document.getElementById('blocker');
+        if (blocker) blocker.style.display = 'none';
+    };
     let armed = false;
     const armClickRetry = () => {
         if (armed) return;
@@ -203,14 +209,26 @@ function requestPointerLockSafe() {
         try {
             const maybePromise = controls.lock();
             if (maybePromise && typeof maybePromise.catch === 'function') {
-                maybePromise.catch(() => armClickRetry());
+                maybePromise.catch(() => {
+                    continueWithoutPointerLock();
+                    armClickRetry();
+                });
             }
         } catch (err) {
+            continueWithoutPointerLock();
             armClickRetry();
         }
     };
     tryLock();
 }
+
+// If pointer lock is unavailable, keep mouse-look available while the cursor
+// is over the game canvas. This also lets browser automation aim and click.
+document.addEventListener('pointermove', e => {
+    if (isPaused || isCutscene || controls.isLocked || e.target !== controls.domElement) return;
+    camera.rotation.y -= e.movementX * 0.002;
+    camera.rotation.x = THREE.MathUtils.clamp(camera.rotation.x - e.movementY * 0.002, -Math.PI / 2, Math.PI / 2);
+});
 
 const btnPlay = document.getElementById('btn-play');
 if (btnPlay) {
@@ -11055,6 +11073,11 @@ const raycaster = new THREE.Raycaster();
 const screenCenter = new THREE.Vector2(0, 0);
 const rayResult = new CANNON.RaycastResult();
 
+window.addEventListener('blur', () => {
+    keys.w = keys.a = keys.s = keys.d = keys.space = keys.shift = false;
+    if (controls.isLocked) controls.unlock();
+});
+
 document.addEventListener('keydown', e => {
     if (e.code === 'KeyW' || e.code === 'KeyZ' || e.code === 'ArrowUp') keys.w = true;
     if (e.code === 'KeyA' || e.code === 'KeyQ' || e.code === 'ArrowLeft') keys.a = true;
@@ -11212,10 +11235,16 @@ function getAvailableSpace(block) {
 
 document.addEventListener('pointerdown', e => {
     isMouseDown = true;
-    if (isPaused || isCutscene || document.pointerLockElement !== controls.domElement) return;
+    if (isPaused || isCutscene) return;
     if (e.target !== document.body && e.target.tagName !== 'CANVAS') return;
 
-    raycaster.setFromCamera(screenCenter, camera);
+    const pointerNdc = screenCenter.clone();
+    if (!controls.isLocked) {
+        const rect = controls.domElement.getBoundingClientRect();
+        pointerNdc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointerNdc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    }
+    raycaster.setFromCamera(pointerNdc, camera);
 
     if (isEditorMode && !isPlayingCustom) {
         const hits = raycaster.intersectObjects(editorSceneGroup.children, false);
@@ -11919,7 +11948,7 @@ function animate() {
         }
 
         // 9. Player Locomotion, Swimming & Jump Handling
-        if (controls.isLocked && !isTransitioning) {
+        if (!isPaused && !isTransitioning) {
             if (_frameCount % 5 === 0) {
                 raycaster.setFromCamera(screenCenter, activeCamera);
                 let audioHits = raycaster.intersectObjects(interactiveTargets);
